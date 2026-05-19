@@ -1,0 +1,31 @@
+/* Shot properties panel */
+.inspector {
+  padding: 10px 12px;
+  background: var(--color-panel);
+}
+
+.inspector h3 {
+  margin: 0 0 8px;
+  font-size: var(--font-size-sm);
+}
+
+.inspector-label {
+  font-weight: 600;
+  margin: 0 0 10px;
+  font-size: var(--font-size-sm);
+}
+
+.inspector-hint {
+  color: var(--color-text-dim);
+  font-size: var(--font-size-sm);
+  margin: 8px;
+}
+
+.inspector .field {
+  margin-bottom: 8px;
+}
+
+.inspector button {
+  margin-top: 4px;
+  margin-right: 6px;
+}

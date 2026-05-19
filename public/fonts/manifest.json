@@ -1,0 +1,67 @@
+{
+  "fonts": [
+    {
+      "family": "Consolas",
+      "label": "Consolas",
+      "regular": "Consolas.ttf",
+      "bold": "Consolas-Bold.ttf",
+      "category": "monospace"
+    },
+    {
+      "family": "Courier New",
+      "label": "Courier New",
+      "regular": "CourierNew.ttf",
+      "bold": "CourierNew-Bold.ttf",
+      "category": "monospace"
+    },
+    {
+      "family": "Calibri",
+      "label": "Calibri",
+      "regular": "Calibri.ttf",
+      "bold": "Calibri-Bold.ttf",
+      "category": "sans-serif"
+    },
+    {
+      "family": "Arial",
+      "label": "Arial",
+      "regular": "Arial.ttf",
+      "bold": "Arial-Bold.ttf",
+      "category": "sans-serif"
+    },
+    {
+      "family": "Georgia",
+      "label": "Georgia",
+      "regular": "Georgia.ttf",
+      "bold": "Georgia-Bold.ttf",
+      "category": "serif"
+    },
+    {
+      "family": "Times New Roman",
+      "label": "Times New Roman",
+      "regular": "TimesNewRoman.ttf",
+      "bold": "TimesNewRoman-Bold.ttf",
+      "category": "serif"
+    },
+    {
+      "family": "Verdana",
+      "label": "Verdana",
+      "regular": "Verdana.ttf",
+      "bold": "Verdana-Bold.ttf",
+      "category": "sans-serif"
+    },
+    {
+      "family": "Segoe UI",
+      "label": "Segoe UI",
+      "regular": "SegoeUI.ttf",
+      "bold": "SegoeUI-Bold.ttf",
+      "category": "sans-serif"
+    },
+    {
+      "family": "Roboto",
+      "label": "Roboto",
+      "regular": "Roboto.ttf",
+      "bold": "Roboto-Bold.ttf",
+      "category": "sans-serif"
+    }
+  ]
+}

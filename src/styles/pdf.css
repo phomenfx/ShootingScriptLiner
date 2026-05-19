@@ -1,0 +1,164 @@
+/* Script PDF pane */
+.script-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.script-pane-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.script-pane-bar button {
+  cursor: pointer;
+  background: var(--color-btn);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+}
+
+.script-filename {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pdf-viewer {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+.pdf-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.pdf-controls button {
+  cursor: pointer;
+  background: var(--color-btn);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+}
+
+.pdf-canvas-wrap {
+  overflow: auto;
+  background: var(--color-bg);
+}
+
+.pdf-canvas-wrap canvas {
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.pdf-page-stack {
+  position: relative;
+  margin: 0 auto;
+}
+
+.pdf-page-stack canvas {
+  display: block;
+}
+
+.annotation-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  touch-action: none;
+}
+
+.annotation-layer.tool-draw {
+  cursor: crosshair;
+}
+
+.annotation-layer.tool-text {
+  cursor: text;
+}
+
+.annotation-layer.tool-select {
+  cursor: default;
+}
+
+.annotation-layer .line-handle {
+  fill: #4a9eff;
+  stroke: #fff;
+  stroke-width: 1.5;
+  cursor: grab;
+}
+
+.annotation-layer .line-handle-center {
+  fill: #6bb3ff;
+}
+
+.annotation-layer .line-selected line {
+  filter: drop-shadow(0 0 2px rgba(74, 158, 255, 0.8));
+}
+
+.annotation-layer .text-selected text {
+  filter: drop-shadow(0 0 2px rgba(74, 158, 255, 0.8));
+}
+
+.script-toolbar {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.script-toolbar button {
+  cursor: pointer;
+  padding: 4px 12px;
+  background: var(--color-btn);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+}
+
+.script-toolbar button.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.pdf-cache-hint {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--color-dialog);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pdf-error {
+  color: var(--color-error);
+  padding: 8px;
+}
+
+.pdf-placeholder-inner {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-dim);
+}
+
+.pdf-hint {
+  color: #999;
+  font-size: 13px;
+  padding: 8px 12px;
+}
+
+.pdf-hint code {
+  background: var(--color-dialog);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}

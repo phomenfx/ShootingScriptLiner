@@ -1,0 +1,146 @@
+/* Modals and confirm dialogs */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.dialog {
+  background: var(--color-dialog);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-dialog);
+  padding: 20px;
+  min-width: 280px;
+  max-width: 90vw;
+}
+
+.settings-dialog {
+  min-width: 320px;
+}
+
+.settings-dialog-wide {
+  min-width: 360px;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.settings-section {
+  margin: 16px 0 8px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.settings-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.settings-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.settings-inline-actions button {
+  font-size: 13px;
+}
+
+.settings-hint code {
+  background: var(--color-btn);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.dialog-actions button {
+  cursor: pointer;
+  background: var(--color-btn);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+}
+
+.dialog-actions button:hover {
+  background: var(--color-btn-hover);
+}
+
+.tool-keybind-settings {
+  margin-top: 4px;
+}
+
+.keybind-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.keybind-label {
+  flex: 1;
+  font-size: var(--font-size-sm);
+}
+
+.keybind-key {
+  min-width: 1.5em;
+  text-align: center;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-btn);
+  border: 1px solid var(--color-border-input);
+}
+
+.keybind-row button {
+  cursor: pointer;
+  background: var(--color-btn);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.keybind-row button:hover,
+.keybind-row button.active {
+  background: var(--color-btn-hover);
+}
+
+.keybind-error {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #e57373;
+}
+
+.keybind-reset {
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.keybind-reset:hover {
+  color: var(--color-text);
+}

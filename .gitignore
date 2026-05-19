@@ -1,0 +1,12 @@
+node_modules
+dist
+*.local
+.DS_Store
+tsconfig.tsbuildinfo
+
+# Portable package output (regenerate with npm run build:portable)
+portable/dist
+portable/server/win/miniserve.exe
+portable/server/mac-arm64/miniserve
+portable/server/mac-x64/miniserve
+portable/server/linux-x64/miniserve

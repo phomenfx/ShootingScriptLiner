@@ -1,0 +1,193 @@
+/* Scene / shot list panel */
+.outliner {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+.outliner-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.outliner-toolbar button {
+  cursor: pointer;
+  background: var(--color-btn);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+}
+
+.outliner-toolbar button:hover:not(:disabled) {
+  background: var(--color-btn-hover);
+}
+
+.outliner-empty {
+  color: var(--color-text-dim);
+  font-size: var(--font-size-sm);
+  margin: 8px;
+}
+
+/* Scene blocks */
+.scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scene-block {
+  background: var(--color-block);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-strong);
+}
+
+.scene-block.selected {
+  border-color: var(--color-accent);
+}
+
+.scene-block.drop-over {
+  outline: 2px dashed var(--color-accent);
+}
+
+.scene-block.is-dragging {
+  opacity: 0.35;
+  transition: opacity 150ms ease;
+}
+
+.scene-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: var(--color-header);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  cursor: pointer;
+}
+
+.scene-number {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.scene-slugline {
+  flex: 1;
+  min-width: 0;
+  background: var(--color-row);
+  border: 1px solid var(--color-border-input);
+  color: var(--color-text);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.shot-list {
+  padding: 4px 8px 8px;
+  min-height: 32px;
+}
+
+.empty-scene-hint {
+  color: var(--color-text-dim);
+  font-size: var(--font-size-sm);
+  margin: 8px;
+}
+
+/* Shot rows */
+.shot-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin: 2px 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: var(--color-row);
+  transition: opacity 150ms ease;
+}
+
+.shot-row.selected {
+  background: var(--color-row-selected);
+}
+
+.shot-row.is-dragging {
+  opacity: 0.35;
+}
+
+.shot-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shot-label-draggable {
+  cursor: grab;
+}
+
+.shot-label-draggable:active {
+  cursor: grabbing;
+}
+
+/* Drag handle */
+.drag-handle {
+  cursor: grab;
+  color: var(--color-text-muted);
+  user-select: none;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  margin: -4px 0;
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  min-width: 36px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+}
+
+.drag-handle:hover {
+  background: var(--color-overlay);
+  color: var(--color-text);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+  background: #555;
+}
+
+/* Visibility eye */
+.eye-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: var(--font-size);
+}
+
+.eye-off {
+  opacity: 0.4;
+}
+
+/* Floating preview while dragging */
+.drag-overlay-preview {
+  padding: 10px 14px;
+  background: var(--color-block);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  cursor: grabbing;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drag-overlay-preview--scene {
+  font-weight: 600;
+}
+
+.drag-overlay-preview--shot {
+  font-weight: 500;
+}

@@ -1,0 +1,41 @@
+/* Color palette and shared tokens */
+:root {
+  --color-bg: #1a1a1a;
+  --color-surface: #2a2a2a;
+  --color-surface-raised: #2d2d2d;
+  --color-surface-muted: #252525;
+  --color-panel: #282828;
+  --color-block: #383838;
+  --color-header: #323232;
+  --color-row: #2a2a2a;
+  --color-row-selected: #445;
+
+  --color-border: #444;
+  --color-border-strong: #4a4a4a;
+  --color-border-input: #555;
+  --color-accent: #7ab;
+
+  --color-text: #e8e8e8;
+  --color-text-muted: #aaa;
+  --color-text-dim: #888;
+  --color-text-hint: #bbb;
+  --color-error: #f88;
+
+  --color-btn: #3a3a3a;
+  --color-btn-hover: #4a4a4a;
+  --color-btn-danger: #522;
+  --color-btn-danger-border: #833;
+  --color-overlay: #444;
+  --color-dialog: #333;
+
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-dialog: 8px;
+
+  --font-size: 14px;
+  --font-size-sm: 12px;
+  --font-size-lg: 22px;
+
+  --drag-transition: transform 200ms ease;
+}
