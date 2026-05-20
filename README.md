@@ -1,6 +1,8 @@
 # Shooting Script Liner
 
 Local web app for building a scene/shot outliner and lining shooting scripts on PDF.
+Runs in the browser and should run offline after initial setup. Tested with Firefox and Google Chrome. Projects are saved as .ZIP files containing a .JSON project file and the original script PDF.
+Built with TypeScript, React, PDF.js, and pdf-lib.
 
 ## Features
 
@@ -59,7 +61,32 @@ npm run build:portable
 
 That fills [`portable/dist/`](portable/dist/) (the built app + fonts) and downloads small server binaries under `portable/server/`. Root launchers use those files. If `portable/dist` is missing but Node.js is installed, the start script tries to build automatically.
 
+## Built with
+### App & UI
+TypeScript, 
+React, 
+Vite, 
+Zustand, 
+@dnd-kit, 
+
+### PDF
+PDF.js (displays the script PDF in the browser),
+pdf-lib (builds the Export lined PDF)
+
+### Project Files
+JSZip (Save / Open ZIP files)
+
+### Offline / portable package
+Node.js, miniserve
+
+### Development
+Visual Studio Code,
+Vitest
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## AI Disclosure
+
+AI was used in the development of this project to assist with  refactoring, debugging, and documentation.  I'm a filmmaker, not a programmer; I created this tool because this kept becoming a slow portion of my preproduction workflow and, as far as I could find, no other tool filled this niche.  If that affects whether you trust or use the tool, I completely understand.  As a creative, I am not a fan of AI either, but it made this project possible to be made.  All creative decisions (features, UX, shot/outliner behavior, and base functionality) are mine.
