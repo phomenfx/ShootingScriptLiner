@@ -9,9 +9,9 @@ set SERVE=portable\server\win\miniserve.exe
 call :EnsurePortable || exit /b 1
 
 echo.
-echo Shooting Script Liner - http://127.0.0.1:%PORT%
+echo Shooting Script Liner - http://127.0.0.1:%PORT%/index.html
 echo Close this window to stop the server.
-start "" "http://127.0.0.1:%PORT%"
+start "" "http://127.0.0.1:%PORT%/index.html"
 "%SERVE%" "%APP%" -p %PORT% --interfaces 127.0.0.1
 exit /b 0
 

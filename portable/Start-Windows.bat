@@ -7,20 +7,19 @@ set SERVE=server\win\miniserve.exe
 
 if not exist "%SERVE%" (
   echo Missing %SERVE%
-  echo Run from project root: npm run build:portable
+  echo This portable package is incomplete. Re-download the release or rebuild with: npm run build:portable
   pause
   exit /b 1
 )
 
 if not exist "dist\index.html" (
   echo Missing dist\index.html
-  echo Run from project root: npm run build:portable
-  echo Or double-click Start-Windows.bat in the parent folder.
+  echo This portable package is incomplete. Re-download the release or rebuild with: npm run build:portable
   pause
   exit /b 1
 )
 
-echo Shooting Script Liner - http://127.0.0.1:%PORT%
+echo Shooting Script Liner - http://127.0.0.1:8080/index.html
 echo Close this window to stop the server.
-start "" "http://127.0.0.1:%PORT%"
+start "" "http://127.0.0.1:8080/index.html"
 "%SERVE%" dist -p %PORT% --interfaces 127.0.0.1

@@ -45,7 +45,7 @@ ensure_portable
 chmod +x "$SERVE" 2>/dev/null || true
 
 echo ""
-echo "Shooting Script Liner - http://127.0.0.1:$PORT"
+echo "Shooting Script Liner - http://127.0.0.1:$PORT/index.html"
 echo "Close this window to stop the server."
-open "http://127.0.0.1:$PORT" 2>/dev/null || true
+open "http://127.0.0.1:$PORT/index.html" 2>/dev/null || true
 exec "./$SERVE" "$APP" -p "$PORT" --interfaces 127.0.0.1

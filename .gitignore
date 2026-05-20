@@ -10,3 +10,7 @@ portable/server/win/miniserve.exe
 portable/server/mac-arm64/miniserve
 portable/server/mac-x64/miniserve
 portable/server/linux-x64/miniserve
+portable/Start-Windows.bat
+portable/Start-macOS.command
+portable/start-linux.sh
+portable/README.md

@@ -48,7 +48,7 @@ npm test
 
 ## Portable / offline (USB)
 
-Double-click **`Start-Windows.bat`** (or `Start-macOS.command` / `start-linux.sh`) in the **project root**. The script opens the app in your browser at http://127.0.0.1:8080.
+Double-click **`Start-Windows.bat`** (or `Start-macOS.command` / `start-linux.sh`) in the **project root**. The script opens the app in your browser at http://127.0.0.1:8080/index.html.
 
 **First-time setup:**
 
@@ -57,7 +57,9 @@ npm install
 npm run build:portable
 ```
 
-That fills [`portable/dist/`](portable/dist/) (the built app + fonts) and downloads small server binaries under `portable/server/`. Root launchers use those files. If `portable/dist` is missing but Node.js is installed, the start script tries to build automatically.
+That fills [`portable/dist/`](portable/dist/) (the built app + fonts), downloads small server binaries under `portable/server/`, and **generates** `portable/Start-*.bat`, `Start-macOS.command`, `start-linux.sh`, and `portable/README.md` (browser opens http://127.0.0.1:8080/index.html). Root launchers use those files. If `portable/dist` is missing but Node.js is installed, the start script tries to build automatically.
+
+Zip the entire `portable/` folder for release downloads — do not commit generated portable output to git.
 
 
 ## License

@@ -40,7 +40,7 @@ ensure_portable
 chmod +x "$SERVE" 2>/dev/null || true
 
 echo ""
-echo "Shooting Script Liner - http://127.0.0.1:$PORT"
+echo "Shooting Script Liner - http://127.0.0.1:$PORT/index.html"
 echo "Press Ctrl+C to stop the server."
-xdg-open "http://127.0.0.1:$PORT" 2>/dev/null || sensible-browser "http://127.0.0.1:$PORT" 2>/dev/null || true
+xdg-open "http://127.0.0.1:$PORT/index.html" 2>/dev/null || sensible-browser "http://127.0.0.1:$PORT/index.html" 2>/dev/null || true
 exec "./$SERVE" "$APP" -p "$PORT" --interfaces 127.0.0.1

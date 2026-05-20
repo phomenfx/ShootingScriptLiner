@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
+import { generatePortableFiles, PORTABLE_APP_URL } from "./generate-portable-files.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -91,7 +92,14 @@ async function main() {
     }
   }
 
+  console.log("Generating portable start scripts and README...");
+  const written = await generatePortableFiles(portableRoot);
+  for (const p of written) {
+    console.log(`  -> ${p}`);
+  }
+
   console.log("\nPortable package ready in portable/");
+  console.log(`  App URL: ${PORTABLE_APP_URL}`);
   console.log("  Windows: portable\\Start-Windows.bat");
   console.log("  macOS:   portable/Start-macOS.command");
   console.log("  Linux:   portable/start-linux.sh");
