@@ -1,10 +1,13 @@
 import {
   cssFontFamily,
   defaultBundledFont,
+  ensureViewerFontLoaded,
+  fontOptionsFromManifest,
   loadFontManifest,
-  registerBundledFontsForViewer,
   type FontOption,
 } from "./bundledFonts";
+import { collectProjectFontFamilies } from "./projectFonts";
+import type { Project } from "../types/project";
 
 export {
   getBundledFontLoadErrors,
@@ -19,18 +22,29 @@ export function getFontOptions(): FontOption[] {
   return fontOptions;
 }
 
+/** Load manifest + dropdown options; preload default font only. */
 export async function loadBundledFonts(): Promise<void> {
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
-    fontOptions = await registerBundledFontsForViewer();
+    const manifest = await loadFontManifest();
+    fontOptions = fontOptionsFromManifest(manifest);
+    await ensureViewerFontLoaded(cssFontFamily(defaultBundledFont(manifest)));
   })();
   return loadPromise;
+}
+
+export async function ensureViewerFontsForProject(project: Project): Promise<void> {
+  await loadBundledFonts();
+  const families = collectProjectFontFamilies(project);
+  await Promise.all(families.map((f) => ensureViewerFontLoaded(f)));
 }
 
 export async function getDefaultFontFamily(): Promise<string> {
   const manifest = await loadFontManifest();
   return cssFontFamily(defaultBundledFont(manifest));
 }
+
+export { ensureViewerFontLoaded } from "./bundledFonts";
 
 export const SHOT_LINK_MIME = "application/x-ssl-shot";
 

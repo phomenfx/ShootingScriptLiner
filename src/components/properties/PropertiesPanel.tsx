@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { findShot, getLineDisplayLabel } from "../../lib/annotationUtils";
 import {
+  ensureViewerFontLoaded,
   getFontOptions,
   loadBundledFonts,
   parseShotLinkPayload,
@@ -345,7 +346,12 @@ export function PropertiesPanel() {
               Font
               <select
                 value={line.fontFamily}
-                onChange={(e) => updateLine(line.id, { fontFamily: e.target.value })}
+                onChange={(e) => {
+                  const fontFamily = e.target.value;
+                  void ensureViewerFontLoaded(fontFamily).then(() =>
+                    updateLine(line.id, { fontFamily })
+                  );
+                }}
               >
                 {fontOptions.map((f) => (
                   <option key={f.value} value={f.value}>
@@ -441,7 +447,12 @@ export function PropertiesPanel() {
               Font
               <select
                 value={textSel.fontFamily ?? '"Arial", sans-serif'}
-                onChange={(e) => updateText(textSel.id, { fontFamily: e.target.value })}
+                onChange={(e) => {
+                  const fontFamily = e.target.value;
+                  void ensureViewerFontLoaded(fontFamily).then(() =>
+                    updateText(textSel.id, { fontFamily })
+                  );
+                }}
               >
                 {fontOptions.map((f) => (
                   <option key={f.value} value={f.value}>

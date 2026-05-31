@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
+import { ensureViewerFontsForProject } from "../../lib/fonts";
 import { cachePdfForProject, loadPdfForProject } from "../../lib/pdfCache";
+import { collectProjectFontFamilies } from "../../lib/projectFonts";
 import { useProjectStore } from "../../stores/projectStore";
 import { PdfViewer } from "./PdfViewer";
 
@@ -14,6 +16,12 @@ export function ScriptPane() {
     project.scriptFileName && !scriptPdfFile
       ? `PDF not in browser cache. Import "${project.scriptFileName}" to view the script.`
       : null;
+
+  const fontKey = collectProjectFontFamilies(project).join("\0");
+
+  useEffect(() => {
+    void ensureViewerFontsForProject(project);
+  }, [fontKey, project]);
 
   useEffect(() => {
     let cancelled = false;

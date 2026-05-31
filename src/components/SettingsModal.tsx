@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getFontOptions, loadBundledFonts } from "../lib/fonts";
+import { ensureViewerFontLoaded, getFontOptions, loadBundledFonts } from "../lib/fonts";
 import { CAP_OPTIONS } from "../lib/lineCaps";
 import { STROKE_OPTIONS } from "../lib/lineStrokes";
 import { useProjectStore } from "../stores/projectStore";
@@ -147,7 +147,12 @@ export function SettingsModal() {
             Font
             <select
               value={d.fontFamily}
-              onChange={(e) => setDefaultLine({ fontFamily: e.target.value })}
+              onChange={(e) => {
+                const fontFamily = e.target.value;
+                void ensureViewerFontLoaded(fontFamily).then(() =>
+                  setDefaultLine({ fontFamily })
+                );
+              }}
             >
               {fontOptions.map((f) => (
                 <option key={f.value} value={f.value}>
