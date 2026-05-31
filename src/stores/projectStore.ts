@@ -28,12 +28,15 @@ import { DEFAULT_TOOL_KEYBINDS, type ToolKeybinds } from "../types/toolKeybinds"
 import {
   clampLineHitTolerancePx,
   clampMaxMountedPdfPages,
+  clampViewerZoomPercent,
   loadLineHitTolerancePx,
   loadMaxMountedPdfPages,
   loadViewerLayoutMode,
+  loadViewerZoomPercent,
   saveLineHitTolerancePx,
   saveMaxMountedPdfPages,
   saveViewerLayoutMode,
+  saveViewerZoomPercent,
 } from "../lib/appPreferences";
 import type { ViewerLayoutMode } from "../types/viewerLayout";
 import { clampLabelOffsetPt, migrateLabelLayout } from "../types/labelLayout";
@@ -71,6 +74,8 @@ type ProjectState = {
   lineHitTolerancePx: number;
   /** Max page stacks mounted in scroll view; app preference in localStorage. */
   maxMountedPdfPages: number;
+  /** PDF zoom as percent (100 = scale 1.0); app preference in localStorage. */
+  viewerZoomPercent: number;
   /** Active script PDF in memory (for viewer + Save ZIP when cache key mismatches). */
   scriptPdfFile: File | null;
 
@@ -94,6 +99,8 @@ type ProjectState = {
   resetToolKeybinds: () => void;
   setLineHitTolerancePx: (px: number) => void;
   setMaxMountedPdfPages: (count: number) => void;
+  setViewerZoomPercent: (percent: number) => void;
+  adjustViewerZoom: (deltaPercent: number) => void;
   setScriptPdfFile: (file: File | null) => void;
 
   selectScene: (sceneId: string) => void;
@@ -209,6 +216,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   toolKeybinds: loadToolKeybinds(),
   lineHitTolerancePx: loadLineHitTolerancePx(),
   maxMountedPdfPages: loadMaxMountedPdfPages(),
+  viewerZoomPercent: loadViewerZoomPercent(),
   scriptPdfFile: null,
 
   newProject: () =>
@@ -341,6 +349,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const next = clampMaxMountedPdfPages(count);
     saveMaxMountedPdfPages(next);
     set({ maxMountedPdfPages: next });
+  },
+
+  setViewerZoomPercent: (percent) => {
+    const next = clampViewerZoomPercent(percent);
+    saveViewerZoomPercent(next);
+    set({ viewerZoomPercent: next });
+  },
+
+  adjustViewerZoom: (deltaPercent) => {
+    const next = clampViewerZoomPercent(get().viewerZoomPercent + deltaPercent);
+    saveViewerZoomPercent(next);
+    set({ viewerZoomPercent: next });
   },
 
   setScriptPdfFile: (scriptPdfFile) => set({ scriptPdfFile }),

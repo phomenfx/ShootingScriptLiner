@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useProjectStore } from "../../stores/projectStore";
 import { AnnotationLayer } from "./AnnotationLayer";
 
@@ -13,6 +13,15 @@ type Props = {
   updatePageHeightPt?: boolean;
 };
 
+function isRenderCancelledError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  return (
+    e.name === "RenderingCancelledException" ||
+    /cancel/i.test(e.message) ||
+    /same canvas during multiple render/i.test(e.message)
+  );
+}
+
 export function PdfPageStack({
   pdf,
   pageNum,
@@ -22,9 +31,23 @@ export function PdfPageStack({
   updatePageHeightPt = false,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderTaskRef = useRef<RenderTask | null>(null);
   const setScriptPageHeightPt = useProjectStore((s) => s.setScriptPageHeightPt);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [renderError, setRenderError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!updatePageHeightPt || !isActive) return;
+
+    let cancelled = false;
+    void pdf.getPage(pageNum).then((page) => {
+      if (cancelled) return;
+      setScriptPageHeightPt(page.getViewport({ scale: 1 }).height);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pdf, pageNum, isActive, updatePageHeightPt, setScriptPageHeightPt]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -33,36 +56,42 @@ export function PdfPageStack({
     let cancelled = false;
     setRenderError(null);
 
+    const cancelRenderTask = () => {
+      renderTaskRef.current?.cancel();
+      renderTaskRef.current = null;
+    };
+
     const render = async () => {
       try {
+        cancelRenderTask();
         const page = await pdf.getPage(pageNum);
         if (cancelled) return;
 
-        if (updatePageHeightPt && isActive) {
-          const vp1 = page.getViewport({ scale: 1 });
-          setScriptPageHeightPt(vp1.height);
-        }
-
         const viewport = page.getViewport({ scale });
         const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        if (!ctx || cancelled) return;
 
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         setSize({ width: viewport.width, height: viewport.height });
-        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        const task = page.render({ canvasContext: ctx, viewport });
+        renderTaskRef.current = task;
+        await task.promise;
+        if (cancelled) return;
+        renderTaskRef.current = null;
       } catch (e) {
-        if (!cancelled) {
-          setRenderError(e instanceof Error ? e.message : "Failed to render page");
-        }
+        if (cancelled || isRenderCancelledError(e)) return;
+        setRenderError(e instanceof Error ? e.message : "Failed to render page");
       }
     };
 
     void render();
     return () => {
       cancelled = true;
+      cancelRenderTask();
     };
-  }, [pdf, pageNum, scale, isActive, updatePageHeightPt, setScriptPageHeightPt]);
+  }, [pdf, pageNum, scale]);
 
   return (
     <div

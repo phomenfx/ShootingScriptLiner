@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useMountedPageRange } from "../../hooks/useMountedPageRange";
+import { usePdfPageScale } from "../../hooks/usePdfPageScale";
 import {
-  DEFAULT_VIEWER_SCALE,
   getFirstPageSizeAtScale,
   PDF_PAGE_GAP_PX,
 } from "../../lib/pdfViewport";
@@ -13,6 +13,7 @@ type Props = {
   pdf: PDFDocumentProxy;
   pageCount: number;
   activePage: number;
+  zoomPercent: number;
   scrollToPage: number | null;
   onScrollToPageDone: () => void;
   onFocusPage: (page: number) => void;
@@ -23,6 +24,7 @@ export function PdfScrollView({
   pdf,
   pageCount,
   activePage,
+  zoomPercent,
   scrollToPage,
   onScrollToPageDone,
   onFocusPage,
@@ -31,10 +33,11 @@ export function PdfScrollView({
   const slotRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [pageStridePx, setPageStridePx] = useState(0);
   const maxMountedPdfPages = useProjectStore((s) => s.maxMountedPdfPages);
+  const { scale } = usePdfPageScale(wrapRef, pdf, zoomPercent);
 
   useEffect(() => {
     let cancelled = false;
-    void getFirstPageSizeAtScale(pdf, DEFAULT_VIEWER_SCALE).then((s) => {
+    void getFirstPageSizeAtScale(pdf, scale).then((s) => {
       if (!cancelled) {
         setPageStridePx(s.height + PDF_PAGE_GAP_PX);
       }
@@ -42,7 +45,7 @@ export function PdfScrollView({
     return () => {
       cancelled = true;
     };
-  }, [pdf]);
+  }, [pdf, scale]);
 
   const { start, end } = useMountedPageRange(
     wrapRef,
@@ -85,7 +88,7 @@ export function PdfScrollView({
                 <PdfPageStack
                   pdf={pdf}
                   pageNum={pageNum}
-                  scale={DEFAULT_VIEWER_SCALE}
+                  scale={scale}
                   isActive={activePage === pageNum}
                   onFocus={() => onFocusPage(pageNum)}
                   updatePageHeightPt={activePage === pageNum}

@@ -6,6 +6,7 @@ import {
   pagesInSpread,
   spreadCount,
   spreadIndexFromPage,
+  spreadSlots,
 } from "./pdfSpread";
 
 describe("pdfSpread", () => {
@@ -21,6 +22,12 @@ describe("pdfSpread", () => {
     expect(pagesInSpread(0, 4)).toEqual([1]);
     expect(pagesInSpread(1, 4)).toEqual([2, 3]);
     expect(pagesInSpread(2, 4)).toEqual([4]);
+  });
+
+  it("assigns left/right spread slots", () => {
+    expect(spreadSlots(0, 4)).toEqual([null, 1]);
+    expect(spreadSlots(1, 4)).toEqual([2, 3]);
+    expect(spreadSlots(2, 4)).toEqual([4, null]);
   });
 
   it("maps page to spread index", () => {

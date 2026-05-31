@@ -1,18 +1,14 @@
-import { useEffect, useState } from "react";
-import type { PDFDocumentProxy } from "pdfjs-dist";
-import { pagesInSpread, spreadIndexFromPage } from "../../lib/pdfSpread";
-import {
-  PDF_SPREAD_GAP_PX,
-  scaleToFitTwoPages,
-  scaleToFitWidth,
-} from "../../lib/pdfViewport";
+import { spreadIndexFromPage, spreadSlots } from "../../lib/pdfSpread";
+import { usePdfPageScale } from "../../hooks/usePdfPageScale";
 import { PdfPageStack } from "./PdfPageStack";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 
 type Props = {
   pdf: PDFDocumentProxy;
   pageCount: number;
   anchorPage: number;
   activePage: number;
+  zoomPercent: number;
   onFocusPage: (page: number) => void;
   wrapRef: React.RefObject<HTMLDivElement | null>;
 };
@@ -22,59 +18,48 @@ export function PdfSpreadView({
   pageCount,
   anchorPage,
   activePage,
+  zoomPercent,
   onFocusPage,
   wrapRef,
 }: Props) {
-  const [scale, setScale] = useState(1);
-  const [pageWidthPt, setPageWidthPt] = useState(0);
+  const { scale, pageWidthPt, pageHeightPt } = usePdfPageScale(wrapRef, pdf, zoomPercent);
 
   const spreadIndex = spreadIndexFromPage(anchorPage);
-  const visiblePages = pagesInSpread(spreadIndex, pageCount);
+  const [leftPage, rightPage] = spreadSlots(spreadIndex, pageCount);
 
-  useEffect(() => {
-    let cancelled = false;
-    void pdf.getPage(1).then((page) => {
-      if (cancelled) return;
-      setPageWidthPt(page.getViewport({ scale: 1 }).width);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [pdf]);
+  const slotWidth = pageWidthPt * scale;
+  const slotHeight = pageHeightPt * scale;
 
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el || pageWidthPt <= 0) return;
-
-    const update = () => {
-      const w = el.clientWidth - 32;
-      const next =
-        visiblePages.length >= 2
-          ? scaleToFitTwoPages(pageWidthPt, w, PDF_SPREAD_GAP_PX)
-          : scaleToFitWidth(pageWidthPt, w);
-      setScale(Math.max(0.35, Math.min(2, next)));
-    };
-
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [wrapRef, pageWidthPt, visiblePages.length]);
+  const renderSlot = (pageNum: number | null, side: "left" | "right") => {
+    if (pageNum == null) {
+      return (
+        <div
+          key={`empty-${side}`}
+          className="pdf-spread-slot pdf-spread-slot--empty"
+          style={{ width: slotWidth || undefined, minHeight: slotHeight || undefined }}
+          aria-hidden
+        />
+      );
+    }
+    return (
+      <div key={pageNum} className="pdf-spread-slot">
+        <PdfPageStack
+          pdf={pdf}
+          pageNum={pageNum}
+          scale={scale}
+          isActive={activePage === pageNum}
+          onFocus={() => onFocusPage(pageNum)}
+          updatePageHeightPt={activePage === pageNum}
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="pdf-canvas-wrap pdf-spread-wrap" ref={wrapRef}>
       <div className="pdf-spread-row">
-        {visiblePages.map((pageNum) => (
-          <PdfPageStack
-            key={pageNum}
-            pdf={pdf}
-            pageNum={pageNum}
-            scale={scale}
-            isActive={activePage === pageNum}
-            onFocus={() => onFocusPage(pageNum)}
-            updatePageHeightPt={activePage === pageNum}
-          />
-        ))}
+        {renderSlot(leftPage, "left")}
+        {renderSlot(rightPage, "right")}
       </div>
     </div>
   );

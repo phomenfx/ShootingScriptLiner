@@ -1,22 +1,32 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import { DEFAULT_VIEWER_SCALE } from "../../lib/pdfViewport";
+import { usePdfPageScale } from "../../hooks/usePdfPageScale";
 import { PdfPageStack } from "./PdfPageStack";
 
 type Props = {
   pdf: PDFDocumentProxy;
   pageNum: number;
+  zoomPercent: number;
   isActive: boolean;
   onFocus: () => void;
   wrapRef: React.RefObject<HTMLDivElement | null>;
 };
 
-export function PdfSingleView({ pdf, pageNum, isActive, onFocus, wrapRef }: Props) {
+export function PdfSingleView({
+  pdf,
+  pageNum,
+  zoomPercent,
+  isActive,
+  onFocus,
+  wrapRef,
+}: Props) {
+  const { scale } = usePdfPageScale(wrapRef, pdf, zoomPercent);
+
   return (
     <div className="pdf-canvas-wrap pdf-single-wrap" ref={wrapRef}>
       <PdfPageStack
         pdf={pdf}
         pageNum={pageNum}
-        scale={DEFAULT_VIEWER_SCALE}
+        scale={scale}
         isActive={isActive}
         onFocus={onFocus}
         updatePageHeightPt

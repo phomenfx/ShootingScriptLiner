@@ -1,10 +1,13 @@
 import {
   DEFAULT_LINE_HIT_TOLERANCE_PX,
   DEFAULT_MAX_MOUNTED_PDF_PAGES,
+  DEFAULT_VIEWER_ZOOM_PERCENT,
   MAX_LINE_HIT_TOLERANCE_PX,
   MAX_MAX_MOUNTED_PDF_PAGES,
+  MAX_VIEWER_ZOOM_PERCENT,
   MIN_LINE_HIT_TOLERANCE_PX,
   MIN_MAX_MOUNTED_PDF_PAGES,
+  MIN_VIEWER_ZOOM_PERCENT,
 } from "../types/appPreferences";
 import type { ViewerLayoutMode } from "../types/viewerLayout";
 import { VIEWER_LAYOUT_MODES } from "../types/viewerLayout";
@@ -12,6 +15,7 @@ import { VIEWER_LAYOUT_MODES } from "../types/viewerLayout";
 const STORAGE_KEY = "shooting-script-liner-line-hit-tolerance";
 const LAYOUT_MODE_KEY = "shooting-script-liner-viewer-layout";
 const MAX_MOUNTED_PAGES_KEY = "shooting-script-liner-max-mounted-pdf-pages";
+const VIEWER_ZOOM_KEY = "shooting-script-liner-viewer-zoom-percent";
 
 export function clampLineHitTolerancePx(value: number): number {
   const n = Number(value);
@@ -69,4 +73,26 @@ export function loadMaxMountedPdfPages(): number {
 
 export function saveMaxMountedPdfPages(count: number): void {
   localStorage.setItem(MAX_MOUNTED_PAGES_KEY, String(clampMaxMountedPdfPages(count)));
+}
+
+export function clampViewerZoomPercent(value: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_VIEWER_ZOOM_PERCENT;
+  return Math.round(
+    Math.max(MIN_VIEWER_ZOOM_PERCENT, Math.min(MAX_VIEWER_ZOOM_PERCENT, n))
+  );
+}
+
+export function loadViewerZoomPercent(): number {
+  try {
+    const raw = localStorage.getItem(VIEWER_ZOOM_KEY);
+    if (raw == null || raw === "") return DEFAULT_VIEWER_ZOOM_PERCENT;
+    return clampViewerZoomPercent(Number(raw));
+  } catch {
+    return DEFAULT_VIEWER_ZOOM_PERCENT;
+  }
+}
+
+export function saveViewerZoomPercent(percent: number): void {
+  localStorage.setItem(VIEWER_ZOOM_KEY, String(clampViewerZoomPercent(percent)));
 }

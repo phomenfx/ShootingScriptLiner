@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAnnotationKeyboard } from "../../hooks/useAnnotationKeyboard";
 import { usePdfDocument } from "../../hooks/usePdfDocument";
 import { usePdfPageNavigation } from "../../hooks/usePdfPageNavigation";
+import { usePdfZoomWheel } from "../../hooks/usePdfZoomWheel";
 import {
   anchorPageAfterSpreadDelta,
   formatSpreadLabel,
@@ -17,6 +18,7 @@ import {
 import { PdfScrollView } from "./PdfScrollView";
 import { PdfSingleView } from "./PdfSingleView";
 import { PdfSpreadView } from "./PdfSpreadView";
+import { PdfZoomControls } from "./PdfZoomControls";
 import { ScriptToolbar } from "./ScriptToolbar";
 
 type Props = {
@@ -29,6 +31,7 @@ export function PdfViewer({ file }: Props) {
   const activePage = useProjectStore((s) => s.activePage);
   const pageCount = useProjectStore((s) => s.pdfPageCount);
   const layoutMode = useProjectStore((s) => s.viewerLayoutMode);
+  const viewerZoomPercent = useProjectStore((s) => s.viewerZoomPercent);
   const setViewerPage = useProjectStore((s) => s.setViewerPage);
   const setActivePage = useProjectStore((s) => s.setActivePage);
   const setViewerLayoutMode = useProjectStore((s) => s.setViewerLayoutMode);
@@ -64,6 +67,8 @@ export function PdfViewer({ file }: Props) {
     onScrollToPage,
     enabled: Boolean(file && pdf && pageCount > 0),
   });
+
+  usePdfZoomWheel(canvasWrapRef, Boolean(file && pdf && pageCount > 0));
 
   useEffect(() => {
     if (!file) {
@@ -161,37 +166,43 @@ export function PdfViewer({ file }: Props) {
 
   return (
     <div className="pdf-viewer">
-      <ScriptToolbar />
-      {loadError && <p className="pdf-error">{loadError}</p>}
-      <div className="pdf-controls">
-        <div className="pdf-layout-toggle" role="group" aria-label="View layout">
-          {VIEWER_LAYOUT_MODES.map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className={layoutMode === mode ? "active" : ""}
-              title={VIEWER_LAYOUT_LABELS[mode]}
-              onClick={() => setViewerLayoutMode(mode)}
-            >
-              {VIEWER_LAYOUT_LABELS[mode]}
-            </button>
-          ))}
+      <div className="pdf-ribbon">
+        <ScriptToolbar />
+        <div className="pdf-controls">
+          <div className="pdf-layout-toggle" role="group" aria-label="View layout">
+            {VIEWER_LAYOUT_MODES.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={layoutMode === mode ? "active" : ""}
+                title={VIEWER_LAYOUT_LABELS[mode]}
+                onClick={() => setViewerLayoutMode(mode)}
+              >
+                {VIEWER_LAYOUT_LABELS[mode]}
+              </button>
+            ))}
+          </div>
+          <button type="button" disabled={prevDisabled} onClick={goPrev}>
+            Prev
+          </button>
+          <span className="pdf-page-status">{statusLabel}</span>
+          <button type="button" disabled={nextDisabled} onClick={goNext}>
+            Next
+          </button>
+          <div className="pdf-controls-trail">
+            <span className="pdf-nav-hint" title="Navigation shortcuts">
+              {navHint}
+            </span>
+            <PdfZoomControls />
+          </div>
         </div>
-        <button type="button" disabled={prevDisabled} onClick={goPrev}>
-          Prev
-        </button>
-        <span className="pdf-page-status">{statusLabel}</span>
-        <button type="button" disabled={nextDisabled} onClick={goNext}>
-          Next
-        </button>
-        <span className="pdf-nav-hint" title="Navigation shortcuts">
-          {navHint}
-        </span>
       </div>
+      {loadError && <p className="pdf-error">{loadError}</p>}
       {pdf && layoutMode === "single" && (
         <PdfSingleView
           pdf={pdf}
           pageNum={viewerPage}
+          zoomPercent={viewerZoomPercent}
           isActive
           onFocus={() => focusPage(viewerPage)}
           wrapRef={canvasWrapRef}
@@ -202,6 +213,7 @@ export function PdfViewer({ file }: Props) {
           pdf={pdf}
           pageCount={pageCount}
           activePage={activePage}
+          zoomPercent={viewerZoomPercent}
           scrollToPage={scrollToPage}
           onScrollToPageDone={clearScrollRequest}
           onFocusPage={focusPage}
@@ -214,6 +226,7 @@ export function PdfViewer({ file }: Props) {
           pageCount={pageCount}
           anchorPage={viewerPage}
           activePage={activePage}
+          zoomPercent={viewerZoomPercent}
           onFocusPage={focusPage}
           wrapRef={canvasWrapRef}
         />

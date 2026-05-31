@@ -40,3 +40,10 @@ export function scaleToFitTwoPages(
 export const DEFAULT_VIEWER_SCALE = 1.25;
 export const PDF_PAGE_GAP_PX = 16;
 export const PDF_SPREAD_GAP_PX = 12;
+
+/** Convert stored zoom percent to pdf.js viewport scale. */
+export function viewerScaleFromZoomPercent(zoomPercent: number): number {
+  const n = Number(zoomPercent);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return n / 100;
+}
