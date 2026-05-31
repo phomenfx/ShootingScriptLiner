@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import * as pdfjs from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useAnnotationKeyboard } from "../../hooks/useAnnotationKeyboard";
+import { usePdfDocument } from "../../hooks/usePdfDocument";
+import { usePdfPageNavigation } from "../../hooks/usePdfPageNavigation";
 import { useProjectStore } from "../../stores/projectStore";
 import { AnnotationLayer } from "./AnnotationLayer";
 import { ScriptToolbar } from "./ScriptToolbar";
 
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
+const VIEWER_SCALE = 1.25;
 
 type Props = {
   file: File | null;
@@ -14,19 +14,30 @@ type Props = {
 
 export function PdfViewer({ file }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
   const pageNum = useProjectStore((s) => s.viewerPage);
+  const pageCount = useProjectStore((s) => s.pdfPageCount);
   const setViewerPage = useProjectStore((s) => s.setViewerPage);
   const setPdfPageCount = useProjectStore((s) => s.setPdfPageCount);
   const setScriptPageHeightPt = useProjectStore((s) => s.setScriptPageHeightPt);
-  const [pageCount, setPageCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const { pdf, error: loadError, loading } = usePdfDocument(file);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
+
+  const error = loadError ?? renderError;
 
   useAnnotationKeyboard(pageNum);
 
+  usePdfPageNavigation({
+    wrapRef: canvasWrapRef,
+    pageNum,
+    pageCount,
+    setViewerPage,
+    enabled: Boolean(file && pdf && pageCount > 0),
+  });
+
   useEffect(() => {
     if (!file) {
-      setPageCount(0);
       setPdfPageCount(0);
       setViewerPage(1);
       setPageSize({ width: 0, height: 0 });
@@ -36,18 +47,19 @@ export function PdfViewer({ file }: Props) {
   }, [file, setPdfPageCount, setViewerPage]);
 
   useEffect(() => {
-    if (!file || !canvasRef.current) return;
+    if (pdf) {
+      setPdfPageCount(pdf.numPages);
+    }
+  }, [pdf, setPdfPageCount]);
+
+  useEffect(() => {
+    if (!pdf || !canvasRef.current) return;
 
     let cancelled = false;
-    setError(null);
+    setRenderError(null);
 
-    const load = async () => {
+    const render = async () => {
       try {
-        const data = await file.arrayBuffer();
-        const pdf = await pdfjs.getDocument({ data }).promise;
-        if (cancelled) return;
-        setPageCount(pdf.numPages);
-        setPdfPageCount(pdf.numPages);
         const safePage = Math.min(pageNum, pdf.numPages);
         const page = await pdf.getPage(safePage);
         if (cancelled) return;
@@ -55,7 +67,7 @@ export function PdfViewer({ file }: Props) {
         const vp1 = page.getViewport({ scale: 1 });
         setScriptPageHeightPt(vp1.height);
 
-        const viewport = page.getViewport({ scale: 1.25 });
+        const viewport = page.getViewport({ scale: VIEWER_SCALE });
         const canvas = canvasRef.current!;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
@@ -66,16 +78,16 @@ export function PdfViewer({ file }: Props) {
         await page.render({ canvasContext: ctx, viewport }).promise;
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load PDF");
+          setRenderError(e instanceof Error ? e.message : "Failed to render page");
         }
       }
     };
 
-    void load();
+    void render();
     return () => {
       cancelled = true;
     };
-  }, [file, pageNum, setPdfPageCount, setScriptPageHeightPt]);
+  }, [pdf, pageNum, setScriptPageHeightPt]);
 
   if (!file) {
     return (
@@ -92,7 +104,7 @@ export function PdfViewer({ file }: Props) {
       <div className="pdf-controls">
         <button
           type="button"
-          disabled={pageNum <= 1}
+          disabled={pageNum <= 1 || loading}
           onClick={() => setViewerPage(pageNum - 1)}
         >
           Prev
@@ -102,13 +114,16 @@ export function PdfViewer({ file }: Props) {
         </span>
         <button
           type="button"
-          disabled={pageCount === 0 || pageNum >= pageCount}
+          disabled={loading || pageCount === 0 || pageNum >= pageCount}
           onClick={() => setViewerPage(pageNum + 1)}
         >
           Next
         </button>
+        <span className="pdf-nav-hint" title="Scroll wheel over the page preview">
+          Mouse Wheel | Left/Right Arrows | Page Up/Page Down
+        </span>
       </div>
-      <div className="pdf-canvas-wrap">
+      <div className="pdf-canvas-wrap" ref={canvasWrapRef}>
         <div
           className="pdf-page-stack"
           style={{ width: pageSize.width, height: pageSize.height }}

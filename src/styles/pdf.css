@@ -40,6 +40,13 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.pdf-nav-hint {
+  color: var(--color-text-dim);
+  font-size: var(--font-size-sm);
+  margin-left: auto;
 }
 
 .pdf-controls button {
