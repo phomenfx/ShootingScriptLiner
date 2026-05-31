@@ -78,6 +78,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   const lineHitTolerancePx = useProjectStore((s) => s.lineHitTolerancePx);
   const selectAnnotation = useProjectStore((s) => s.selectAnnotation);
   const selectShot = useProjectStore((s) => s.selectShot);
+  const setActivePage = useProjectStore((s) => s.setActivePage);
   const shotSelection = useProjectStore((s) =>
     s.selection?.kind === "shot" ? s.selection : null
   );
@@ -123,6 +124,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    setActivePage(pageNum);
     const pu = getPointUnclamped(e);
     const p = { x: clamp01(pu.x), y: clamp01(pu.y) };
 

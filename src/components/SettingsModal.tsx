@@ -9,7 +9,9 @@ import { capSupportsFill } from "../types/annotations";
 import { ToolKeybindSettings } from "./ToolKeybindSettings";
 import {
   MAX_LINE_HIT_TOLERANCE_PX,
+  MAX_MAX_MOUNTED_PDF_PAGES,
   MIN_LINE_HIT_TOLERANCE_PX,
+  MIN_MAX_MOUNTED_PDF_PAGES,
 } from "../types/appPreferences";
 import { MAX_LABEL_OFFSET_PT, MIN_LABEL_OFFSET_PT } from "../types/labelLayout";
 
@@ -87,6 +89,8 @@ export function SettingsModal() {
   const setLabelSecondaryGapPt = useProjectStore((s) => s.setLabelSecondaryGapPt);
   const lineHitTolerancePx = useProjectStore((s) => s.lineHitTolerancePx);
   const setLineHitTolerancePx = useProjectStore((s) => s.setLineHitTolerancePx);
+  const maxMountedPdfPages = useProjectStore((s) => s.maxMountedPdfPages);
+  const setMaxMountedPdfPages = useProjectStore((s) => s.setMaxMountedPdfPages);
 
   const [fontOptions, setFontOptions] = useState(getFontOptions());
 
@@ -309,6 +313,21 @@ export function SettingsModal() {
         </label>
         <p className="settings-hint settings-hint-tight">
           How close to a line you can click to select it (Select tool).
+        </p>
+        <label className="field">
+          Scroll view page limit
+          <input
+            type="number"
+            min={MIN_MAX_MOUNTED_PDF_PAGES}
+            max={MAX_MAX_MOUNTED_PDF_PAGES}
+            step={1}
+            value={maxMountedPdfPages}
+            onChange={(e) => setMaxMountedPdfPages(Number(e.target.value))}
+          />
+        </label>
+        <p className="settings-hint settings-hint-tight">
+          Maximum PDF pages loaded at once in scroll layout ({MIN_MAX_MOUNTED_PDF_PAGES}–
+          {MAX_MAX_MOUNTED_PDF_PAGES}). Lower values use less memory on long scripts.
         </p>
 
         <p className="settings-hint">

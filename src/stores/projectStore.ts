@@ -27,9 +27,15 @@ import { loadToolKeybinds, saveToolKeybinds, validateToolKeybindChange } from ".
 import { DEFAULT_TOOL_KEYBINDS, type ToolKeybinds } from "../types/toolKeybinds";
 import {
   clampLineHitTolerancePx,
+  clampMaxMountedPdfPages,
   loadLineHitTolerancePx,
+  loadMaxMountedPdfPages,
+  loadViewerLayoutMode,
   saveLineHitTolerancePx,
+  saveMaxMountedPdfPages,
+  saveViewerLayoutMode,
 } from "../lib/appPreferences";
+import type { ViewerLayoutMode } from "../types/viewerLayout";
 import { clampLabelOffsetPt, migrateLabelLayout } from "../types/labelLayout";
 
 export type Selection =
@@ -52,14 +58,19 @@ type ProjectState = {
   lineClipboard: LineClipboard | null;
   settingsOpen: boolean;
   confirm: ConfirmRequest | null;
-  /** Synced with PDF viewer (1-based). */
+  /** Primary navigation page (1-based); spread mode uses left/anchor page. */
   viewerPage: number;
+  /** Page receiving keyboard paste and focus outline (1-based). */
+  activePage: number;
+  viewerLayoutMode: ViewerLayoutMode;
   pdfPageCount: number;
   /** PDF page height in points (72 pt = 1 in); used for margin continuation inset. */
   scriptPageHeightPt: number;
   toolKeybinds: ToolKeybinds;
   /** Perpendicular click slop for selecting lines (px); app preference in localStorage. */
   lineHitTolerancePx: number;
+  /** Max page stacks mounted in scroll view; app preference in localStorage. */
+  maxMountedPdfPages: number;
   /** Active script PDF in memory (for viewer + Save ZIP when cache key mismatches). */
   scriptPdfFile: File | null;
 
@@ -82,6 +93,7 @@ type ProjectState = {
   setToolKeybind: (tool: ScriptTool, key: string) => string | null;
   resetToolKeybinds: () => void;
   setLineHitTolerancePx: (px: number) => void;
+  setMaxMountedPdfPages: (count: number) => void;
   setScriptPdfFile: (file: File | null) => void;
 
   selectScene: (sceneId: string) => void;
@@ -114,6 +126,8 @@ type ProjectState = {
   duplicateLine: (id: string) => void;
 
   setViewerPage: (page: number) => void;
+  setActivePage: (page: number) => void;
+  setViewerLayoutMode: (mode: ViewerLayoutMode) => void;
   setPdfPageCount: (count: number) => void;
   setScriptPageHeightPt: (pt: number) => void;
 
@@ -188,10 +202,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   settingsOpen: false,
   confirm: null,
   viewerPage: 1,
+  activePage: 1,
+  viewerLayoutMode: loadViewerLayoutMode(),
   pdfPageCount: 0,
   scriptPageHeightPt: 792,
   toolKeybinds: loadToolKeybinds(),
   lineHitTolerancePx: loadLineHitTolerancePx(),
+  maxMountedPdfPages: loadMaxMountedPdfPages(),
   scriptPdfFile: null,
 
   newProject: () =>
@@ -201,6 +218,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       activeTool: "select",
       lineClipboard: null,
       viewerPage: 1,
+      activePage: 1,
       pdfPageCount: 0,
       scriptPageHeightPt: 792,
       scriptPdfFile: null,
@@ -229,6 +247,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       selection: null,
       activeTool: "select",
       viewerPage: 1,
+      activePage: 1,
       pdfPageCount: 0,
       scriptPageHeightPt: 792,
       scriptPdfFile: null,
@@ -318,20 +337,49 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ lineHitTolerancePx: next });
   },
 
+  setMaxMountedPdfPages: (count) => {
+    const next = clampMaxMountedPdfPages(count);
+    saveMaxMountedPdfPages(next);
+    set({ maxMountedPdfPages: next });
+  },
+
   setScriptPdfFile: (scriptPdfFile) => set({ scriptPdfFile }),
 
   setViewerPage: (page) =>
     set((s) => {
       const max = s.pdfPageCount > 0 ? s.pdfPageCount : 9999;
       const clamped = Math.max(1, Math.min(max, Math.floor(page)));
-      return { viewerPage: clamped };
+      const syncActive = s.viewerLayoutMode === "single";
+      return {
+        viewerPage: clamped,
+        ...(syncActive ? { activePage: clamped } : {}),
+      };
     }),
+
+  setActivePage: (page) =>
+    set((s) => {
+      const max = s.pdfPageCount > 0 ? s.pdfPageCount : 9999;
+      const clamped = Math.max(1, Math.min(max, Math.floor(page)));
+      return { activePage: clamped };
+    }),
+
+  setViewerLayoutMode: (mode) => {
+    saveViewerLayoutMode(mode);
+    set((s) => {
+      const syncActive = mode === "single";
+      return {
+        viewerLayoutMode: mode,
+        ...(syncActive ? { activePage: s.viewerPage } : {}),
+      };
+    });
+  },
 
   setPdfPageCount: (count) =>
     set((s) => {
       const n = Math.max(0, Math.floor(count));
       const viewerPage = n > 0 ? Math.min(s.viewerPage, n) : 1;
-      return { pdfPageCount: n, viewerPage };
+      const activePage = n > 0 ? Math.min(s.activePage, n) : 1;
+      return { pdfPageCount: n, viewerPage, activePage };
     }),
 
   setScriptPageHeightPt: (pt) =>

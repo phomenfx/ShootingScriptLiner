@@ -1,38 +1,67 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAnnotationKeyboard } from "../../hooks/useAnnotationKeyboard";
 import { usePdfDocument } from "../../hooks/usePdfDocument";
 import { usePdfPageNavigation } from "../../hooks/usePdfPageNavigation";
+import {
+  anchorPageAfterSpreadDelta,
+  formatSpreadLabel,
+  pagesInSpread,
+  spreadCount,
+  spreadIndexFromPage,
+} from "../../lib/pdfSpread";
 import { useProjectStore } from "../../stores/projectStore";
-import { AnnotationLayer } from "./AnnotationLayer";
+import {
+  VIEWER_LAYOUT_LABELS,
+  VIEWER_LAYOUT_MODES,
+} from "../../types/viewerLayout";
+import { PdfScrollView } from "./PdfScrollView";
+import { PdfSingleView } from "./PdfSingleView";
+import { PdfSpreadView } from "./PdfSpreadView";
 import { ScriptToolbar } from "./ScriptToolbar";
-
-const VIEWER_SCALE = 1.25;
 
 type Props = {
   file: File | null;
 };
 
 export function PdfViewer({ file }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
-  const pageNum = useProjectStore((s) => s.viewerPage);
+  const viewerPage = useProjectStore((s) => s.viewerPage);
+  const activePage = useProjectStore((s) => s.activePage);
   const pageCount = useProjectStore((s) => s.pdfPageCount);
+  const layoutMode = useProjectStore((s) => s.viewerLayoutMode);
   const setViewerPage = useProjectStore((s) => s.setViewerPage);
+  const setActivePage = useProjectStore((s) => s.setActivePage);
+  const setViewerLayoutMode = useProjectStore((s) => s.setViewerLayoutMode);
   const setPdfPageCount = useProjectStore((s) => s.setPdfPageCount);
-  const setScriptPageHeightPt = useProjectStore((s) => s.setScriptPageHeightPt);
   const { pdf, error: loadError, loading } = usePdfDocument(file);
-  const [renderError, setRenderError] = useState<string | null>(null);
-  const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
+  const [scrollToPage, setScrollToPage] = useState<number | null>(null);
 
-  const error = loadError ?? renderError;
+  useAnnotationKeyboard(activePage);
 
-  useAnnotationKeyboard(pageNum);
+  const onScrollToPage = useCallback((page: number) => {
+    setScrollToPage(page);
+  }, []);
+
+  const clearScrollRequest = useCallback(() => {
+    setScrollToPage(null);
+  }, []);
+
+  const focusPage = useCallback(
+    (page: number) => {
+      setActivePage(page);
+    },
+    [setActivePage]
+  );
 
   usePdfPageNavigation({
+    mode: layoutMode,
     wrapRef: canvasWrapRef,
-    pageNum,
+    pageNum: viewerPage,
+    activePage,
     pageCount,
     setViewerPage,
+    setActivePage,
+    onScrollToPage,
     enabled: Boolean(file && pdf && pageCount > 0),
   });
 
@@ -40,54 +69,87 @@ export function PdfViewer({ file }: Props) {
     if (!file) {
       setPdfPageCount(0);
       setViewerPage(1);
-      setPageSize({ width: 0, height: 0 });
+      setActivePage(1);
       return;
     }
     setViewerPage(1);
-  }, [file, setPdfPageCount, setViewerPage]);
+    setActivePage(1);
+  }, [file, setPdfPageCount, setViewerPage, setActivePage]);
 
   useEffect(() => {
-    if (pdf) {
-      setPdfPageCount(pdf.numPages);
-    }
+    if (pdf) setPdfPageCount(pdf.numPages);
   }, [pdf, setPdfPageCount]);
 
-  useEffect(() => {
-    if (!pdf || !canvasRef.current) return;
+  const goPrev = () => {
+    if (pageCount <= 0) return;
+    if (layoutMode === "spread") {
+      const anchor = anchorPageAfterSpreadDelta(viewerPage, pageCount, -1);
+      const pages = pagesInSpread(spreadIndexFromPage(anchor), pageCount);
+      setViewerPage(anchor);
+      setActivePage(pages.includes(activePage) ? activePage : pages[0]);
+    } else if (layoutMode === "scroll") {
+      const next = Math.max(1, activePage - 1);
+      setActivePage(next);
+      setViewerPage(next);
+      onScrollToPage(next);
+    } else {
+      setViewerPage(viewerPage - 1);
+    }
+  };
 
-    let cancelled = false;
-    setRenderError(null);
+  const goNext = () => {
+    if (pageCount <= 0) return;
+    if (layoutMode === "spread") {
+      const anchor = anchorPageAfterSpreadDelta(viewerPage, pageCount, 1);
+      const pages = pagesInSpread(spreadIndexFromPage(anchor), pageCount);
+      setViewerPage(anchor);
+      setActivePage(pages.includes(activePage) ? activePage : pages[0]);
+    } else if (layoutMode === "scroll") {
+      const next = Math.min(pageCount, activePage + 1);
+      setActivePage(next);
+      setViewerPage(next);
+      onScrollToPage(next);
+    } else {
+      setViewerPage(viewerPage + 1);
+    }
+  };
 
-    const render = async () => {
-      try {
-        const safePage = Math.min(pageNum, pdf.numPages);
-        const page = await pdf.getPage(safePage);
-        if (cancelled) return;
+  const prevDisabled =
+    loading ||
+    pageCount === 0 ||
+    (layoutMode === "spread"
+      ? spreadIndexFromPage(viewerPage) <= 0
+      : layoutMode === "scroll"
+        ? activePage <= 1
+        : viewerPage <= 1);
 
-        const vp1 = page.getViewport({ scale: 1 });
-        setScriptPageHeightPt(vp1.height);
+  const nextDisabled =
+    loading ||
+    pageCount === 0 ||
+    (layoutMode === "spread"
+      ? spreadIndexFromPage(viewerPage) >= spreadCount(pageCount) - 1
+      : layoutMode === "scroll"
+        ? activePage >= pageCount
+        : viewerPage >= pageCount);
 
-        const viewport = page.getViewport({ scale: VIEWER_SCALE });
-        const canvas = canvasRef.current!;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+  const statusLabel = (() => {
+    if (pageCount <= 0) return "—";
+    if (layoutMode === "spread") {
+      const pages = pagesInSpread(spreadIndexFromPage(viewerPage), pageCount);
+      return `${formatSpreadLabel(pages)} / ${pageCount}`;
+    }
+    if (layoutMode === "scroll") {
+      return `Page ${activePage} / ${pageCount}`;
+    }
+    return `Page ${viewerPage} / ${pageCount}`;
+  })();
 
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        setPageSize({ width: viewport.width, height: viewport.height });
-        await page.render({ canvasContext: ctx, viewport }).promise;
-      } catch (e) {
-        if (!cancelled) {
-          setRenderError(e instanceof Error ? e.message : "Failed to render page");
-        }
-      }
-    };
-
-    void render();
-    return () => {
-      cancelled = true;
-    };
-  }, [pdf, pageNum, setScriptPageHeightPt]);
+  const navHint =
+    layoutMode === "scroll"
+      ? "Click a page to focus · PgUp/PgDn"
+      : layoutMode === "spread"
+        ? "Wheel · ← → · PgUp/PgDn (spread)"
+        : "Wheel · ← → · PgUp/PgDn";
 
   if (!file) {
     return (
@@ -100,44 +162,62 @@ export function PdfViewer({ file }: Props) {
   return (
     <div className="pdf-viewer">
       <ScriptToolbar />
-      {error && <p className="pdf-error">{error}</p>}
+      {loadError && <p className="pdf-error">{loadError}</p>}
       <div className="pdf-controls">
-        <button
-          type="button"
-          disabled={pageNum <= 1 || loading}
-          onClick={() => setViewerPage(pageNum - 1)}
-        >
+        <div className="pdf-layout-toggle" role="group" aria-label="View layout">
+          {VIEWER_LAYOUT_MODES.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              className={layoutMode === mode ? "active" : ""}
+              title={VIEWER_LAYOUT_LABELS[mode]}
+              onClick={() => setViewerLayoutMode(mode)}
+            >
+              {VIEWER_LAYOUT_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+        <button type="button" disabled={prevDisabled} onClick={goPrev}>
           Prev
         </button>
-        <span>
-          Page {pageNum} / {pageCount || "?"}
-        </span>
-        <button
-          type="button"
-          disabled={loading || pageCount === 0 || pageNum >= pageCount}
-          onClick={() => setViewerPage(pageNum + 1)}
-        >
+        <span className="pdf-page-status">{statusLabel}</span>
+        <button type="button" disabled={nextDisabled} onClick={goNext}>
           Next
         </button>
-        <span className="pdf-nav-hint" title="Scroll wheel over the page preview">
-          Mouse Wheel | Left/Right Arrows | Page Up/Page Down
+        <span className="pdf-nav-hint" title="Navigation shortcuts">
+          {navHint}
         </span>
       </div>
-      <div className="pdf-canvas-wrap" ref={canvasWrapRef}>
-        <div
-          className="pdf-page-stack"
-          style={{ width: pageSize.width, height: pageSize.height }}
-        >
-          <canvas ref={canvasRef} />
-          {pageSize.width > 0 && (
-            <AnnotationLayer
-              pageNum={pageNum}
-              width={pageSize.width}
-              height={pageSize.height}
-            />
-          )}
-        </div>
-      </div>
+      {pdf && layoutMode === "single" && (
+        <PdfSingleView
+          pdf={pdf}
+          pageNum={viewerPage}
+          isActive
+          onFocus={() => focusPage(viewerPage)}
+          wrapRef={canvasWrapRef}
+        />
+      )}
+      {pdf && layoutMode === "scroll" && (
+        <PdfScrollView
+          pdf={pdf}
+          pageCount={pageCount}
+          activePage={activePage}
+          scrollToPage={scrollToPage}
+          onScrollToPageDone={clearScrollRequest}
+          onFocusPage={focusPage}
+          wrapRef={canvasWrapRef}
+        />
+      )}
+      {pdf && layoutMode === "spread" && (
+        <PdfSpreadView
+          pdf={pdf}
+          pageCount={pageCount}
+          anchorPage={viewerPage}
+          activePage={activePage}
+          onFocusPage={focusPage}
+          wrapRef={canvasWrapRef}
+        />
+      )}
     </div>
   );
 }
