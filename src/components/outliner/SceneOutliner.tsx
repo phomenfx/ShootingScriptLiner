@@ -25,6 +25,7 @@ type DragItem =
 export function SceneOutliner() {
   const project = useProjectStore((s) => s.project);
   const selection = useProjectStore((s) => s.selection);
+  const collapsedSceneIds = useProjectStore((s) => s.collapsedSceneIds);
   const addScene = useProjectStore((s) => s.addScene);
   const addShot = useProjectStore((s) => s.addShot);
   const selectScene = useProjectStore((s) => s.selectScene);
@@ -37,6 +38,9 @@ export function SceneOutliner() {
   const moveShotWithinScene = useProjectStore((s) => s.moveShotWithinScene);
   const reorderShots = useProjectStore((s) => s.reorderShots);
   const getLastSelectedSceneId = useProjectStore((s) => s.getLastSelectedSceneId);
+  const toggleSceneCollapsed = useProjectStore((s) => s.toggleSceneCollapsed);
+  const collapseAllScenes = useProjectStore((s) => s.collapseAllScenes);
+  const expandAllScenes = useProjectStore((s) => s.expandAllScenes);
 
   const [dragItem, setDragItem] = useState<DragItem | null>(null);
 
@@ -126,6 +130,22 @@ export function SceneOutliner() {
         >
           + NEW SHOT
         </button>
+        <button
+          type="button"
+          onClick={() => collapseAllScenes()}
+          disabled={scenes.length === 0}
+          title="Collapse all scenes"
+        >
+          COLLAPSE
+        </button>
+        <button
+          type="button"
+          onClick={() => expandAllScenes()}
+          disabled={scenes.length === 0}
+          title="Expand all scenes"
+        >
+          EXPAND
+        </button>
       </div>
 
       <DndContext
@@ -150,6 +170,8 @@ export function SceneOutliner() {
                     ? selection.shotId
                     : null
                 }
+                collapsed={!!collapsedSceneIds[scene.id]}
+                onToggleCollapsed={() => toggleSceneCollapsed(scene.id)}
                 onSelectScene={() => selectScene(scene.id)}
                 onSelectShot={(shotId) => selectShot(scene.id, shotId)}
                 onUpdateScene={(patch) => updateScene(scene.id, patch)}

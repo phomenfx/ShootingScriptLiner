@@ -15,6 +15,8 @@ type Props = {
   project: Project;
   selectedScene: boolean;
   selectedShotId: string | null;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   onSelectScene: () => void;
   onSelectShot: (shotId: string) => void;
   onUpdateScene: (patch: Partial<Pick<Scene, "slugline" | "visible">>) => void;
@@ -27,6 +29,8 @@ export function SortableSceneRow({
   project,
   selectedScene,
   selectedShotId,
+  collapsed,
+  onToggleCollapsed,
   onSelectScene,
   onSelectShot,
   onUpdateScene,
@@ -61,9 +65,26 @@ export function SortableSceneRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`scene-block ${selectedScene ? "selected" : ""} ${isOver ? "drop-over" : ""} ${isDragging ? "is-dragging" : ""}`}
+      className={`scene-block ${selectedScene ? "selected" : ""} ${isOver ? "drop-over" : ""} ${isDragging ? "is-dragging" : ""} ${collapsed ? "collapsed" : ""}`}
     >
-      <div className="scene-header" onClick={onSelectScene}>
+      <div
+        className="scene-header"
+        onClick={onSelectScene}
+        ref={collapsed ? setDropRef : undefined}
+      >
+        <button
+          type="button"
+          className="fold-btn"
+          title={collapsed ? "Expand scene" : "Collapse scene"}
+          aria-label={collapsed ? `Expand Scene ${num}` : `Collapse Scene ${num}`}
+          aria-expanded={!collapsed}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCollapsed();
+          }}
+        >
+          {collapsed ? "▶" : "▼"}
+        </button>
         <span className="drag-handle" {...attributes} {...listeners}>
           ≡
         </span>
@@ -73,6 +94,11 @@ export function SortableSceneRow({
           label={`Scene ${num}`}
         />
         <span className="scene-number">Scene {num}</span>
+        {collapsed && (
+          <span className="scene-shot-count" title={`${shots.length} shots`}>
+            ({shots.length})
+          </span>
+        )}
         <input
           className="scene-slugline"
           value={scene.slugline}
@@ -92,28 +118,30 @@ export function SortableSceneRow({
           ×
         </button>
       </div>
-      <div ref={setDropRef} className="shot-list">
-        <SortableContext items={shotIds} strategy={verticalListSortingStrategy}>
-          {shots.map((shot) => (
-            <SortableShotRow
-              key={shot.id}
-              scene={scene}
-              shot={shot}
-              scenes={project.scenes}
-              labelMode={project.labelMode}
-              additionalInfoStyle={project.additionalInfoStyle}
-              selected={selectedShotId === shot.id}
-              onSelect={() => onSelectShot(shot.id)}
-              onToggleVisible={() =>
-                onToggleShotVisible(shot.id, !shot.visible)
-              }
-            />
-          ))}
-        </SortableContext>
-        {shots.length === 0 && (
-          <p className="empty-scene-hint">Empty scene - add shots below</p>
-        )}
-      </div>
+      {!collapsed && (
+        <div ref={setDropRef} className="shot-list">
+          <SortableContext items={shotIds} strategy={verticalListSortingStrategy}>
+            {shots.map((shot) => (
+              <SortableShotRow
+                key={shot.id}
+                scene={scene}
+                shot={shot}
+                scenes={project.scenes}
+                labelMode={project.labelMode}
+                additionalInfoStyle={project.additionalInfoStyle}
+                selected={selectedShotId === shot.id}
+                onSelect={() => onSelectShot(shot.id)}
+                onToggleVisible={() =>
+                  onToggleShotVisible(shot.id, !shot.visible)
+                }
+              />
+            ))}
+          </SortableContext>
+          {shots.length === 0 && (
+            <p className="empty-scene-hint">Empty scene - add shots below</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

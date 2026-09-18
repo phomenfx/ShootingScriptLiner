@@ -57,6 +57,8 @@ type LineClipboard = { kind: "line"; lines: LineAnnotation[] };
 type ProjectState = {
   project: Project;
   selection: Selection;
+  /** Session-only: scene IDs whose shot lists are folded in the outliner. */
+  collapsedSceneIds: Record<string, true>;
   activeTool: ScriptTool;
   lineClipboard: LineClipboard | null;
   settingsOpen: boolean;
@@ -81,6 +83,10 @@ type ProjectState = {
 
   newProject: () => void;
   loadProject: (project: Project) => void;
+  toggleSceneCollapsed: (sceneId: string) => void;
+  setSceneCollapsed: (sceneId: string, collapsed: boolean) => void;
+  collapseAllScenes: () => void;
+  expandAllScenes: () => void;
   setProjectName: (name: string) => void;
   setScriptFileName: (scriptFileName: string) => void;
   setLabelMode: (mode: LabelMode) => void;
@@ -204,6 +210,7 @@ function createScene(order: number, slugline = ""): Scene {
 export const useProjectStore = create<ProjectState>((set, get) => ({
   project: { ...DEFAULT_PROJECT },
   selection: null,
+  collapsedSceneIds: {},
   activeTool: "select",
   lineClipboard: null,
   settingsOpen: false,
@@ -223,6 +230,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({
       project: { ...DEFAULT_PROJECT, scenes: [] },
       selection: null,
+      collapsedSceneIds: {},
       activeTool: "select",
       lineClipboard: null,
       viewerPage: 1,
@@ -253,6 +261,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         project.scenes
       ),
       selection: null,
+      collapsedSceneIds: {},
       activeTool: "select",
       viewerPage: 1,
       activePage: 1,
@@ -260,6 +269,35 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       scriptPageHeightPt: 792,
       scriptPdfFile: null,
     }),
+
+  toggleSceneCollapsed: (sceneId) =>
+    set((s) => {
+      const next = { ...s.collapsedSceneIds };
+      if (next[sceneId]) delete next[sceneId];
+      else next[sceneId] = true;
+      return { collapsedSceneIds: next };
+    }),
+
+  setSceneCollapsed: (sceneId, collapsed) =>
+    set((s) => {
+      if (collapsed) {
+        if (s.collapsedSceneIds[sceneId]) return s;
+        return { collapsedSceneIds: { ...s.collapsedSceneIds, [sceneId]: true } };
+      }
+      if (!s.collapsedSceneIds[sceneId]) return s;
+      const next = { ...s.collapsedSceneIds };
+      delete next[sceneId];
+      return { collapsedSceneIds: next };
+    }),
+
+  collapseAllScenes: () =>
+    set((s) => {
+      const collapsedSceneIds: Record<string, true> = {};
+      for (const sc of s.project.scenes) collapsedSceneIds[sc.id] = true;
+      return { collapsedSceneIds };
+    }),
+
+  expandAllScenes: () => set({ collapsedSceneIds: {} }),
 
   setProjectName: (name) =>
     set((s) => ({ project: { ...s.project, name } })),
@@ -408,7 +446,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   selectScene: (sceneId) => set({ selection: { kind: "scene", sceneId } }),
 
   selectShot: (sceneId, shotId) =>
-    set({ selection: { kind: "shot", sceneId, shotId } }),
+    set((s) => {
+      const collapsedSceneIds = s.collapsedSceneIds[sceneId]
+        ? (() => {
+            const next = { ...s.collapsedSceneIds };
+            delete next[sceneId];
+            return next;
+          })()
+        : s.collapsedSceneIds;
+      return {
+        selection: { kind: "shot", sceneId, shotId },
+        collapsedSceneIds,
+      };
+    }),
 
   selectAnnotation: (annotationId) =>
     set({ selection: { kind: "annotation", annotationId } }),
@@ -460,7 +510,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           : s.selection?.kind === "shot" && s.selection.sceneId === sceneId
             ? null
             : s.selection;
-      return { project: applyScenes(s.project, scenes), selection: sel };
+      const collapsedSceneIds = s.collapsedSceneIds[sceneId]
+        ? (() => {
+            const next = { ...s.collapsedSceneIds };
+            delete next[sceneId];
+            return next;
+          })()
+        : s.collapsedSceneIds;
+      return {
+        project: applyScenes(s.project, scenes),
+        selection: sel,
+        collapsedSceneIds,
+      };
     }),
 
   reorderScenes: (activeId, overId) =>
@@ -485,9 +546,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const next = applyScenes(s.project, scenes);
       const scene = next.scenes.find((sc) => sc.id === targetId);
       const shot = scene?.shots[scene.shots.length - 1];
+      const collapsedSceneIds = s.collapsedSceneIds[targetId]
+        ? (() => {
+            const ids = { ...s.collapsedSceneIds };
+            delete ids[targetId];
+            return ids;
+          })()
+        : s.collapsedSceneIds;
       return {
         project: next,
         selection: shot ? { kind: "shot", sceneId: targetId, shotId: shot.id } : s.selection,
+        collapsedSceneIds,
       };
     }),
 

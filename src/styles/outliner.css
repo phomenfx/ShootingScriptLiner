@@ -7,6 +7,7 @@
 
 .outliner-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -66,9 +67,20 @@
   cursor: pointer;
 }
 
+.scene-block.collapsed .scene-header {
+  border-radius: var(--radius-lg);
+}
+
 .scene-number {
   font-weight: 600;
   white-space: nowrap;
+}
+
+.scene-shot-count {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .scene-slugline {
@@ -129,7 +141,31 @@
   cursor: grabbing;
 }
 
-/* Drag handle */
+/* Fold / drag handle */
+.fold-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  user-select: none;
+  flex-shrink: 0;
+  padding: 6px 4px;
+  margin: -4px 0;
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  min-width: 24px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+}
+
+.fold-btn:hover {
+  background: var(--color-overlay);
+  color: var(--color-text);
+}
+
 .drag-handle {
   cursor: grab;
   color: var(--color-text-muted);

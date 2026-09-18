@@ -67,17 +67,30 @@ async function download(url, destPath) {
 }
 
 async function main() {
-  console.log("Building app...");
-  execSync("npm run build", { cwd: root, stdio: "inherit" });
+  // Relative base so miniserve can load assets from http://127.0.0.1:8080/
+  console.log("Building app for portable (base=./)...");
+  execSync("npm run build", {
+    cwd: root,
+    stdio: "inherit",
+    env: { ...process.env, VITE_BASE: "./" },
+  });
 
   if (!existsSync(distSrc)) {
-    throw new Error("dist/ missing after build");
+    throw new Error("dist/ missing after portable build");
   }
 
   console.log("Copying dist/ to portable/dist/ ...");
   await rm(distDest, { recursive: true, force: true });
   await mkdir(portableRoot, { recursive: true });
   await cp(distSrc, distDest, { recursive: true });
+
+  // Restore dist/ for GitHub Pages (absolute /ShootingScriptLiner/ base)
+  console.log("Building app for GitHub Pages (dist/)...");
+  execSync("npm run build", { cwd: root, stdio: "inherit" });
+
+  if (!existsSync(distSrc)) {
+    throw new Error("dist/ missing after GitHub Pages build");
+  }
 
   if (skipDownload) {
     console.log("Skipped miniserve download (--skip-download).");
