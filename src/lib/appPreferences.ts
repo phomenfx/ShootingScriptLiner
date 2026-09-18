@@ -1,12 +1,15 @@
 import {
   DEFAULT_LINE_HIT_TOLERANCE_PX,
   DEFAULT_MAX_MOUNTED_PDF_PAGES,
+  DEFAULT_SIDEBAR_WIDTH_PX,
   DEFAULT_VIEWER_ZOOM_PERCENT,
   MAX_LINE_HIT_TOLERANCE_PX,
   MAX_MAX_MOUNTED_PDF_PAGES,
+  MAX_SIDEBAR_WIDTH_RATIO,
   MAX_VIEWER_ZOOM_PERCENT,
   MIN_LINE_HIT_TOLERANCE_PX,
   MIN_MAX_MOUNTED_PDF_PAGES,
+  MIN_SIDEBAR_WIDTH_PX,
   MIN_VIEWER_ZOOM_PERCENT,
 } from "../types/appPreferences";
 import type { ViewerLayoutMode } from "../types/viewerLayout";
@@ -16,6 +19,7 @@ const STORAGE_KEY = "shooting-script-liner-line-hit-tolerance";
 const LAYOUT_MODE_KEY = "shooting-script-liner-viewer-layout";
 const MAX_MOUNTED_PAGES_KEY = "shooting-script-liner-max-mounted-pdf-pages";
 const VIEWER_ZOOM_KEY = "shooting-script-liner-viewer-zoom-percent";
+const SIDEBAR_WIDTH_KEY = "shooting-script-liner-sidebar-width-px";
 
 export function clampLineHitTolerancePx(value: number): number {
   const n = Number(value);
@@ -95,4 +99,37 @@ export function loadViewerZoomPercent(): number {
 
 export function saveViewerZoomPercent(percent: number): void {
   localStorage.setItem(VIEWER_ZOOM_KEY, String(clampViewerZoomPercent(percent)));
+}
+
+export function clampSidebarWidthPx(value: number, viewportWidth?: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_SIDEBAR_WIDTH_PX;
+  const rounded = Math.round(Math.max(MIN_SIDEBAR_WIDTH_PX, n));
+  if (viewportWidth == null || !Number.isFinite(viewportWidth) || viewportWidth <= 0) {
+    return rounded;
+  }
+  const max = Math.max(MIN_SIDEBAR_WIDTH_PX, viewportWidth * MAX_SIDEBAR_WIDTH_RATIO);
+  return Math.round(Math.min(max, rounded));
+}
+
+export function loadSidebarWidthPx(): number {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    if (raw == null || raw === "") return DEFAULT_SIDEBAR_WIDTH_PX;
+    const viewport =
+      typeof window !== "undefined" && Number.isFinite(window.innerWidth)
+        ? window.innerWidth
+        : undefined;
+    return clampSidebarWidthPx(Number(raw), viewport);
+  } catch {
+    return DEFAULT_SIDEBAR_WIDTH_PX;
+  }
+}
+
+export function saveSidebarWidthPx(px: number): void {
+  const viewport =
+    typeof window !== "undefined" && Number.isFinite(window.innerWidth)
+      ? window.innerWidth
+      : undefined;
+  localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clampSidebarWidthPx(px, viewport)));
 }

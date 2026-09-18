@@ -28,13 +28,16 @@ import { DEFAULT_TOOL_KEYBINDS, type ToolKeybinds } from "../types/toolKeybinds"
 import {
   clampLineHitTolerancePx,
   clampMaxMountedPdfPages,
+  clampSidebarWidthPx,
   clampViewerZoomPercent,
   loadLineHitTolerancePx,
   loadMaxMountedPdfPages,
+  loadSidebarWidthPx,
   loadViewerLayoutMode,
   loadViewerZoomPercent,
   saveLineHitTolerancePx,
   saveMaxMountedPdfPages,
+  saveSidebarWidthPx,
   saveViewerLayoutMode,
   saveViewerZoomPercent,
 } from "../lib/appPreferences";
@@ -78,6 +81,8 @@ type ProjectState = {
   maxMountedPdfPages: number;
   /** PDF zoom as percent (100 = scale 1.0); app preference in localStorage. */
   viewerZoomPercent: number;
+  /** Right sidebar width (px); app preference in localStorage. */
+  sidebarWidthPx: number;
   /** Active script PDF in memory (for viewer + Save ZIP when cache key mismatches). */
   scriptPdfFile: File | null;
 
@@ -107,6 +112,7 @@ type ProjectState = {
   setMaxMountedPdfPages: (count: number) => void;
   setViewerZoomPercent: (percent: number) => void;
   adjustViewerZoom: (deltaPercent: number) => void;
+  setSidebarWidthPx: (px: number) => void;
   setScriptPdfFile: (file: File | null) => void;
 
   selectScene: (sceneId: string) => void;
@@ -224,6 +230,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   lineHitTolerancePx: loadLineHitTolerancePx(),
   maxMountedPdfPages: loadMaxMountedPdfPages(),
   viewerZoomPercent: loadViewerZoomPercent(),
+  sidebarWidthPx: loadSidebarWidthPx(),
   scriptPdfFile: null,
 
   newProject: () =>
@@ -399,6 +406,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const next = clampViewerZoomPercent(get().viewerZoomPercent + deltaPercent);
     saveViewerZoomPercent(next);
     set({ viewerZoomPercent: next });
+  },
+
+  setSidebarWidthPx: (px) => {
+    const next = clampSidebarWidthPx(px, typeof window !== "undefined" ? window.innerWidth : undefined);
+    saveSidebarWidthPx(next);
+    set({ sidebarWidthPx: next });
   },
 
   setScriptPdfFile: (scriptPdfFile) => set({ scriptPdfFile }),

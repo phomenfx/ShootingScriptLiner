@@ -1,14 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { clampLineHitTolerancePx, clampMaxMountedPdfPages, clampViewerZoomPercent } from "./appPreferences";
+import {
+  clampLineHitTolerancePx,
+  clampMaxMountedPdfPages,
+  clampSidebarWidthPx,
+  clampViewerZoomPercent,
+} from "./appPreferences";
 import {
   DEFAULT_LINE_HIT_TOLERANCE_PX,
   DEFAULT_MAX_MOUNTED_PDF_PAGES,
+  DEFAULT_SIDEBAR_WIDTH_PX,
   DEFAULT_VIEWER_ZOOM_PERCENT,
   MAX_LINE_HIT_TOLERANCE_PX,
   MAX_MAX_MOUNTED_PDF_PAGES,
+  MAX_SIDEBAR_WIDTH_RATIO,
   MAX_VIEWER_ZOOM_PERCENT,
   MIN_LINE_HIT_TOLERANCE_PX,
   MIN_MAX_MOUNTED_PDF_PAGES,
+  MIN_SIDEBAR_WIDTH_PX,
   MIN_VIEWER_ZOOM_PERCENT,
 } from "../types/appPreferences";
 
@@ -54,5 +62,24 @@ describe("clampViewerZoomPercent", () => {
 
   it("rounds valid values", () => {
     expect(clampViewerZoomPercent(130.6)).toBe(131);
+  });
+});
+
+describe("clampSidebarWidthPx", () => {
+  it("returns default for invalid input", () => {
+    expect(clampSidebarWidthPx(NaN)).toBe(DEFAULT_SIDEBAR_WIDTH_PX);
+  });
+
+  it("clamps to min when no viewport is given", () => {
+    expect(clampSidebarWidthPx(100)).toBe(MIN_SIDEBAR_WIDTH_PX);
+    expect(clampSidebarWidthPx(900)).toBe(900);
+  });
+
+  it("caps at 75% of the viewport width", () => {
+    expect(clampSidebarWidthPx(9999, 1000)).toBe(1000 * MAX_SIDEBAR_WIDTH_RATIO);
+  });
+
+  it("rounds valid values", () => {
+    expect(clampSidebarWidthPx(400.6, 2000)).toBe(401);
   });
 });
