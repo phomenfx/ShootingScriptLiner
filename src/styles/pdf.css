@@ -88,7 +88,7 @@
 .pdf-layout-toggle button.active {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
 }
 
 .pdf-zoom-controls {
@@ -259,7 +259,7 @@
 .script-toolbar button.active {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
 }
 
 .pdf-cache-hint {
@@ -283,7 +283,7 @@
 }
 
 .pdf-hint {
-  color: #999;
+  color: var(--color-text-dim);
   font-size: 13px;
   padding: 8px 12px;
 }

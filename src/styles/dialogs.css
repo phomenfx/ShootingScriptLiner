@@ -209,7 +209,7 @@
 .keybind-error {
   margin: 0 0 8px;
   font-size: 12px;
-  color: #e57373;
+  color: var(--color-error);
 }
 
 .keybind-reset {

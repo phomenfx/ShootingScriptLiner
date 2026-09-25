@@ -1,5 +1,7 @@
 /* Color palette and shared tokens */
 :root {
+  color-scheme: dark;
+
   --color-bg: #1a1a1a;
   --color-surface: #2a2a2a;
   --color-surface-raised: #2d2d2d;
@@ -27,6 +29,7 @@
   --color-btn-danger-border: #833;
   --color-overlay: #444;
   --color-dialog: #333;
+  --color-on-accent: #fff;
 
   --radius-sm: 3px;
   --radius-md: 4px;
@@ -38,4 +41,37 @@
   --font-size-lg: 22px;
 
   --drag-transition: transform 200ms ease;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg: #f3f3f4;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #e8e8ea;
+  --color-panel: #f7f7f8;
+  --color-block: #e4e4e7;
+  --color-header: #ececee;
+  --color-row: #ffffff;
+  --color-row-selected: #d7e6f5;
+
+  --color-border: #d0d0d4;
+  --color-border-strong: #c2c2c8;
+  --color-border-input: #b4b4ba;
+  --color-accent: #2f6fa3;
+
+  --color-text: #1c1c1e;
+  --color-text-muted: #5c5c63;
+  --color-text-dim: #6e6e76;
+  --color-text-hint: #3a3a40;
+  --color-error: #b42318;
+
+  --color-btn: #e8e8ec;
+  --color-btn-hover: #dcdce2;
+  --color-btn-danger: #f8d6d6;
+  --color-btn-danger-border: #e09a9a;
+  --color-overlay: #d8d8de;
+  --color-dialog: #ffffff;
+  --color-on-accent: #fff;
 }

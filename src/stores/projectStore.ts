@@ -32,17 +32,21 @@ import { DEFAULT_LINE_DEFAULTS } from "../types/lineDefaults";
 import { loadToolKeybinds, saveToolKeybinds, validateToolKeybindChange } from "../lib/toolKeybinds";
 import { DEFAULT_TOOL_KEYBINDS, type ToolKeybinds } from "../types/toolKeybinds";
 import {
+  applyColorTheme,
   clampLineHitTolerancePx,
   clampMaxMountedPdfPages,
   clampPropertiesHeightPx,
   clampSidebarWidthPx,
   clampViewerZoomPercent,
+  loadColorTheme,
+  normalizeColorTheme,
   loadLineHitTolerancePx,
   loadMaxMountedPdfPages,
   loadPropertiesHeightPx,
   loadSidebarWidthPx,
   loadViewerLayoutMode,
   loadViewerZoomPercent,
+  saveColorTheme,
   saveLineHitTolerancePx,
   saveMaxMountedPdfPages,
   savePropertiesHeightPx,
@@ -50,6 +54,7 @@ import {
   saveViewerLayoutMode,
   saveViewerZoomPercent,
 } from "../lib/appPreferences";
+import type { ColorTheme } from "../types/appPreferences";
 import type { ViewerLayoutMode } from "../types/viewerLayout";
 import { clampLabelOffsetPt, migrateLabelLayout } from "../types/labelLayout";
 
@@ -84,6 +89,8 @@ type ProjectState = {
   /** PDF page height in points (72 pt = 1 in); used for margin continuation inset. */
   scriptPageHeightPt: number;
   toolKeybinds: ToolKeybinds;
+  /** Chrome theme (dark/light); app preference in localStorage. Not part of the project file. */
+  colorTheme: ColorTheme;
   /** Perpendicular click slop for selecting lines (px); app preference in localStorage. */
   lineHitTolerancePx: number;
   /** Max page stacks mounted in scroll view; app preference in localStorage. */
@@ -122,6 +129,7 @@ type ProjectState = {
   setActiveTool: (tool: ScriptTool) => void;
   setToolKeybind: (tool: ScriptTool, key: string) => string | null;
   resetToolKeybinds: () => void;
+  setColorTheme: (theme: ColorTheme) => void;
   setLineHitTolerancePx: (px: number) => void;
   setMaxMountedPdfPages: (count: number) => void;
   setViewerZoomPercent: (percent: number) => void;
@@ -277,6 +285,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   pdfPageCount: 0,
   scriptPageHeightPt: 792,
   toolKeybinds: loadToolKeybinds(),
+  colorTheme: loadColorTheme(),
   lineHitTolerancePx: loadLineHitTolerancePx(),
   maxMountedPdfPages: loadMaxMountedPdfPages(),
   viewerZoomPercent: loadViewerZoomPercent(),
@@ -462,6 +471,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const next = { ...DEFAULT_TOOL_KEYBINDS };
     saveToolKeybinds(next);
     set({ toolKeybinds: next });
+  },
+
+  setColorTheme: (theme) => {
+    const next = normalizeColorTheme(theme);
+    saveColorTheme(next);
+    applyColorTheme(next);
+    set({ colorTheme: next });
   },
 
   setLineHitTolerancePx: (px) => {

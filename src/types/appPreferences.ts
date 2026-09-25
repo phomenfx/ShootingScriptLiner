@@ -1,3 +1,10 @@
+/** App chrome theme. Does not affect PDF pixels, annotations, or exports. */
+export const COLOR_THEMES = ["dark", "light"] as const;
+
+export type ColorTheme = (typeof COLOR_THEMES)[number];
+
+export const DEFAULT_COLOR_THEME: ColorTheme = "dark";
+
 /** Default perpendicular click slop for selecting lines (Select tool). */
 export const DEFAULT_LINE_HIT_TOLERANCE_PX = 12;
 

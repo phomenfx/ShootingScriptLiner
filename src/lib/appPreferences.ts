@@ -1,4 +1,5 @@
 import {
+  DEFAULT_COLOR_THEME,
   DEFAULT_LINE_HIT_TOLERANCE_PX,
   DEFAULT_MAX_MOUNTED_PDF_PAGES,
   DEFAULT_PROPERTIES_HEIGHT_PX,
@@ -16,16 +17,42 @@ import {
   MIN_SIDEBAR_WIDTH_PX,
   MIN_VIEWER_ZOOM_PERCENT,
   PROPERTIES_SPLITTER_PX,
+  type ColorTheme,
 } from "../types/appPreferences";
 import type { ViewerLayoutMode } from "../types/viewerLayout";
 import { VIEWER_LAYOUT_MODES } from "../types/viewerLayout";
 
 const STORAGE_KEY = "shooting-script-liner-line-hit-tolerance";
+const COLOR_THEME_KEY = "shooting-script-liner-color-theme";
 const LAYOUT_MODE_KEY = "shooting-script-liner-viewer-layout";
 const MAX_MOUNTED_PAGES_KEY = "shooting-script-liner-max-mounted-pdf-pages";
 const VIEWER_ZOOM_KEY = "shooting-script-liner-viewer-zoom-percent";
 const SIDEBAR_WIDTH_KEY = "shooting-script-liner-sidebar-width-px";
 const PROPERTIES_HEIGHT_KEY = "shooting-script-liner-properties-height-px";
+
+export function normalizeColorTheme(value: unknown): ColorTheme {
+  return value === "light" ? "light" : DEFAULT_COLOR_THEME;
+}
+
+export function loadColorTheme(): ColorTheme {
+  try {
+    return normalizeColorTheme(localStorage.getItem(COLOR_THEME_KEY));
+  } catch {
+    return DEFAULT_COLOR_THEME;
+  }
+}
+
+export function saveColorTheme(theme: ColorTheme): void {
+  localStorage.setItem(COLOR_THEME_KEY, normalizeColorTheme(theme));
+}
+
+/** Paint the chrome theme before React renders. No effect on PDF or exports. */
+export function applyColorTheme(theme: ColorTheme): void {
+  if (typeof document === "undefined") return;
+  const next = normalizeColorTheme(theme);
+  document.documentElement.dataset.theme = next;
+  document.documentElement.style.colorScheme = next;
+}
 
 export function clampLineHitTolerancePx(value: number): number {
   const n = Number(value);

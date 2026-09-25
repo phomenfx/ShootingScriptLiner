@@ -1,12 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clampLineHitTolerancePx,
   clampMaxMountedPdfPages,
   clampPropertiesHeightPx,
   clampSidebarWidthPx,
   clampViewerZoomPercent,
+  loadColorTheme,
+  normalizeColorTheme,
+  saveColorTheme,
 } from "./appPreferences";
 import {
+  DEFAULT_COLOR_THEME,
   DEFAULT_LINE_HIT_TOLERANCE_PX,
   DEFAULT_MAX_MOUNTED_PDF_PAGES,
   DEFAULT_PROPERTIES_HEIGHT_PX,
@@ -22,6 +26,41 @@ import {
   MIN_SIDEBAR_WIDTH_PX,
   MIN_VIEWER_ZOOM_PERCENT,
 } from "../types/appPreferences";
+
+describe("loadColorTheme", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubStorage(initial: Record<string, string> = {}) {
+    const mem = { ...initial };
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => (key in mem ? mem[key] : null),
+      setItem: (key: string, value: string) => {
+        mem[key] = value;
+      },
+    });
+    return mem;
+  }
+
+  it("falls back to dark for an unknown stored value", () => {
+    const mem = stubStorage();
+    saveColorTheme("light");
+    const key = Object.keys(mem)[0];
+    mem[key] = "sepia";
+    expect(loadColorTheme()).toBe("dark");
+    expect(normalizeColorTheme(null)).toBe(DEFAULT_COLOR_THEME);
+  });
+
+  it("keeps dark and light", () => {
+    const mem = stubStorage();
+    saveColorTheme("light");
+    expect(loadColorTheme()).toBe("light");
+    saveColorTheme("dark");
+    expect(loadColorTheme()).toBe("dark");
+    expect(Object.values(mem)).toContain("dark");
+  });
+});
 
 describe("clampLineHitTolerancePx", () => {
   it("returns default for invalid input", () => {

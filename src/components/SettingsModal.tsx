@@ -14,6 +14,7 @@ import {
   MAX_MAX_MOUNTED_PDF_PAGES,
   MIN_LINE_HIT_TOLERANCE_PX,
   MIN_MAX_MOUNTED_PDF_PAGES,
+  type ColorTheme,
 } from "../types/appPreferences";
 import { MAX_LABEL_OFFSET_PT, MIN_LABEL_OFFSET_PT } from "../types/labelLayout";
 
@@ -92,6 +93,8 @@ export function SettingsModal() {
   const setLabelOffsetXPt = useProjectStore((s) => s.setLabelOffsetXPt);
   const setLabelOffsetYPt = useProjectStore((s) => s.setLabelOffsetYPt);
   const setLabelSecondaryGapPt = useProjectStore((s) => s.setLabelSecondaryGapPt);
+  const colorTheme = useProjectStore((s) => s.colorTheme);
+  const setColorTheme = useProjectStore((s) => s.setColorTheme);
   const lineHitTolerancePx = useProjectStore((s) => s.lineHitTolerancePx);
   const setLineHitTolerancePx = useProjectStore((s) => s.setLineHitTolerancePx);
   const maxMountedPdfPages = useProjectStore((s) => s.maxMountedPdfPages);
@@ -111,6 +114,17 @@ export function SettingsModal() {
     <div className="dialog-backdrop" role="dialog" aria-modal="true">
       <div className="dialog settings-dialog settings-dialog-wide">
         <h2>Settings</h2>
+        <h3 className="settings-section">Appearance</h3>
+        <label className="field">
+          Theme
+          <select
+            value={colorTheme}
+            onChange={(e) => setColorTheme(e.target.value as ColorTheme)}
+          >
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </label>
         <label className="field">
           Project name
           <input
@@ -185,7 +199,7 @@ export function SettingsModal() {
           ))}
         </ul>
 
-        <h3 className="settings-section">Scheduled date</h3>
+        <h3 className="settings-section">Date Format</h3>
         <p className="settings-hint settings-hint-tight">
           Shown on line text and in the lined PDF. The shot list CSV writes the date as YYYY-MM-DD.
         </p>

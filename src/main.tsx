@@ -1,8 +1,11 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { applyColorTheme, loadColorTheme } from "./lib/appPreferences";
 import { getBundledFontLoadErrors, loadBundledFonts } from "./lib/fonts";
 import "./index.css";
+
+applyColorTheme(loadColorTheme());
 
 void loadBundledFonts().then(() => {
   const errors = getBundledFontLoadErrors();
