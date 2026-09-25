@@ -1,6 +1,6 @@
 import { arrayMove } from "@dnd-kit/sortable";
 import { create } from "zustand";
-import { cloneLine, migrateLineDefaults } from "../lib/annotationUtils";
+import { cloneLine, cloneText, migrateLineDefaults } from "../lib/annotationUtils";
 import {
   computeMarginContinuationTrim,
   type MarginTrimHint,
@@ -197,6 +197,7 @@ type ProjectState = {
 
   addText: (text: TextAnnotation) => void;
   updateText: (id: string, patch: Partial<Omit<TextAnnotation, "id" | "kind">>) => void;
+  duplicateText: (id: string) => void;
 
   getLastSelectedSceneId: () => string | null;
   getSelectedLine: () => LineAnnotation | null;
@@ -228,6 +229,16 @@ function syncLockedLinesFromShots(project: Project): Project {
     }
     if (lineChanged) changed = true;
     return lineChanged ? line : a;
+  });
+
+  annotations = annotations.map((a) => {
+    if (a.kind !== "text" || !a.shotId || !a.locks?.color) return a;
+    const shot = project.scenes
+      .flatMap((sc) => sc.shots)
+      .find((sh) => sh.id === a.shotId);
+    if (!shot || a.color === shot.color) return a;
+    changed = true;
+    return { ...a, color: shot.color };
   });
 
   return changed ? { ...project, annotations } : project;
@@ -765,6 +776,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ),
       },
     })),
+
+  duplicateText: (id) => {
+    const text = get().project.annotations.find((a) => a.id === id && a.kind === "text");
+    if (!text || text.kind !== "text") return;
+    get().addText(cloneText(text));
+  },
 
   updateLine: (id, patch) =>
     set((s) => ({

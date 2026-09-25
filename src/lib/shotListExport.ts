@@ -4,7 +4,6 @@ import type { Project, Scene, Shot } from "../types/project";
 
 export const SHOT_LIST_COLUMNS = [
   "Scene",
-  "Slugline",
   "Shot",
   "Type",
   "Subject",
@@ -38,7 +37,6 @@ function shotIndex(scene: Scene, shot: Shot, project: Project): string {
 function rowFromShot(scene: Scene, shot: Shot, project: Project): ShotListRow {
   return {
     Scene: String(sceneNumber(scene, project.scenes)),
-    Slugline: scene.slugline,
     Shot: shotIndex(scene, shot, project),
     Type: shot.shotType?.trim() ?? "",
     Subject: shot.subject?.trim() ?? "",
@@ -61,7 +59,6 @@ function rowFromShot(scene: Scene, shot: Shot, project: Project): ShotListRow {
 function rowFromEmptyScene(scene: Scene, project: Project): ShotListRow {
   return {
     Scene: String(sceneNumber(scene, project.scenes)),
-    Slugline: scene.slugline,
     Shot: "",
     Type: "",
     Subject: "",

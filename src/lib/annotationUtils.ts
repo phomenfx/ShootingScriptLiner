@@ -2,7 +2,12 @@ import { formatLineCaption } from "./lineCaption";
 import { migrateCapName } from "./lineCaps";
 import { normalizeStroke } from "./lineStrokes";
 import type { LineAnnotation, LineEnding, LineStyle, TextAnnotation } from "../types/annotations";
-import { DEFAULT_LINE_LOCKS, UNLINKED_LINE_LOCKS, isTextAnnotation } from "../types/annotations";
+import {
+  DEFAULT_LINE_LOCKS,
+  UNLINKED_LINE_LOCKS,
+  isTextAnnotation,
+  type TextFieldLocks,
+} from "../types/annotations";
 import { DEFAULT_LINE_DEFAULTS, type LineDefaults } from "../types/lineDefaults";
 import type { Project, Scene, Shot } from "../types/project";
 import { newId } from "./ids";
@@ -43,10 +48,11 @@ export function getLineDisplayLabel(line: LineAnnotation, project: Project): str
 }
 
 export function getTextDisplayText(text: TextAnnotation, project: Project): string {
-  if (text.followShot && text.shotId) {
-    const found = findShot(project, text.shotId);
-    if (found) return formatLineCaption(found.scene, found.shot, project);
-  }
+  const found = text.shotId ? findShot(project, text.shotId) : null;
+  const caption = found ? formatLineCaption(found.scene, found.shot, project) : "";
+  if (text.followShot && found) return caption;
+  if (text.text.trim()) return text.text;
+  if (found) return caption;
   return text.text;
 }
 
@@ -95,6 +101,26 @@ export function getLineLabelBold(line: LineAnnotation, project: Project): boolea
 
 export function getTextLabelBold(text: TextAnnotation, project: Project): boolean {
   return text.labelBold ?? project.defaultLine.labelBold;
+}
+
+export function textFieldLocks(text: TextAnnotation): TextFieldLocks {
+  return {
+    shotId: text.locks?.shotId === true,
+    color: text.locks?.color === true,
+  };
+}
+
+/** A locked note uses the linked shot color. Otherwise it uses its own color. */
+export function resolveTextColor(text: TextAnnotation, project: Project): string {
+  if (textFieldLocks(text).color && text.shotId) {
+    const found = findShot(project, text.shotId);
+    if (found) return found.shot.color;
+  }
+  return text.color;
+}
+
+export function textIsVisible(text: TextAnnotation): boolean {
+  return text.showText !== false;
 }
 
 /** Endpoint index used for bottom-margin secondary “(cont.)” label (prefer arrow end). */
@@ -356,7 +382,26 @@ export function migrateTextAnnotation(
   }
   if (typeof raw.shotId === "string" && raw.shotId) text.shotId = raw.shotId;
   if (typeof raw.followShot === "boolean") text.followShot = raw.followShot;
+  if (typeof raw.showText === "boolean") text.showText = raw.showText;
+  if (raw.locks && typeof raw.locks === "object") {
+    const locks = raw.locks as Record<string, unknown>;
+    text.locks = {
+      shotId: locks.shotId === true,
+      color: locks.color === true,
+    };
+  }
   return text;
+}
+
+export function cloneText(text: TextAnnotation): TextAnnotation {
+  const offset = 0.02;
+  return {
+    ...text,
+    id: newId(),
+    x: text.x + offset,
+    y: text.y + offset,
+    locks: text.locks ? { ...text.locks } : undefined,
+  };
 }
 
 export function getProjectCacheKey(project: Project): string {

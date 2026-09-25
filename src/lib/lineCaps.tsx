@@ -28,14 +28,15 @@ export function renderLineCap(
   color: string,
   strokeWidth: number,
   angleRad: number,
-  atStart: boolean
+  atStart: boolean,
+  pxPerPt = 1
 ): { elements: ReactNode; key: string } | null {
   const cap = ending.cap;
   if (cap === "none") return null;
 
   const rot = (atStart ? angleRad + Math.PI : angleRad) * (180 / Math.PI);
-  const s = scale(BASE, ending.scalePercent);
-  const sw = Math.max(1, strokeWidth * 0.8);
+  const s = scale(BASE, ending.scalePercent) * pxPerPt;
+  const sw = Math.max(0.75, strokeWidth * 0.8);
   const filled = ending.filled && capSupportsFill(ending.cap);
   const key = `${cap}-${ending.scalePercent}-${filled}`;
 

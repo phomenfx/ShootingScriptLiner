@@ -8,6 +8,8 @@ import {
   getLineLabelBold,
   getTextLabelBold,
   getTextDisplayText,
+  resolveTextColor,
+  textIsVisible,
   lineEndIndexForContLabel,
   resolveLineStyle,
 } from "./annotationUtils";
@@ -125,7 +127,7 @@ export async function buildLinedPdfBytes(
     }
 
     for (const t of texts) {
-      if (!isTextAnnotation(t)) continue;
+      if (!isTextAnnotation(t) || !textIsVisible(t)) continue;
       const tp = normToPdf(t.x, t.y, pw, ph);
       const singleLine = sanitizePdfExportText(
         getTextDisplayText(t, project).replace(/\s+/g, " ").trim() || " "
@@ -139,7 +141,7 @@ export async function buildLinedPdfBytes(
         y: tp.y,
         size: t.fontSize ?? 11,
         font: textFont,
-        color: hexToRgb(t.color),
+        color: hexToRgb(resolveTextColor(t, project)),
       });
     }
   }

@@ -59,6 +59,21 @@ export const UNLINKED_LINE_LOCKS: LineFieldLocks = {
   color: false,
 };
 
+export type TextFieldLocks = {
+  shotId: boolean;
+  color: boolean;
+};
+
+export const DEFAULT_TEXT_LOCKS: TextFieldLocks = {
+  shotId: true,
+  color: true,
+};
+
+export const UNLINKED_TEXT_LOCKS: TextFieldLocks = {
+  shotId: false,
+  color: false,
+};
+
 export const DEFAULT_LINE_ENDING: LineEnding = {
   cap: "none",
   scalePercent: 100,
@@ -100,6 +115,9 @@ export type TextAnnotation = {
   shotId?: string;
   /** Locked to the shot caption. Unlock to edit this note's own text. */
   followShot?: boolean;
+  /** When false, the note is hidden on the script and in the lined PDF. */
+  showText?: boolean;
+  locks?: TextFieldLocks;
 };
 
 export type Annotation = LineAnnotation | TextAnnotation;

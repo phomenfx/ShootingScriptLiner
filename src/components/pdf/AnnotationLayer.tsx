@@ -9,6 +9,8 @@ import {
   getLineScriptLabels,
   getTextLabelBold,
   getTextDisplayText,
+  resolveTextColor,
+  textIsVisible,
   isAnnotationVisible,
   lineEndIndexForContLabel,
   resolveLineStyle,
@@ -355,14 +357,16 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         const labelWeight = labelFontWeight(getLineLabelBold(line, project));
         const isSel = line.id === selectedId;
         const ang = lineAngleRad(p0.x, p0.y, p1.x, p1.y);
+        const strokePx = style.widthPt * labelScale;
         const startCap = renderLineCap(
           style.start,
           style.color,
-          style.widthPt,
+          strokePx,
           ang,
-          true
+          true,
+          labelScale
         );
-        const endCap = renderLineCap(style.end, style.color, style.widthPt, ang, false);
+        const endCap = renderLineCap(style.end, style.color, strokePx, ang, false, labelScale);
 
         return (
           <g key={line.id} className={isSel ? "line-selected" : undefined}>
@@ -372,8 +376,8 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
               x2={p1.x}
               y2={p1.y}
               stroke={style.color}
-              strokeWidth={style.widthPt}
-              strokeDasharray={strokeDashArray(style.stroke, style.widthPt)}
+              strokeWidth={strokePx}
+              strokeDasharray={strokeDashArray(style.stroke, strokePx)}
             />
             {startCap && (
               <g transform={`translate(${p0.x}, ${p0.y})`}>{startCap.elements}</g>
@@ -427,16 +431,18 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         const textFsPx = (t.fontSize ?? project.defaultLine.fontSizePt) * labelScale;
         return (
           <g key={t.id} className={isSel ? "text-selected" : undefined}>
-            <text
-              x={tx}
-              y={ty}
-              fill={t.color}
-              fontSize={textFsPx}
-              fontFamily={t.fontFamily ?? project.defaultLine.fontFamily}
-              fontWeight={labelFontWeight(getTextLabelBold(t, project))}
-            >
-              {getTextDisplayText(t, project)}
-            </text>
+            {textIsVisible(t) && (
+              <text
+                x={tx}
+                y={ty}
+                fill={resolveTextColor(t, project)}
+                fontSize={textFsPx}
+                fontFamily={t.fontFamily ?? project.defaultLine.fontFamily}
+                fontWeight={labelFontWeight(getTextLabelBold(t, project))}
+              >
+                {getTextDisplayText(t, project)}
+              </text>
+            )}
             {isSel && <circle className="line-handle" cx={tx} cy={ty} r={6} />}
           </g>
         );
@@ -448,8 +454,8 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
           x2={normalizedToPx(previewEnd, width, height).x}
           y2={normalizedToPx(previewEnd, width, height).y}
           stroke="#4a9eff"
-          strokeWidth={2}
-          strokeDasharray="4 4"
+          strokeWidth={2 * labelScale}
+          strokeDasharray={`${4 * labelScale} ${4 * labelScale}`}
           pointerEvents="none"
         />
       )}

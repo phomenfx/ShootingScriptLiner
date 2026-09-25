@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatExcelDate } from "./dateFormat";
-import { getLineDisplayLabel, getTextDisplayText } from "./annotationUtils";
+import { getLineDisplayLabel, getTextDisplayText, resolveTextColor, textIsVisible } from "./annotationUtils";
 import { formatLineCaption } from "./lineCaption";
 import { formatShotLabel, parseProject, serializeProject } from "./labelUtils";
 import { buildShotListRows, rowsToCsv, SHOT_LIST_COLUMNS } from "./shotListExport";
@@ -122,6 +122,43 @@ describe("line and text overrides", () => {
     expect(getLineDisplayLabel(line, project)).toBe("Custom line");
   });
 
+  it("draws a line's own words when no shot is linked", () => {
+    const sh = shot();
+    const sc = scene([sh]);
+    const project = withScenes([sc]);
+    const unlinked = {
+      id: "line-2",
+      kind: "line" as const,
+      page: 1,
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+      ],
+      style: {
+        stroke: "solid" as const,
+        widthPt: 1,
+        color: "#111111",
+        start: { cap: "none" as const, scalePercent: 100, filled: true },
+        end: { cap: "none" as const, scalePercent: 100, filled: true },
+      },
+      fontFamily: "Arial",
+      fontSizePt: 11,
+      labelBold: true,
+      label: "Alone",
+      showLabel: true,
+      locks: { ...DEFAULT_LINE_LOCKS, label: false, shotId: false },
+    };
+    expect(getLineDisplayLabel(unlinked, project)).toBe("Alone");
+    const locked = {
+      ...unlinked,
+      id: "line-3",
+      shotId: sh.id,
+      label: "Hidden while locked",
+      locks: { ...DEFAULT_LINE_LOCKS },
+    };
+    expect(getLineDisplayLabel(locked, project)).toBe("1A-WS Subject (Moving Master)");
+  });
+
   it("shows custom text, then the shot caption, then an unlocked override", () => {
     const sh = shot();
     const sc = scene([sh]);
@@ -145,6 +182,32 @@ describe("line and text overrides", () => {
         project
       )
     ).toBe("One off");
+    expect(
+      getTextDisplayText({ ...base, shotId: sh.id, followShot: false, text: "  " }, project)
+    ).toBe("1A-WS Subject (Moving Master)");
+  });
+
+  it("uses the shot color while a note's color is locked", () => {
+    const sh = shot();
+    const project = withScenes([scene([sh])]);
+    const base = {
+      id: "text-color",
+      kind: "text" as const,
+      page: 1,
+      x: 0.2,
+      y: 0.2,
+      text: "Note",
+      color: "#111111",
+      shotId: sh.id,
+    };
+    expect(resolveTextColor({ ...base, locks: { shotId: true, color: true } }, project)).toBe(
+      "#FF0000"
+    );
+    expect(resolveTextColor({ ...base, locks: { shotId: true, color: false } }, project)).toBe(
+      "#111111"
+    );
+    expect(textIsVisible(base)).toBe(true);
+    expect(textIsVisible({ ...base, showText: false })).toBe(false);
   });
 });
 
@@ -170,7 +233,6 @@ describe("parseProject compatibility", () => {
     expect(rows[0]?.Sync).toBe("SYNC");
     expect(rows[0]?.Indicator).toBe("INT.");
     expect(rows[0]?.Time).toBe("DAY");
-    expect(rows[0]?.Slugline).toBe("Entry Room");
   });
 
   it("splits an old slugline into indicator, location, and time", () => {
@@ -278,7 +340,6 @@ describe("shot list export", () => {
     const sc = scene([], { location: "Alley", scheduledDate: "2012-03-27" });
     const rows = buildShotListRows(withScenes([sc]));
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.Slugline).toBe("Entry Room");
     expect(rows[0]?.Location).toBe("Alley");
     expect(rows[0]?.Shot).toBe("");
   });
