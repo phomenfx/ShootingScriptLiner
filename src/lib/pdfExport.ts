@@ -7,6 +7,7 @@ import {
   getLineFontFamily,
   getLineLabelBold,
   getTextLabelBold,
+  getTextDisplayText,
   lineEndIndexForContLabel,
   resolveLineStyle,
 } from "./annotationUtils";
@@ -126,7 +127,9 @@ export async function buildLinedPdfBytes(
     for (const t of texts) {
       if (!isTextAnnotation(t)) continue;
       const tp = normToPdf(t.x, t.y, pw, ph);
-      const singleLine = sanitizePdfExportText(t.text.replace(/\s+/g, " ").trim() || " ");
+      const singleLine = sanitizePdfExportText(
+        getTextDisplayText(t, project).replace(/\s+/g, " ").trim() || " "
+      );
       const textFont = await getFont(
         t.fontFamily ?? project.defaultLine.fontFamily,
         getTextLabelBold(t, project)

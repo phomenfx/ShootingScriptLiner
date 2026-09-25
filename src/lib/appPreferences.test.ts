@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   clampLineHitTolerancePx,
   clampMaxMountedPdfPages,
+  clampPropertiesHeightPx,
   clampSidebarWidthPx,
   clampViewerZoomPercent,
 } from "./appPreferences";
 import {
   DEFAULT_LINE_HIT_TOLERANCE_PX,
   DEFAULT_MAX_MOUNTED_PDF_PAGES,
+  DEFAULT_PROPERTIES_HEIGHT_PX,
   DEFAULT_SIDEBAR_WIDTH_PX,
   DEFAULT_VIEWER_ZOOM_PERCENT,
   MAX_LINE_HIT_TOLERANCE_PX,
@@ -16,6 +18,7 @@ import {
   MAX_VIEWER_ZOOM_PERCENT,
   MIN_LINE_HIT_TOLERANCE_PX,
   MIN_MAX_MOUNTED_PDF_PAGES,
+  MIN_PROPERTIES_HEIGHT_PX,
   MIN_SIDEBAR_WIDTH_PX,
   MIN_VIEWER_ZOOM_PERCENT,
 } from "../types/appPreferences";
@@ -81,5 +84,25 @@ describe("clampSidebarWidthPx", () => {
 
   it("rounds valid values", () => {
     expect(clampSidebarWidthPx(400.6, 2000)).toBe(401);
+  });
+});
+
+describe("clampPropertiesHeightPx", () => {
+  it("returns default for invalid input", () => {
+    expect(clampPropertiesHeightPx(NaN)).toBe(DEFAULT_PROPERTIES_HEIGHT_PX);
+  });
+
+  it("clamps to min when no pane height is given", () => {
+    expect(clampPropertiesHeightPx(40)).toBe(MIN_PROPERTIES_HEIGHT_PX);
+    expect(clampPropertiesHeightPx(900)).toBe(900);
+  });
+
+  it("leaves room for the shot list and stays within 75% of the pane", () => {
+    expect(clampPropertiesHeightPx(9999, 800)).toBe(600);
+    expect(clampPropertiesHeightPx(9999, 400)).toBe(255);
+  });
+
+  it("rounds valid values", () => {
+    expect(clampPropertiesHeightPx(240.6, 800)).toBe(241);
   });
 });

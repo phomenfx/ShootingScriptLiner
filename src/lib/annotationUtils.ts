@@ -1,4 +1,4 @@
-import { formatShotLabel } from "./labelUtils";
+import { formatLineCaption } from "./lineCaption";
 import { migrateCapName } from "./lineCaps";
 import { normalizeStroke } from "./lineStrokes";
 import type { LineAnnotation, LineEnding, LineStyle, TextAnnotation } from "../types/annotations";
@@ -36,16 +36,18 @@ export function getLineDisplayLabel(line: LineAnnotation, project: Project): str
   if (line.shotId) {
     const found = findShot(project, line.shotId);
     if (found) {
-      return formatShotLabel(
-        found.scene,
-        found.shot,
-        project.scenes,
-        project.labelMode,
-        project.additionalInfoStyle
-      );
+      return formatLineCaption(found.scene, found.shot, project);
     }
   }
   return line.label ?? "";
+}
+
+export function getTextDisplayText(text: TextAnnotation, project: Project): string {
+  if (text.followShot && text.shotId) {
+    const found = findShot(project, text.shotId);
+    if (found) return formatLineCaption(found.scene, found.shot, project);
+  }
+  return text.text;
 }
 
 /** Primary + optional secondary "(cont.)" for margin continuation (see `marginContinuation`). */
@@ -352,6 +354,8 @@ export function migrateTextAnnotation(
   } else {
     text.labelBold = defaultLabelBold;
   }
+  if (typeof raw.shotId === "string" && raw.shotId) text.shotId = raw.shotId;
+  if (typeof raw.followShot === "boolean") text.followShot = raw.followShot;
   return text;
 }
 

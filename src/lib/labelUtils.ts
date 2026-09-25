@@ -7,8 +7,13 @@ import type {
   Shot,
 } from "../types/project";
 import { migrateLabelLayout } from "../types/labelLayout";
+import {
+  DEFAULT_SCHEDULED_DATE_FORMAT,
+  migrateLineLabelFields,
+} from "../types/lineLabelFields";
 import { DEFAULT_PROJECT } from "../types/project";
 import { DEFAULT_LINE_DEFAULTS } from "../types/lineDefaults";
+import { migrateSceneSlugline } from "./slugline";
 
 /** Excel-style: 0 → A, 25 → Z, 26 → AA */
 export function indexToLetters(index: number): string {
@@ -108,6 +113,8 @@ export function serializeProject(project: Project): string {
     labelOffsetYPt: project.labelOffsetYPt,
     labelSecondaryGapPt: project.labelSecondaryGapPt,
     defaultLine: project.defaultLine,
+    lineLabelFields: project.lineLabelFields,
+    scheduledDateFormat: project.scheduledDateFormat,
     scriptFileName: project.scriptFileName,
     scenes: renumberAll(getSortedScenes(project.scenes)),
     annotations: project.annotations,
@@ -159,7 +166,12 @@ export function parseProject(json: string): Project {
     inheritLineFromPrevious: data.inheritLineFromPrevious ?? false,
     ...migrateLabelLayout(data),
     defaultLine,
+    lineLabelFields: migrateLineLabelFields(data.lineLabelFields),
+    scheduledDateFormat:
+      typeof data.scheduledDateFormat === "string" && data.scheduledDateFormat.trim()
+        ? data.scheduledDateFormat
+        : DEFAULT_SCHEDULED_DATE_FORMAT,
     annotations,
-    scenes: renumberAll(sorted),
+    scenes: renumberAll(sorted.map((scene) => migrateSceneSlugline(scene))),
   };
 }

@@ -1,5 +1,10 @@
 import { useRef } from "react";
-import { downloadLinedPdf, downloadProjectZip, openProjectFile } from "../lib/projectIO";
+import {
+  downloadLinedPdf,
+  downloadProjectZip,
+  downloadShotListCsv,
+  openProjectFile,
+} from "../lib/projectIO";
 import { cachePdfForProject } from "../lib/pdfCache";
 import { useProjectStore } from "../stores/projectStore";
 
@@ -62,6 +67,9 @@ export function Toolbar() {
           }
         >
           Export lined PDF
+        </button>
+        <button type="button" onClick={() => downloadShotListCsv(project)}>
+          Export shot list
         </button>
         <button type="button" onClick={() => setSettingsOpen(true)}>
           Settings

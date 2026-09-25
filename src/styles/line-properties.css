@@ -1,9 +1,8 @@
 .properties-wrap {
   flex: 0 0 auto;
-  max-height: 42%;
   min-height: 120px;
+  max-height: calc(100% - 145px);
   overflow: auto;
-  border-bottom: 1px solid var(--color-border);
 }
 
 .properties-panel {
@@ -177,6 +176,97 @@
 .field-inline.compact {
   font-size: 12px;
   margin: 0;
+}
+
+.include-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.include-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-hint);
+}
+
+.include-check input {
+  margin: 0;
+}
+
+.include-field > input,
+.include-field > textarea,
+.include-field > select {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 3px 6px;
+  background: var(--color-row);
+  border: 1px solid var(--color-border-input);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+}
+
+.shot-caption-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.shot-color-field {
+  flex: 0 0 auto;
+}
+
+.shot-color-field input[type="color"] {
+  width: 36px;
+  height: 36px;
+}
+
+.shot-caption-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.shot-caption-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.shot-caption-text {
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.field-help {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.shot-props-actions button,
+.text-mode-actions button {
+  flex: 1;
+}
+
+.shot-props-actions .btn-danger,
+.text-mode-actions .btn-danger {
+  width: auto;
+  margin-top: 0;
+}
+
+.text-shot-link {
+  margin: 6px 0;
+}
+
+.text-mode-actions {
+  margin-top: 0;
+  margin-bottom: 6px;
 }
 
 .settings-endings {

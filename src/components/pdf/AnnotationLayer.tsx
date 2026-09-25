@@ -8,6 +8,7 @@ import {
   getLineLabelBold,
   getLineScriptLabels,
   getTextLabelBold,
+  getTextDisplayText,
   isAnnotationVisible,
   lineEndIndexForContLabel,
   resolveLineStyle,
@@ -434,7 +435,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
               fontFamily={t.fontFamily ?? project.defaultLine.fontFamily}
               fontWeight={labelFontWeight(getTextLabelBold(t, project))}
             >
-              {t.text}
+              {getTextDisplayText(t, project)}
             </text>
             {isSel && <circle className="line-handle" cx={tx} cy={ty} r={6} />}
           </g>

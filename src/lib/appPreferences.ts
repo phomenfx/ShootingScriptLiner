@@ -1,16 +1,21 @@
 import {
   DEFAULT_LINE_HIT_TOLERANCE_PX,
   DEFAULT_MAX_MOUNTED_PDF_PAGES,
+  DEFAULT_PROPERTIES_HEIGHT_PX,
   DEFAULT_SIDEBAR_WIDTH_PX,
   DEFAULT_VIEWER_ZOOM_PERCENT,
   MAX_LINE_HIT_TOLERANCE_PX,
   MAX_MAX_MOUNTED_PDF_PAGES,
+  MAX_PROPERTIES_HEIGHT_RATIO,
   MAX_SIDEBAR_WIDTH_RATIO,
   MAX_VIEWER_ZOOM_PERCENT,
   MIN_LINE_HIT_TOLERANCE_PX,
   MIN_MAX_MOUNTED_PDF_PAGES,
+  MIN_OUTLINER_HEIGHT_PX,
+  MIN_PROPERTIES_HEIGHT_PX,
   MIN_SIDEBAR_WIDTH_PX,
   MIN_VIEWER_ZOOM_PERCENT,
+  PROPERTIES_SPLITTER_PX,
 } from "../types/appPreferences";
 import type { ViewerLayoutMode } from "../types/viewerLayout";
 import { VIEWER_LAYOUT_MODES } from "../types/viewerLayout";
@@ -20,6 +25,7 @@ const LAYOUT_MODE_KEY = "shooting-script-liner-viewer-layout";
 const MAX_MOUNTED_PAGES_KEY = "shooting-script-liner-max-mounted-pdf-pages";
 const VIEWER_ZOOM_KEY = "shooting-script-liner-viewer-zoom-percent";
 const SIDEBAR_WIDTH_KEY = "shooting-script-liner-sidebar-width-px";
+const PROPERTIES_HEIGHT_KEY = "shooting-script-liner-properties-height-px";
 
 export function clampLineHitTolerancePx(value: number): number {
   const n = Number(value);
@@ -132,4 +138,33 @@ export function saveSidebarWidthPx(px: number): void {
       ? window.innerWidth
       : undefined;
   localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clampSidebarWidthPx(px, viewport)));
+}
+
+export function clampPropertiesHeightPx(value: number, paneHeight?: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_PROPERTIES_HEIGHT_PX;
+  const rounded = Math.round(Math.max(MIN_PROPERTIES_HEIGHT_PX, n));
+  if (paneHeight == null || !Number.isFinite(paneHeight) || paneHeight <= 0) return rounded;
+  const ratioMax = paneHeight * MAX_PROPERTIES_HEIGHT_RATIO;
+  const roomMax = paneHeight - MIN_OUTLINER_HEIGHT_PX - PROPERTIES_SPLITTER_PX;
+  const max = Math.max(MIN_PROPERTIES_HEIGHT_PX, Math.min(ratioMax, roomMax));
+  return Math.round(Math.min(max, rounded));
+}
+
+export function loadPropertiesHeightPx(): number {
+  try {
+    const raw = localStorage.getItem(PROPERTIES_HEIGHT_KEY);
+    if (raw == null || raw === "") return DEFAULT_PROPERTIES_HEIGHT_PX;
+    const paneHeight =
+      typeof window !== "undefined" && Number.isFinite(window.innerHeight)
+        ? window.innerHeight
+        : undefined;
+    return clampPropertiesHeightPx(Number(raw), paneHeight);
+  } catch {
+    return DEFAULT_PROPERTIES_HEIGHT_PX;
+  }
+}
+
+export function savePropertiesHeightPx(px: number, paneHeight?: number): void {
+  localStorage.setItem(PROPERTIES_HEIGHT_KEY, String(clampPropertiesHeightPx(px, paneHeight)));
 }

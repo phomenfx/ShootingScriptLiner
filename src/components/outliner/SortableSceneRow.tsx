@@ -7,6 +7,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { getSortedShots, sceneNumber } from "../../lib/labelUtils";
 import type { Project, Scene } from "../../types/project";
+import { SluglineFields, SLUGLINE_PLACEHOLDERS } from "../SluglineFields";
 import { VisibilityToggle } from "../VisibilityToggle";
 import { SortableShotRow } from "./SortableShotRow";
 
@@ -19,7 +20,9 @@ type Props = {
   onToggleCollapsed: () => void;
   onSelectScene: () => void;
   onSelectShot: (shotId: string) => void;
-  onUpdateScene: (patch: Partial<Pick<Scene, "slugline" | "visible">>) => void;
+  onUpdateScene: (
+    patch: Partial<Pick<Scene, "indicator" | "location" | "timeOfDay" | "visible">>
+  ) => void;
   onToggleShotVisible: (shotId: string, visible: boolean) => void;
   onDeleteScene: () => void;
 };
@@ -99,12 +102,13 @@ export function SortableSceneRow({
             ({shots.length})
           </span>
         )}
-        <input
-          className="scene-slugline"
-          value={scene.slugline}
-          placeholder="INT. LOCATION - DAY"
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => onUpdateScene({ slugline: e.target.value })}
+        <SluglineFields
+          header
+          indicator={scene.indicator ?? ""}
+          location={scene.location ?? ""}
+          timeOfDay={scene.timeOfDay ?? ""}
+          placeholders={SLUGLINE_PLACEHOLDERS}
+          onChange={(patch) => onUpdateScene(patch)}
         />
         <button
           type="button"

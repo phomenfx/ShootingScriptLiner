@@ -6,6 +6,7 @@ import {
   type MarginTrimHint,
 } from "../lib/lineMarginContinuation";
 import { newId } from "../lib/ids";
+import { applyScenePatch, migrateSceneSlugline } from "../lib/slugline";
 import {
   assignShotOrders,
   getSortedScenes,
@@ -21,6 +22,11 @@ import type {
   Shot,
 } from "../types/project";
 import { DEFAULT_PROJECT } from "../types/project";
+import {
+  DEFAULT_SCHEDULED_DATE_FORMAT,
+  migrateLineLabelFields,
+  type LineLabelFieldId,
+} from "../types/lineLabelFields";
 import type { LineDefaults } from "../types/lineDefaults";
 import { DEFAULT_LINE_DEFAULTS } from "../types/lineDefaults";
 import { loadToolKeybinds, saveToolKeybinds, validateToolKeybindChange } from "../lib/toolKeybinds";
@@ -28,15 +34,18 @@ import { DEFAULT_TOOL_KEYBINDS, type ToolKeybinds } from "../types/toolKeybinds"
 import {
   clampLineHitTolerancePx,
   clampMaxMountedPdfPages,
+  clampPropertiesHeightPx,
   clampSidebarWidthPx,
   clampViewerZoomPercent,
   loadLineHitTolerancePx,
   loadMaxMountedPdfPages,
+  loadPropertiesHeightPx,
   loadSidebarWidthPx,
   loadViewerLayoutMode,
   loadViewerZoomPercent,
   saveLineHitTolerancePx,
   saveMaxMountedPdfPages,
+  savePropertiesHeightPx,
   saveSidebarWidthPx,
   saveViewerLayoutMode,
   saveViewerZoomPercent,
@@ -83,6 +92,8 @@ type ProjectState = {
   viewerZoomPercent: number;
   /** Right sidebar width (px); app preference in localStorage. */
   sidebarWidthPx: number;
+  /** Properties panel height (px); app preference in localStorage. */
+  propertiesHeightPx: number;
   /** Active script PDF in memory (for viewer + Save ZIP when cache key mismatches). */
   scriptPdfFile: File | null;
 
@@ -102,6 +113,9 @@ type ProjectState = {
   setLabelOffsetXPt: (pt: number) => void;
   setLabelOffsetYPt: (pt: number) => void;
   setLabelSecondaryGapPt: (pt: number) => void;
+  setScheduledDateFormat: (format: string) => void;
+  setLineLabelFieldEnabled: (id: LineLabelFieldId, enabled: boolean) => void;
+  moveLineLabelField: (id: LineLabelFieldId, direction: "up" | "down") => void;
   setDefaultLine: (patch: Partial<LineDefaults>) => void;
   setSettingsOpen: (open: boolean) => void;
   setConfirm: (confirm: ConfirmRequest | null) => void;
@@ -113,6 +127,7 @@ type ProjectState = {
   setViewerZoomPercent: (percent: number) => void;
   adjustViewerZoom: (deltaPercent: number) => void;
   setSidebarWidthPx: (px: number) => void;
+  setPropertiesHeightPx: (px: number, paneHeight?: number) => void;
   setScriptPdfFile: (file: File | null) => void;
 
   selectScene: (sceneId: string) => void;
@@ -121,7 +136,10 @@ type ProjectState = {
   clearSelection: () => void;
 
   addScene: (slugline?: string) => void;
-  updateScene: (sceneId: string, patch: Partial<Pick<Scene, "slugline" | "visible">>) => void;
+  updateScene: (
+    sceneId: string,
+    patch: Partial<Omit<Scene, "id" | "order" | "shots">>
+  ) => void;
   deleteScene: (sceneId: string) => void;
   reorderScenes: (activeId: string, overId: string) => void;
 
@@ -129,7 +147,28 @@ type ProjectState = {
   updateShot: (
     sceneId: string,
     shotId: string,
-    patch: Partial<Pick<Shot, "shotType" | "subject" | "slug" | "color" | "visible" | "notes">>
+    patch: Partial<
+      Pick<
+        Shot,
+        | "shotType"
+        | "subject"
+        | "slug"
+        | "color"
+        | "visible"
+        | "notes"
+        | "cameraSupport"
+        | "lens"
+        | "audioSource"
+        | "indicator"
+        | "location"
+        | "timeOfDay"
+        | "camera"
+        | "fps"
+        | "sync"
+        | "scheduledDate"
+        | "lineLabelInclude"
+      >
+    >
   ) => void;
   deleteShot: (sceneId: string, shotId: string) => void;
   reorderShots: (shotId: string, fromSceneId: string, toSceneId: string, overShotId: string | null) => void;
@@ -204,13 +243,13 @@ function createShot(project: Project, order: number): Shot {
 }
 
 function createScene(order: number, slugline = ""): Scene {
-  return {
+  return migrateSceneSlugline({
     id: newId(),
     slugline,
     order,
     visible: true,
     shots: [],
-  };
+  });
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -231,6 +270,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   maxMountedPdfPages: loadMaxMountedPdfPages(),
   viewerZoomPercent: loadViewerZoomPercent(),
   sidebarWidthPx: loadSidebarWidthPx(),
+  propertiesHeightPx: loadPropertiesHeightPx(),
   scriptPdfFile: null,
 
   newProject: () =>
@@ -259,13 +299,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             (project as { labelBold?: boolean }).labelBold
           ),
           inheritLineFromPrevious: project.inheritLineFromPrevious ?? false,
+          lineLabelFields: migrateLineLabelFields(project.lineLabelFields),
+          scheduledDateFormat:
+            typeof project.scheduledDateFormat === "string" && project.scheduledDateFormat.trim()
+              ? project.scheduledDateFormat
+              : DEFAULT_SCHEDULED_DATE_FORMAT,
           snapAngleDegrees:
             project.snapAngleDegrees ??
             ((project as { snapLineAngles?: boolean }).snapLineAngles === false ? 0 : 15),
           annotations: project.annotations ?? [],
           ...migrateLabelLayout(project),
         },
-        project.scenes
+        project.scenes.map((scene) => migrateSceneSlugline(scene))
       ),
       selection: null,
       collapsedSceneIds: {},
@@ -350,6 +395,30 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       },
     })),
 
+  setScheduledDateFormat: (scheduledDateFormat) =>
+    set((s) => ({ project: { ...s.project, scheduledDateFormat } })),
+
+  setLineLabelFieldEnabled: (id, enabled) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        lineLabelFields: s.project.lineLabelFields.map((field) =>
+          field.id === id ? { ...field, enabled } : field
+        ),
+      },
+    })),
+
+  moveLineLabelField: (id, direction) =>
+    set((s) => {
+      const fields = s.project.lineLabelFields;
+      const index = fields.findIndex((field) => field.id === id);
+      const nextIndex = index + (direction === "up" ? -1 : 1);
+      if (index < 0 || nextIndex < 0 || nextIndex >= fields.length) return s;
+      return {
+        project: { ...s.project, lineLabelFields: arrayMove(fields, index, nextIndex) },
+      };
+    }),
+
   setDefaultLine: (patch) =>
     set((s) => ({
       project: {
@@ -412,6 +481,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const next = clampSidebarWidthPx(px, typeof window !== "undefined" ? window.innerWidth : undefined);
     saveSidebarWidthPx(next);
     set({ sidebarWidthPx: next });
+  },
+
+  setPropertiesHeightPx: (px, paneHeight) => {
+    const next = clampPropertiesHeightPx(px, paneHeight);
+    savePropertiesHeightPx(next, paneHeight);
+    set({ propertiesHeightPx: next });
   },
 
   setScriptPdfFile: (scriptPdfFile) => set({ scriptPdfFile }),
@@ -509,7 +584,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       project: syncLockedLinesFromShots(
         applyScenes(
           s.project,
-          s.project.scenes.map((sc) => (sc.id === sceneId ? { ...sc, ...patch } : sc))
+          s.project.scenes.map((sc) => (sc.id === sceneId ? applyScenePatch(sc, patch) : sc))
         )
       ),
     })),

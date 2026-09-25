@@ -96,6 +96,10 @@ export type TextAnnotation = {
   fontFamily?: string;
   /** When omitted, uses default line labelBold. */
   labelBold?: boolean;
+  /** When set with followShot, the note draws that shot's line caption. */
+  shotId?: string;
+  /** Locked to the shot caption. Unlock to edit this note's own text. */
+  followShot?: boolean;
 };
 
 export type Annotation = LineAnnotation | TextAnnotation;

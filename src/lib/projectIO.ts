@@ -3,6 +3,7 @@ import type { Project } from "../types/project";
 import { cachePdfForProject, loadPdfForProject } from "./pdfCache";
 import { buildLinedPdfBytes } from "./pdfExport";
 import { parseProject, serializeProject } from "./labelUtils";
+import { buildShotListRows, rowsToCsv } from "./shotListExport";
 import { useProjectStore } from "../stores/projectStore";
 
 async function resolveScriptPdfForExport(project: Project): Promise<File | null> {
@@ -74,6 +75,25 @@ export async function downloadProjectZip(project: Project): Promise<void> {
   a.download = `${safeName}.zip`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function triggerDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function projectFileStem(project: Project): string {
+  return project.name.replace(/[^\w.-]+/g, "_") || "project";
+}
+
+export function downloadShotListCsv(project: Project): void {
+  const csv = rowsToCsv(buildShotListRows(project));
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  triggerDownload(blob, `${projectFileStem(project)}-shot-list.csv`);
 }
 
 export async function downloadLinedPdf(project: Project): Promise<void> {

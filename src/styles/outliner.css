@@ -60,6 +60,7 @@
 .scene-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 8px;
   background: var(--color-header);
@@ -83,14 +84,67 @@
   flex-shrink: 0;
 }
 
-.scene-slugline {
+.slugline-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 0;
   flex: 1;
+}
+
+.slugline-fields.header {
+  align-items: center;
+  flex: 1 1 11rem;
+  min-width: min(100%, 11rem);
+}
+
+.slugline-fields.header .slug-indicator {
+  flex: 0 1 3.6rem;
+  width: 3.6rem;
+  min-width: 2.8rem;
+}
+
+.slugline-fields.header .slug-time {
+  flex: 0 1 3.4rem;
+  width: 3.4rem;
+  min-width: 2.6rem;
+}
+
+.slugline-fields.header .slug-location {
+  flex: 1 1 4.5rem;
+  min-width: 4rem;
+}
+
+.slugline-fields .slug-indicator {
+  width: 6.6rem;
+  flex: 0 1 6.6rem;
+  min-width: 3.4rem;
+}
+
+.slugline-fields .slug-time {
+  width: 5.4rem;
+  flex: 0 1 5.4rem;
+  min-width: 3rem;
+}
+
+.slugline-fields .slug-location {
+  flex: 1;
+  min-width: 0;
+}
+
+.slugline-fields.header input {
+  width: 100%;
   min-width: 0;
   background: var(--color-row);
   border: 1px solid var(--color-border-input);
   color: var(--color-text);
   padding: 4px 8px;
   border-radius: var(--radius-sm);
+}
+
+.slug-header-part {
+  display: flex;
+  min-width: 0;
 }
 
 .shot-list {

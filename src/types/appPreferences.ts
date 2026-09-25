@@ -25,3 +25,16 @@ export const MIN_SIDEBAR_WIDTH_PX = 280;
 
 /** Sidebar may take at most this fraction of the window width. */
 export const MAX_SIDEBAR_WIDTH_RATIO = 0.75;
+
+/** Properties panel height inside the sidebar. */
+export const DEFAULT_PROPERTIES_HEIGHT_PX = 320;
+
+export const MIN_PROPERTIES_HEIGHT_PX = 120;
+
+/** Shot list keeps at least this much height below the properties panel. */
+export const MIN_OUTLINER_HEIGHT_PX = 140;
+
+export const PROPERTIES_SPLITTER_PX = 5;
+
+/** Properties panel may take at most this fraction of the sidebar height. */
+export const MAX_PROPERTIES_HEIGHT_RATIO = 0.75;

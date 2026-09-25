@@ -4,6 +4,8 @@ import { CAP_OPTIONS } from "../lib/lineCaps";
 import { STROKE_OPTIONS } from "../lib/lineStrokes";
 import { useProjectStore } from "../stores/projectStore";
 import type { AdditionalInfoStyle, LabelMode } from "../types/project";
+import { LINE_LABEL_FIELD_LABELS } from "../types/lineLabelFields";
+import { formatExcelDate } from "../lib/dateFormat";
 import type { LineCap, LineEnding, LineStroke } from "../types/annotations";
 import { capSupportsFill } from "../types/annotations";
 import { ToolKeybindSettings } from "./ToolKeybindSettings";
@@ -81,6 +83,9 @@ export function SettingsModal() {
   const setLabelMode = useProjectStore((s) => s.setLabelMode);
   const setAdditionalInfoStyle = useProjectStore((s) => s.setAdditionalInfoStyle);
   const setDefaultShotColor = useProjectStore((s) => s.setDefaultShotColor);
+  const setScheduledDateFormat = useProjectStore((s) => s.setScheduledDateFormat);
+  const setLineLabelFieldEnabled = useProjectStore((s) => s.setLineLabelFieldEnabled);
+  const moveLineLabelField = useProjectStore((s) => s.moveLineLabelField);
   const setSnapAngleDegrees = useProjectStore((s) => s.setSnapAngleDegrees);
   const setInheritLineFromPrevious = useProjectStore((s) => s.setInheritLineFromPrevious);
   const setDefaultLine = useProjectStore((s) => s.setDefaultLine);
@@ -144,6 +149,87 @@ export function SettingsModal() {
             onChange={(e) => setDefaultShotColor(e.target.value)}
           />
         </label>
+
+        <h3 className="settings-section">Line text</h3>
+        <p className="settings-hint settings-hint-tight">
+          Checked fields are the default for shots. The top of the list is the start of the line.
+        </p>
+        <ul className="line-label-order">
+          {project.lineLabelFields.map((field, index) => (
+            <li key={field.id}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={field.enabled}
+                  onChange={(e) => setLineLabelFieldEnabled(field.id, e.target.checked)}
+                />
+                {LINE_LABEL_FIELD_LABELS[field.id]}
+              </label>
+              <span className="line-label-order-actions">
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => moveLineLabelField(field.id, "up")}
+                >
+                  Up
+                </button>
+                <button
+                  type="button"
+                  disabled={index === project.lineLabelFields.length - 1}
+                  onClick={() => moveLineLabelField(field.id, "down")}
+                >
+                  Down
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <h3 className="settings-section">Scheduled date</h3>
+        <p className="settings-hint settings-hint-tight">
+          Shown on line text and in the lined PDF. The shot list CSV writes the date as YYYY-MM-DD.
+        </p>
+        <label className="field">
+          <span className="format-label-row">
+            Date format
+            <span className="format-help">
+              <button type="button" className="format-help-btn" aria-label="Date format codes">
+                ?
+              </button>
+              <span className="format-help-pop" role="tooltip">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>To display</th>
+                      <th>Code</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>Months as 1–12</td><td>m</td></tr>
+                    <tr><td>Months as 01–12</td><td>mm</td></tr>
+                    <tr><td>Months as Jan–Dec</td><td>mmm</td></tr>
+                    <tr><td>Months as January–December</td><td>mmmm</td></tr>
+                    <tr><td>First letter of the month</td><td>mmmmm</td></tr>
+                    <tr><td>Days as 1–31</td><td>d</td></tr>
+                    <tr><td>Days as 01–31</td><td>dd</td></tr>
+                    <tr><td>Days as Sun–Sat</td><td>ddd</td></tr>
+                    <tr><td>Days as Sunday–Saturday</td><td>dddd</td></tr>
+                    <tr><td>Years as 00–99</td><td>yy</td></tr>
+                    <tr><td>Years as 1900–9999</td><td>yyyy</td></tr>
+                  </tbody>
+                </table>
+              </span>
+            </span>
+          </span>
+          <input
+            type="text"
+            value={project.scheduledDateFormat}
+            onChange={(e) => setScheduledDateFormat(e.target.value)}
+          />
+        </label>
+        <p className="settings-hint settings-hint-tight">
+          Preview: {formatExcelDate("2012-03-14", project.scheduledDateFormat) || "—"}
+        </p>
 
         <h3 className="settings-section">Default line properties</h3>
         <div className="settings-grid">
