@@ -5,30 +5,6 @@
   height: 100%;
 }
 
-.script-pane-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.script-pane-bar button {
-  cursor: pointer;
-  background: var(--color-btn);
-  color: var(--color-text);
-  border: 1px solid var(--color-border-input);
-  border-radius: var(--radius-md);
-  padding: 6px 10px;
-}
-
-.script-filename {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .pdf-viewer {
   display: flex;
   flex-direction: column;
@@ -45,24 +21,65 @@
 }
 
 .pdf-controls {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   padding: 6px 8px;
+}
+
+.pdf-controls[data-fit="full"] .pdf-controls-nav,
+.pdf-controls[data-fit="compact"] .pdf-controls-nav {
+  position: absolute;
+  left: 50%;
+  z-index: 1;
+  transform: translateX(-50%);
+}
+
+.pdf-controls[data-fit="compact"] .pdf-nav-hint {
+  display: none;
+}
+
+.pdf-controls[data-fit="wrap"] {
   flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.pdf-controls-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 0 0 auto;
 }
 
 .pdf-controls-trail {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
-  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.pdf-controls[data-fit="wrap"] .pdf-layout-toggle,
+.pdf-controls[data-fit="wrap"] .pdf-controls-trail {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  max-width: 100%;
 }
 
 .pdf-nav-hint {
   color: var(--color-text-dim);
   font-size: var(--font-size-sm);
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pdf-controls button,
+.pdf-page-status,
+.pdf-zoom-controls {
+  flex-shrink: 0;
 }
 
 .pdf-controls button {
@@ -77,7 +94,7 @@
 .pdf-layout-toggle {
   display: flex;
   gap: 4px;
-  margin-right: 4px;
+  flex: 0 0 auto;
 }
 
 .pdf-layout-toggle button {
@@ -128,6 +145,7 @@
 
 .pdf-page-status {
   min-width: 8rem;
+  text-align: center;
 }
 
 .pdf-canvas-wrap {

@@ -65,7 +65,7 @@ export async function downloadProjectZip(project: Project): Promise<void> {
     await cachePdfForProject({ ...project, scriptFileName: pdfName }, pdfFile);
   } else if (project.scriptFileName) {
     window.alert(
-      `Could not find "${project.scriptFileName}" in this browser. Use Import PDF on the script, then Save ZIP again.`
+      `Could not find "${project.scriptFileName}" in this browser. Use Import PDF, then Save ZIP again.`
     );
   }
   const blob = await zip.generateAsync({ type: "blob" });

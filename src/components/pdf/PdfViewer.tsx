@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAnnotationKeyboard } from "../../hooks/useAnnotationKeyboard";
+import { usePdfControlsFit } from "../../hooks/usePdfControlsFit";
 import { usePdfDocument } from "../../hooks/usePdfDocument";
 import { usePdfPageNavigation } from "../../hooks/usePdfPageNavigation";
 import { usePdfZoomWheel } from "../../hooks/usePdfZoomWheel";
@@ -156,10 +157,14 @@ export function PdfViewer({ file }: Props) {
         ? "Wheel · ← → · PgUp/PgDn (spread)"
         : "Wheel · ← → · PgUp/PgDn";
 
+  const { fit: controlsFit, ref: controlsRef } = usePdfControlsFit(
+    `${navHint}\0${statusLabel}\0${Boolean(file)}`
+  );
+
   if (!file) {
     return (
       <div className="pdf-placeholder-inner">
-        <p>Use Import PDF below to load a script.</p>
+        <p>Use Import PDF in the toolbar to load a script.</p>
       </div>
     );
   }
@@ -168,7 +173,7 @@ export function PdfViewer({ file }: Props) {
     <div className="pdf-viewer">
       <div className="pdf-ribbon">
         <ScriptToolbar />
-        <div className="pdf-controls">
+        <div className="pdf-controls" ref={controlsRef} data-fit={controlsFit}>
           <div className="pdf-layout-toggle" role="group" aria-label="View layout">
             {VIEWER_LAYOUT_MODES.map((mode) => (
               <button
@@ -182,13 +187,15 @@ export function PdfViewer({ file }: Props) {
               </button>
             ))}
           </div>
-          <button type="button" disabled={prevDisabled} onClick={goPrev}>
-            Prev
-          </button>
-          <span className="pdf-page-status">{statusLabel}</span>
-          <button type="button" disabled={nextDisabled} onClick={goNext}>
-            Next
-          </button>
+          <div className="pdf-controls-nav">
+            <button type="button" disabled={prevDisabled} onClick={goPrev}>
+              Prev
+            </button>
+            <span className="pdf-page-status">{statusLabel}</span>
+            <button type="button" disabled={nextDisabled} onClick={goNext}>
+              Next
+            </button>
+          </div>
           <div className="pdf-controls-trail">
             <span className="pdf-nav-hint" title="Navigation shortcuts">
               {navHint}

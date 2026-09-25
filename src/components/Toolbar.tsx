@@ -10,6 +10,7 @@ import { useProjectStore } from "../stores/projectStore";
 
 export function Toolbar() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const pdfFileRef = useRef<HTMLInputElement>(null);
   const project = useProjectStore((s) => s.project);
   const newProject = useProjectStore((s) => s.newProject);
   const loadProject = useProjectStore((s) => s.loadProject);
@@ -37,11 +38,27 @@ export function Toolbar() {
     }
   };
 
+  const handleImportPdf = async (file: File) => {
+    setScriptPdfFile(file);
+    setScriptFileName(file.name);
+    const proj = useProjectStore.getState().project;
+    await cachePdfForProject({ ...proj, scriptFileName: file.name }, file);
+  };
+
+  const projectLabel = project.scriptFileName
+    ? `${project.scriptFileName} - ${project.name}`
+    : project.name;
+
   return (
     <header className="toolbar">
       <span className="toolbar-title">Shooting Script Liner</span>
-      <span className="toolbar-project">{project.name}</span>
+      <span className="toolbar-project" title={projectLabel}>
+        {projectLabel}
+      </span>
       <div className="toolbar-actions">
+        <button type="button" onClick={() => pdfFileRef.current?.click()}>
+          Import PDF
+        </button>
         <button type="button" onClick={() => newProject()}>
           New
         </button>
@@ -83,6 +100,17 @@ export function Toolbar() {
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) void handleOpen(file);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={pdfFileRef}
+        type="file"
+        accept=".pdf,application/pdf"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleImportPdf(file);
           e.target.value = "";
         }}
       />
