@@ -5,6 +5,50 @@ export type NormPoint = { x: number; y: number };
 export type PxPoint = { x: number; y: number };
 export type PdfPoint = { x: number; y: number };
 
+export function midpoint(a: PxPoint, b: PxPoint): PxPoint {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+/** Project settings, or a dragged label's offset from the line start. */
+export function primaryLayoutForLine(
+  line: { labelOffsetXPt?: number; labelOffsetYPt?: number },
+  project: Project
+): LabelLayout {
+  const base = labelLayoutFromProject(project);
+  return {
+    labelOffsetXPt: line.labelOffsetXPt ?? base.labelOffsetXPt,
+    labelOffsetYPt: line.labelOffsetYPt ?? base.labelOffsetYPt,
+    labelSecondaryGapPt: base.labelSecondaryGapPt,
+  };
+}
+
+/** Continuation label offset from the continuation end. */
+export function secondaryLayoutForLine(
+  line: { secondaryOffsetXPt?: number; secondaryGapPt?: number },
+  project: Project
+): LabelLayout {
+  const base = labelLayoutFromProject(project);
+  return {
+    labelOffsetXPt: line.secondaryOffsetXPt ?? base.labelOffsetXPt,
+    labelOffsetYPt: base.labelOffsetYPt,
+    labelSecondaryGapPt: line.secondaryGapPt ?? base.labelSecondaryGapPt,
+  };
+}
+
+/** Label origin is offset from the line start, including the settings default. */
+export function primaryLabelAnchor<P extends { x: number; y: number }>(start: P): P {
+  return start;
+}
+
+/** Continuation origin is offset from the continuation end. */
+export function secondaryLabelAnchor<P extends { x: number; y: number }>(
+  start: P,
+  end: P,
+  endIndex: 0 | 1
+): P {
+  return endIndex === 0 ? start : end;
+}
+
 export function labelLayoutFromProject(project: Project): LabelLayout {
   return {
     labelOffsetXPt: project.labelOffsetXPt,

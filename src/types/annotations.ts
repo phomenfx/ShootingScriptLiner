@@ -83,6 +83,12 @@ export const DEFAULT_LINE_ENDING: LineEnding = {
 /** After dragging past page top/bottom; visual labels only (no linked segments). */
 export type MarginContinuation = "top" | "bottom";
 
+export type TextAlign = "left" | "center" | "right";
+
+export function isTextAlign(value: unknown): value is TextAlign {
+  return value === "left" || value === "center" || value === "right";
+}
+
 export type LineAnnotation = {
   id: string;
   kind: "line";
@@ -92,6 +98,25 @@ export type LineAnnotation = {
   fontFamily: string;
   fontSizePt: number;
   labelBold: boolean;
+  labelItalic?: boolean;
+  labelUnderline?: boolean;
+  /**
+   * Primary label origin offset from the line start, in PDF points.
+   * Positive Y is up. Omitted values use the project label offset.
+   */
+  labelOffsetXPt?: number;
+  labelOffsetYPt?: number;
+  /** Wrap width of the primary label. Omitted hugs the text on one line. */
+  labelWidthPt?: number;
+  /** Box height. Omitted hugs the wrapped lines. Extra space sits below the text. */
+  labelMinHeightPt?: number;
+  labelAlign?: TextAlign;
+  /** Continuation label origin offset from the continuation end. */
+  secondaryOffsetXPt?: number;
+  secondaryGapPt?: number;
+  secondaryWidthPt?: number;
+  secondaryMinHeightPt?: number;
+  secondaryAlign?: TextAlign;
   shotId?: string;
   label?: string;
   showLabel: boolean;
@@ -111,6 +136,12 @@ export type TextAnnotation = {
   fontFamily?: string;
   /** When omitted, uses default line labelBold. */
   labelBold?: boolean;
+  labelItalic?: boolean;
+  labelUnderline?: boolean;
+  /** Wrap width. Omitted hugs the text. The box origin is `x`/`y` (left edge, first baseline). */
+  widthPt?: number;
+  minHeightPt?: number;
+  align?: TextAlign;
   /** When set with followShot, the note draws that shot's line caption. */
   shotId?: string;
   /** Locked to the shot caption. Unlock to edit this note's own text. */

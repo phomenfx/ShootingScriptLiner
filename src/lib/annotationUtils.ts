@@ -1,13 +1,15 @@
 import { formatLineCaption } from "./lineCaption";
 import { migrateCapName } from "./lineCaps";
 import { normalizeStroke } from "./lineStrokes";
-import type { LineAnnotation, LineEnding, LineStyle, TextAnnotation } from "../types/annotations";
+import type { LineAnnotation, LineEnding, LineStyle, TextAlign, TextAnnotation } from "../types/annotations";
 import {
   DEFAULT_LINE_LOCKS,
   UNLINKED_LINE_LOCKS,
+  isTextAlign,
   isTextAnnotation,
   type TextFieldLocks,
 } from "../types/annotations";
+import { clampBoxHeightPt, clampBoxWidthPt, clampLabelShiftPt } from "./textBox";
 import { DEFAULT_LINE_DEFAULTS, type LineDefaults } from "../types/lineDefaults";
 import type { Project, Scene, Shot } from "../types/project";
 import { newId } from "./ids";
@@ -101,6 +103,15 @@ export function getLineLabelBold(line: LineAnnotation, project: Project): boolea
 
 export function getTextLabelBold(text: TextAnnotation, project: Project): boolean {
   return text.labelBold ?? project.defaultLine.labelBold;
+}
+
+export function lineHasCustomLabelOffset(line: LineAnnotation): boolean {
+  return (
+    line.labelOffsetXPt !== undefined ||
+    line.labelOffsetYPt !== undefined ||
+    line.secondaryOffsetXPt !== undefined ||
+    line.secondaryGapPt !== undefined
+  );
 }
 
 export function textFieldLocks(text: TextAnnotation): TextFieldLocks {
@@ -251,13 +262,61 @@ export function migrateLineAnnotation(
     locks,
   };
   if (marginContinuation) line.marginContinuation = marginContinuation;
+  applyLineTextBoxFields(line, raw);
   return line;
+}
+
+function readShiftPt(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return clampLabelShiftPt(value);
+}
+
+function readWidthPt(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return clampBoxWidthPt(value);
+}
+
+function readMinHeightPt(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return clampBoxHeightPt(value);
+}
+
+function readAlign(value: unknown): TextAlign | undefined {
+  return isTextAlign(value) ? value : undefined;
+}
+
+function applyLineTextBoxFields(line: LineAnnotation, raw: Record<string, unknown>) {
+  if (typeof raw.labelItalic === "boolean") line.labelItalic = raw.labelItalic;
+  if (typeof raw.labelUnderline === "boolean") line.labelUnderline = raw.labelUnderline;
+  const labelOffsetXPt = readShiftPt(raw.labelOffsetXPt);
+  const labelOffsetYPt = readShiftPt(raw.labelOffsetYPt);
+  const labelWidthPt = readWidthPt(raw.labelWidthPt);
+  const labelMinHeightPt = readMinHeightPt(raw.labelMinHeightPt);
+  const labelAlign = readAlign(raw.labelAlign);
+  const secondaryOffsetXPt = readShiftPt(raw.secondaryOffsetXPt);
+  const secondaryGapPt = readShiftPt(raw.secondaryGapPt);
+  const secondaryWidthPt = readWidthPt(raw.secondaryWidthPt);
+  const secondaryMinHeightPt = readMinHeightPt(raw.secondaryMinHeightPt);
+  const secondaryAlign = readAlign(raw.secondaryAlign);
+  if (labelOffsetXPt !== undefined) line.labelOffsetXPt = labelOffsetXPt;
+  if (labelOffsetYPt !== undefined) line.labelOffsetYPt = labelOffsetYPt;
+  if (labelWidthPt !== undefined) line.labelWidthPt = labelWidthPt;
+  if (labelMinHeightPt !== undefined) line.labelMinHeightPt = labelMinHeightPt;
+  if (labelAlign) line.labelAlign = labelAlign;
+  if (secondaryOffsetXPt !== undefined) line.secondaryOffsetXPt = secondaryOffsetXPt;
+  if (secondaryGapPt !== undefined) line.secondaryGapPt = secondaryGapPt;
+  if (secondaryWidthPt !== undefined) line.secondaryWidthPt = secondaryWidthPt;
+  if (secondaryMinHeightPt !== undefined) line.secondaryMinHeightPt = secondaryMinHeightPt;
+  if (secondaryAlign) line.secondaryAlign = secondaryAlign;
 }
 
 function templateForNewLine(
   project: Project,
   endOverride?: Partial<LineEnding>
-): Pick<LineAnnotation, "style" | "fontFamily" | "fontSizePt" | "labelBold"> {
+): Pick<
+  LineAnnotation,
+  "style" | "fontFamily" | "fontSizePt" | "labelBold" | "labelItalic" | "labelUnderline"
+> {
   const lineAnnotations = project.annotations.filter(
     (a): a is LineAnnotation => a.kind === "line"
   );
@@ -273,6 +332,8 @@ function templateForNewLine(
       fontFamily: last.fontFamily,
       fontSizePt: last.fontSizePt,
       labelBold: last.labelBold,
+      labelItalic: last.labelItalic === true,
+      labelUnderline: last.labelUnderline === true,
     };
   }
 
@@ -288,6 +349,8 @@ function templateForNewLine(
     fontFamily: d.fontFamily,
     fontSizePt: d.fontSizePt,
     labelBold: d.labelBold,
+    labelItalic: false,
+    labelUnderline: false,
   };
 }
 
@@ -310,6 +373,8 @@ export function createLineFromShot(
     fontFamily: tmpl.fontFamily,
     fontSizePt: tmpl.fontSizePt,
     labelBold: tmpl.labelBold,
+    labelItalic: tmpl.labelItalic,
+    labelUnderline: tmpl.labelUnderline,
     shotId,
     showLabel: true,
     locks: shotId ? { ...DEFAULT_LINE_LOCKS } : { ...UNLINKED_LINE_LOCKS },
@@ -390,6 +455,14 @@ export function migrateTextAnnotation(
       color: locks.color === true,
     };
   }
+  if (typeof raw.labelItalic === "boolean") text.labelItalic = raw.labelItalic;
+  if (typeof raw.labelUnderline === "boolean") text.labelUnderline = raw.labelUnderline;
+  const widthPt = readWidthPt(raw.widthPt);
+  const minHeightPt = readMinHeightPt(raw.minHeightPt);
+  const align = readAlign(raw.align);
+  if (widthPt !== undefined) text.widthPt = widthPt;
+  if (minHeightPt !== undefined) text.minHeightPt = minHeightPt;
+  if (align) text.align = align;
   return text;
 }
 

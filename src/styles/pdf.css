@@ -208,6 +208,8 @@
   left: 0;
   top: 0;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .annotation-layer.tool-draw {
@@ -237,8 +239,41 @@
   filter: drop-shadow(0 0 2px rgba(74, 158, 255, 0.8));
 }
 
-.annotation-layer .text-selected text {
-  filter: drop-shadow(0 0 2px rgba(74, 158, 255, 0.8));
+.annotation-layer text {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.annotation-layer .text-box-frame {
+  fill: transparent;
+  stroke: #fff;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  cursor: move;
+}
+
+.annotation-layer .text-box-handle {
+  fill: #fff;
+  stroke: #222;
+  stroke-width: 1;
+}
+
+.annotation-layer .text-offset-leader {
+  stroke: #fff;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+
+.annotation-layer .text-offset-handle {
+  fill: #4a9eff;
+  stroke: #fff;
+  stroke-width: 1.5;
+  cursor: move;
+}
+
+.annotation-layer.tool-select text {
+  cursor: move;
 }
 
 .script-toolbar {

@@ -591,6 +591,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const sel = get().selection;
     if (sel?.kind === "scene") return sel.sceneId;
     if (sel?.kind === "shot") return sel.sceneId;
+    if (sel?.kind === "annotation") {
+      const ann = get().project.annotations.find((a) => a.id === sel.annotationId);
+      const shotId = ann && "shotId" in ann ? ann.shotId : undefined;
+      const scene = shotId
+        ? get().project.scenes.find((sc) => sc.shots.some((sh) => sh.id === shotId))
+        : undefined;
+      if (scene) return scene.id;
+    }
     const sorted = getSortedScenes(get().project.scenes);
     return sorted.length > 0 ? sorted[sorted.length - 1]?.id ?? null : null;
   },

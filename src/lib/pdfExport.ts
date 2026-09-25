@@ -1,6 +1,14 @@
-import { PDFDocument, rgb } from "pdf-lib";
+import {
+  PDFDocument,
+  concatTransformationMatrix,
+  popGraphicsState,
+  pushGraphicsState,
+  rgb,
+  type PDFFont,
+  type PDFPage,
+} from "pdf-lib";
 import type { Project } from "../types/project";
-import { isLineAnnotation, isTextAnnotation } from "../types/annotations";
+import { isLineAnnotation, isTextAnnotation, type TextAlign } from "../types/annotations";
 import {
   getLineFontSizePt,
   getLineScriptLabels,
@@ -9,19 +17,28 @@ import {
   getTextLabelBold,
   getTextDisplayText,
   resolveTextColor,
-  textIsVisible,
   lineEndIndexForContLabel,
+  textIsVisible,
   resolveLineStyle,
 } from "./annotationUtils";
 import {
-  labelLayoutFromProject,
   normToPdf,
+  primaryLabelAnchor,
   primaryLabelPositionPdf,
+  primaryLayoutForLine,
+  secondaryLabelAnchor,
   secondaryLabelPositionPdf,
+  secondaryLayoutForLine,
 } from "./labelLayout";
 import { strokeDashPatternPdf } from "./lineStrokes";
 import { drawPdfLineCap } from "./pdfLineCaps";
 import { resolvePdfExportFont, sanitizePdfExportText } from "./pdfExportFonts";
+import {
+  UNDERLINE_THICKNESS_EM,
+  italicBaselineMatrix,
+  layoutTextBlock,
+  pinBlockToOrigin,
+} from "./textBox";
 
 function hexToRgb(hex: string) {
   const h = hex.replace("#", "").trim();
@@ -40,13 +57,71 @@ function hexToRgb(hex: string) {
   );
 }
 
+function drawWrappedPdfText(
+  page: PDFPage,
+  font: PDFFont,
+  text: string,
+  left: number,
+  baseline: number,
+  fontSize: number,
+  widthPt: number | undefined,
+  align: TextAlign,
+  underline: boolean,
+  italic: boolean,
+  color: ReturnType<typeof hexToRgb>,
+  pinOrigin = false
+) {
+  const safe = sanitizePdfExportText(text);
+  if (!safe) return;
+  const laid = layoutTextBlock({
+    text: safe,
+    left,
+    baseline,
+    fontSize,
+    width: widthPt,
+    align,
+    underline,
+    yDown: false,
+    measure: (sample) => font.widthOfTextAtSize(sample, fontSize),
+  });
+  const block = pinOrigin
+    ? pinBlockToOrigin(laid, align, { x: left, y: baseline }, false)
+    : laid;
+  for (const run of block.runs) {
+    if (run.text) {
+      if (italic) {
+        const matrix = italicBaselineMatrix(run.baseline);
+        page.pushOperators(
+          pushGraphicsState(),
+          concatTransformationMatrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f)
+        );
+      }
+      page.drawText(run.text, {
+        x: run.x,
+        y: run.baseline,
+        size: fontSize,
+        font,
+        color,
+      });
+      if (italic) page.pushOperators(popGraphicsState());
+    }
+    if (run.underline) {
+      page.drawLine({
+        start: { x: run.underline.x1, y: run.underline.y },
+        end: { x: run.underline.x2, y: run.underline.y },
+        thickness: Math.max(0.4, fontSize * UNDERLINE_THICKNESS_EM),
+        color,
+      });
+    }
+  }
+}
+
 /** Draws coverage lines and text onto a copy of the script PDF. */
 export async function buildLinedPdfBytes(
   project: Project,
   pdfBytes: ArrayBuffer
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-  const layout = labelLayoutFromProject(project);
 
   const fontCache = new Map<string, Awaited<ReturnType<typeof resolvePdfExportFont>>>();
   const getFont = async (fontFamily: string, bold: boolean, sampleText?: string) => {
@@ -102,26 +177,59 @@ export async function buildLinedPdfBytes(
           getLineLabelBold(line, project),
           labelSample
         );
+        const color = hexToRgb(style.color);
+        const italic = line.labelItalic === true;
+        const underline = line.labelUnderline === true;
         if (primaryText) {
-          const pos = primaryLabelPositionPdf(line.points[0], pw, ph, layout);
-          page.drawText(primaryText, {
-            x: pos.x,
-            y: pos.y,
-            size: fs,
-            font: labelFont,
-            color: hexToRgb(style.color),
-          });
+          const parent = primaryLabelAnchor(line.points[0]);
+          const pos = primaryLabelPositionPdf(
+            parent,
+            pw,
+            ph,
+            primaryLayoutForLine(line, project)
+          );
+          drawWrappedPdfText(
+            page,
+            labelFont,
+            primaryText,
+            pos.x,
+            pos.y,
+            fs,
+            line.labelWidthPt,
+            line.labelAlign ?? "left",
+            underline,
+            italic,
+            color,
+            true
+          );
         }
         if (secondaryText) {
-          const ei = lineEndIndexForContLabel(line);
-          const pos = secondaryLabelPositionPdf(line.points[ei], pw, ph, fs, layout);
-          page.drawText(secondaryText, {
-            x: pos.x,
-            y: pos.y,
-            size: fs,
-            font: labelFont,
-            color: hexToRgb(style.color),
-          });
+          const parent = secondaryLabelAnchor(
+            line.points[0],
+            line.points[1],
+            lineEndIndexForContLabel(line)
+          );
+          const pos = secondaryLabelPositionPdf(
+            parent,
+            pw,
+            ph,
+            fs,
+            secondaryLayoutForLine(line, project)
+          );
+          drawWrappedPdfText(
+            page,
+            labelFont,
+            secondaryText,
+            pos.x,
+            pos.y,
+            fs,
+            line.secondaryWidthPt,
+            line.secondaryAlign ?? "left",
+            underline,
+            italic,
+            color,
+            true
+          );
         }
       }
     }
@@ -129,20 +237,24 @@ export async function buildLinedPdfBytes(
     for (const t of texts) {
       if (!isTextAnnotation(t) || !textIsVisible(t)) continue;
       const tp = normToPdf(t.x, t.y, pw, ph);
-      const singleLine = sanitizePdfExportText(
-        getTextDisplayText(t, project).replace(/\s+/g, " ").trim() || " "
-      );
       const textFont = await getFont(
         t.fontFamily ?? project.defaultLine.fontFamily,
-        getTextLabelBold(t, project)
+        getTextLabelBold(t, project),
+        getTextDisplayText(t, project)
       );
-      page.drawText(singleLine, {
-        x: tp.x,
-        y: tp.y,
-        size: t.fontSize ?? 11,
-        font: textFont,
-        color: hexToRgb(resolveTextColor(t, project)),
-      });
+      drawWrappedPdfText(
+        page,
+        textFont,
+        getTextDisplayText(t, project),
+        tp.x,
+        tp.y,
+        t.fontSize ?? 11,
+        t.widthPt,
+        t.align ?? "left",
+        t.labelUnderline === true,
+        t.labelItalic === true,
+        hexToRgb(resolveTextColor(t, project))
+      );
     }
   }
 

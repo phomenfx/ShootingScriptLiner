@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import {
   findShot,
   getLineDisplayLabel,
+  getLineScriptLabels,
   getTextDisplayText,
+  lineHasCustomLabelOffset,
   resolveTextColor,
   textFieldLocks,
 } from "../../lib/annotationUtils";
+import { CaptionFormatFields } from "./CaptionFormatFields";
 import { SluglineFields, SLUGLINE_PLACEHOLDERS } from "../SluglineFields";
 import { GEAR_PLACEHOLDERS, ShotDetailFields, SyncSelect } from "./ShotDetailFields";
 import {
@@ -368,57 +371,42 @@ export function PropertiesPanel() {
           />
 
           <h5 className="props-subtitle">Caption</h5>
-          <div className="props-grid dense">
-            <label className="field compact span-2">
-              Font
-              <select
-                value={line.fontFamily}
-                onChange={(e) => {
-                  const fontFamily = e.target.value;
-                  void ensureViewerFontLoaded(fontFamily).then(() =>
-                    updateLine(line.id, { fontFamily })
-                  );
-                }}
-              >
-                {fontOptions.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field compact">
-              Size (pt)
-              <input
-                type="number"
-                min={6}
-                max={48}
-                step={0.5}
-                value={line.fontSizePt}
-                onChange={(e) =>
-                  updateLine(line.id, {
-                    fontSizePt: Math.max(6, Number(e.target.value) || 11),
-                  })
-                }
-              />
-            </label>
-            <label className="field-inline compact span-2">
-              <input
-                type="checkbox"
-                checked={line.labelBold}
-                onChange={(e) => updateLine(line.id, { labelBold: e.target.checked })}
-              />
-              Bold
-            </label>
-            <label className="field-inline compact span-2">
-              <input
-                type="checkbox"
-                checked={line.showLabel}
-                onChange={(e) => updateLine(line.id, { showLabel: e.target.checked })}
-              />
-              Show label on script
-            </label>
-          </div>
+          <CaptionFormatFields
+            fontOptions={fontOptions}
+            fontFamily={line.fontFamily}
+            onFontFamily={(fontFamily) => {
+              void ensureViewerFontLoaded(fontFamily).then(() =>
+                updateLine(line.id, { fontFamily })
+              );
+            }}
+            align={line.labelAlign ?? "left"}
+            onAlign={(labelAlign) => updateLine(line.id, { labelAlign })}
+            fontSize={line.fontSizePt}
+            onFontSize={(fontSizePt) => updateLine(line.id, { fontSizePt })}
+            bold={line.labelBold}
+            italic={line.labelItalic === true}
+            underline={line.labelUnderline === true}
+            onBold={(labelBold) => updateLine(line.id, { labelBold })}
+            onItalic={(labelItalic) => updateLine(line.id, { labelItalic })}
+            onUnderline={(labelUnderline) => updateLine(line.id, { labelUnderline })}
+            enabled={line.showLabel}
+            onEnabled={(showLabel) => updateLine(line.id, { showLabel })}
+            secondaryAlign={
+              getLineScriptLabels(line, project).secondary
+                ? line.secondaryAlign ?? "left"
+                : undefined
+            }
+            onSecondaryAlign={(secondaryAlign) => updateLine(line.id, { secondaryAlign })}
+            showResetOffset={lineHasCustomLabelOffset(line)}
+            onResetOffset={() =>
+              updateLine(line.id, {
+                labelOffsetXPt: undefined,
+                labelOffsetYPt: undefined,
+                secondaryOffsetXPt: undefined,
+                secondaryGapPt: undefined,
+              })
+            }
+          />
 
           <div className="props-actions">
             <button type="button" onClick={() => duplicateLine(line.id)}>
@@ -590,57 +578,27 @@ export function PropertiesPanel() {
           )}
 
           <h5 className="props-subtitle">Caption</h5>
-          <div className="props-grid dense">
-            <label className="field compact span-2">
-              Font
-              <select
-                value={textSel.fontFamily ?? '"Arial", sans-serif'}
-                onChange={(e) => {
-                  const fontFamily = e.target.value;
-                  void ensureViewerFontLoaded(fontFamily).then(() =>
-                    updateText(textSel.id, { fontFamily })
-                  );
-                }}
-              >
-                {fontOptions.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field compact">
-              Size (pt)
-              <input
-                type="number"
-                min={6}
-                max={48}
-                step={0.5}
-                value={textSel.fontSize ?? 11}
-                onChange={(e) =>
-                  updateText(textSel.id, {
-                    fontSize: Math.max(6, Number(e.target.value) || 11),
-                  })
-                }
-              />
-            </label>
-            <label className="field-inline compact span-2">
-              <input
-                type="checkbox"
-                checked={textSel.labelBold ?? project.defaultLine.labelBold}
-                onChange={(e) => updateText(textSel.id, { labelBold: e.target.checked })}
-              />
-              Bold
-            </label>
-            <label className="field-inline compact span-2">
-              <input
-                type="checkbox"
-                checked={textSel.showText !== false}
-                onChange={(e) => updateText(textSel.id, { showText: e.target.checked })}
-              />
-              Show text on script
-            </label>
-          </div>
+          <CaptionFormatFields
+            fontOptions={fontOptions}
+            fontFamily={textSel.fontFamily ?? '"Arial", sans-serif'}
+            onFontFamily={(fontFamily) => {
+              void ensureViewerFontLoaded(fontFamily).then(() =>
+                updateText(textSel.id, { fontFamily })
+              );
+            }}
+            align={textSel.align ?? "left"}
+            onAlign={(align) => updateText(textSel.id, { align })}
+            fontSize={textSel.fontSize ?? 11}
+            onFontSize={(fontSize) => updateText(textSel.id, { fontSize })}
+            bold={textSel.labelBold ?? project.defaultLine.labelBold}
+            italic={textSel.labelItalic === true}
+            underline={textSel.labelUnderline === true}
+            onBold={(labelBold) => updateText(textSel.id, { labelBold })}
+            onItalic={(labelItalic) => updateText(textSel.id, { labelItalic })}
+            onUnderline={(labelUnderline) => updateText(textSel.id, { labelUnderline })}
+            enabled={textSel.showText !== false}
+            onEnabled={(showText) => updateText(textSel.id, { showText })}
+          />
           <div className="props-actions">
             <button type="button" onClick={() => duplicateText(textSel.id)}>
               Duplicate text

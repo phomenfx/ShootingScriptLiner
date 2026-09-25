@@ -14,13 +14,22 @@ import {
 import { useState } from "react";
 import { outlinerCollisionDetection } from "../../lib/dndCollision";
 import { getSortedScenes, getSortedShots } from "../../lib/labelUtils";
-import { useProjectStore } from "../../stores/projectStore";
+import { useProjectStore, type Selection } from "../../stores/projectStore";
+import type { Project, Scene } from "../../types/project";
 import { DragOverlayPreview } from "./DragOverlayPreview";
 import { SortableSceneRow } from "./SortableSceneRow";
 
 type DragItem =
   | { type: "scene"; sceneId: string }
   | { type: "shot"; sceneId: string; shotId: string };
+
+function selectedShotInScene(selection: Selection, project: Project, scene: Scene): string | null {
+  if (selection?.kind === "shot" && selection.sceneId === scene.id) return selection.shotId;
+  if (selection?.kind !== "annotation") return null;
+  const ann = project.annotations.find((item) => item.id === selection.annotationId);
+  if (!ann || ann.kind !== "line" || !ann.shotId) return null;
+  return scene.shots.some((shot) => shot.id === ann.shotId) ? ann.shotId : null;
+}
 
 export function SceneOutliner() {
   const project = useProjectStore((s) => s.project);
@@ -165,11 +174,7 @@ export function SceneOutliner() {
                 selectedScene={
                   selection?.kind === "scene" && selection.sceneId === scene.id
                 }
-                selectedShotId={
-                  selection?.kind === "shot" && selection.sceneId === scene.id
-                    ? selection.shotId
-                    : null
-                }
+                selectedShotId={selectedShotInScene(selection, project, scene)}
                 collapsed={!!collapsedSceneIds[scene.id]}
                 onToggleCollapsed={() => toggleSceneCollapsed(scene.id)}
                 onSelectScene={() => selectScene(scene.id)}
