@@ -1,101 +1,207 @@
-/* App shell and split panes */
-.app {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
+/* App shell: top bar, then three panel cards. The window itself never scrolls. */
+html,
+body,
+#root {
+  height: 100%;
 }
 
-.main-split {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.pane {
+body {
   overflow: hidden;
 }
 
-.pane-pdf {
-  flex: 1;
-  overflow: auto;
-  background: var(--color-surface-muted);
+.app-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
   min-width: 0;
 }
 
-.sidebar-splitter {
-  flex: 0 0 5px;
-  width: 5px;
-  cursor: col-resize;
-  background: var(--color-border);
-  touch-action: none;
+.shell-top {
+  min-width: 0;
+}
+
+.shell-main {
+  display: grid;
+  gap: var(--panel-gap);
+  padding: var(--panel-gap);
+  min-height: 0;
+  min-width: 0;
+}
+
+.shell-side {
   position: relative;
-  z-index: 2;
+  min-width: 0;
+  min-height: 0;
 }
 
-.sidebar-splitter::after {
-  content: "";
-  position: absolute;
-  inset: 0 -3px;
-}
-
-.sidebar-splitter:hover,
-.sidebar-splitter:focus-visible,
-body.sidebar-resizing .sidebar-splitter {
-  background: var(--color-accent);
-}
-
-body.sidebar-resizing {
-  cursor: col-resize;
-  user-select: none;
-}
-
-body.properties-resizing {
-  cursor: row-resize;
-  user-select: none;
-}
-
-body.sidebar-resizing iframe,
-body.sidebar-resizing canvas,
-body.properties-resizing iframe,
-body.properties-resizing canvas {
-  pointer-events: none;
-}
-
-.pane-outliner {
-  flex: 0 0 auto;
-  width: 420px;
+/* Panel cards */
+.panel {
   display: flex;
   flex-direction: column;
-  background: var(--color-surface-raised);
+  height: 100%;
+  min-width: 0;
   min-height: 0;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
   overflow: hidden;
-  border-left: 1px solid var(--color-border);
 }
 
-.outliner-wrap {
-  flex: 1 1 auto;
-  min-height: 140px;
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  height: var(--panel-header-height);
+  padding: 0 6px 0 10px;
+  background: var(--color-header);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: var(--font-size);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
 }
 
-.properties-splitter {
-  flex: 0 0 5px;
-  height: 5px;
-  cursor: row-resize;
-  background: var(--color-border);
+.panel-icon-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.panel-icon-btn:hover {
+  background: var(--color-btn-hover);
+  color: var(--color-text);
+}
+
+.panel-icon-btn:focus-visible,
+.panel-resizer:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.panel-collapsed {
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+  background: var(--color-header);
+}
+
+.panel-collapsed-title {
+  writing-mode: vertical-rl;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+/* The script column fills its card. */
+.shell-script {
+  background: var(--color-bg);
+}
+
+/* The inner edge of a side panel sits in the gap next to the script. */
+.panel-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--panel-gap);
+  cursor: col-resize;
   touch-action: none;
-  position: relative;
   z-index: 2;
 }
 
-.properties-splitter::after {
-  content: "";
-  position: absolute;
-  inset: -3px 0;
+.shell-side-left .panel-resizer {
+  right: calc(-1 * var(--panel-gap));
 }
 
-.properties-splitter:hover,
-.properties-splitter:focus-visible,
-body.properties-resizing .properties-splitter {
+.shell-side-right .panel-resizer {
+  left: calc(-1 * var(--panel-gap));
+}
+
+.panel-resizer::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: transparent;
+}
+
+.panel-resizer:hover::after,
+body.panel-resizing .panel-resizer:active::after {
   background: var(--color-accent);
+}
+
+body.panel-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.panel-resizing canvas,
+body.panel-resizing iframe {
+  pointer-events: none;
+}
+
+/* Old panel contents carried their own title; the card header replaces it. */
+.panel .properties-title {
+  display: none;
+}
+
+.panel .outliner {
+  overflow: visible;
+}
+
+/* Thin scrollbars everywhere. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scrollbar) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar);
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-scrollbar-hover);
 }

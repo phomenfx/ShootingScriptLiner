@@ -105,8 +105,6 @@ const actions: Omit<
   | "lineHitTolerancePx"
   | "maxMountedPdfPages"
   | "viewerZoomPercent"
-  | "sidebarWidthPx"
-  | "propertiesHeightPx"
   | "scriptPdfFile"
 > = {
   newProject: () => commands.newProject(),
@@ -184,8 +182,6 @@ const actions: Omit<
   setMaxMountedPdfPages: (count) => prefs().setMaxMountedPdfPages(count),
   setViewerZoomPercent: (percent) => prefs().setViewerZoomPercent(percent),
   adjustViewerZoom: (delta) => prefs().setViewerZoomPercent(prefs().viewerZoomPercent + delta),
-  setSidebarWidthPx: (px) => prefs().setSidebarWidthPx(px),
-  setPropertiesHeightPx: (px, paneHeight) => prefs().setPropertiesHeightPx(px, paneHeight),
   setScriptPdfFile: (file) => {
     session().setScriptPdfFile(file);
     // A PDF that arrives before its page sizes are known still has to be measured.
@@ -409,8 +405,6 @@ function getState(): LegacyState {
     lineHitTolerancePx: p.lineHitTolerancePx,
     maxMountedPdfPages: p.maxMountedPdfPages,
     viewerZoomPercent: p.viewerZoomPercent,
-    sidebarWidthPx: p.sidebarWidthPx,
-    propertiesHeightPx: p.propertiesHeightPx,
     scriptPdfFile: s.scriptPdfFile,
   };
   snapshot = { key, state };

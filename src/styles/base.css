@@ -5,14 +5,10 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   font-size: var(--font-size);
   background: var(--color-bg);
   color: var(--color-text);
-}
-
-#root {
-  min-height: 100vh;
 }
 
 /* Shared form controls */

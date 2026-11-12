@@ -47,10 +47,6 @@ export type LegacyState = {
   maxMountedPdfPages: number;
   /** PDF zoom as percent (100 = scale 1.0); app preference in localStorage. */
   viewerZoomPercent: number;
-  /** Right sidebar width (px); app preference in localStorage. */
-  sidebarWidthPx: number;
-  /** Properties panel height (px); app preference in localStorage. */
-  propertiesHeightPx: number;
   /** Active script PDF in memory (for viewer + Save ZIP when cache key mismatches). */
   scriptPdfFile: File | null;
 
@@ -84,8 +80,6 @@ export type LegacyState = {
   setMaxMountedPdfPages: (count: number) => void;
   setViewerZoomPercent: (percent: number) => void;
   adjustViewerZoom: (deltaPercent: number) => void;
-  setSidebarWidthPx: (px: number) => void;
-  setPropertiesHeightPx: (px: number, paneHeight?: number) => void;
   setScriptPdfFile: (file: File | null) => void;
 
   selectScene: (sceneId: string) => void;

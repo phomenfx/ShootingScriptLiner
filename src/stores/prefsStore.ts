@@ -8,19 +8,22 @@ import {
   applyColorTheme,
   clampLineHitTolerancePx,
   clampMaxMountedPdfPages,
-  clampPropertiesHeightPx,
-  clampSidebarWidthPx,
   clampViewerZoomPercent,
   normalizeColorTheme,
 } from "../lib/appPreferences";
+import {
+  clampPanelWidthPx,
+  DEFAULT_PANEL_WIDTH_PX,
+  defaultPanelPrefs,
+  type PanelPrefs,
+  type SidePanel,
+} from "../lib/panelLayout";
 import { sanitizeToolKeybinds, validateToolKeybindChange } from "../lib/toolKeybinds";
 import type { ScriptTool } from "../types/annotations";
 import {
   DEFAULT_COLOR_THEME,
   DEFAULT_LINE_HIT_TOLERANCE_PX,
   DEFAULT_MAX_MOUNTED_PDF_PAGES,
-  DEFAULT_PROPERTIES_HEIGHT_PX,
-  DEFAULT_SIDEBAR_WIDTH_PX,
   DEFAULT_VIEWER_ZOOM_PERCENT,
   type ColorTheme,
 } from "../types/appPreferences";
@@ -39,8 +42,8 @@ type PrefsValues = {
   maxMountedPdfPages: number;
   /** 100 = fit. */
   viewerZoomPercent: number;
-  sidebarWidthPx: number;
-  propertiesHeightPx: number;
+  /** Side panel widths, collapse state and order. */
+  panels: PanelPrefs;
 };
 
 type PrefsState = PrefsValues & {
@@ -52,8 +55,10 @@ type PrefsState = PrefsValues & {
   setLineHitTolerancePx: (px: number) => void;
   setMaxMountedPdfPages: (count: number) => void;
   setViewerZoomPercent: (percent: number) => void;
-  setSidebarWidthPx: (px: number) => void;
-  setPropertiesHeightPx: (px: number, paneHeight?: number) => void;
+  setPanelWidth: (panel: SidePanel, px: number) => void;
+  resetPanelWidth: (panel: SidePanel) => void;
+  setPanelCollapsed: (panel: SidePanel, collapsed: boolean) => void;
+  setSwapSides: (swap: boolean) => void;
 };
 
 const memory = new Map<string, string>();
@@ -107,13 +112,9 @@ function readOldKeys(): Partial<PrefsValues> {
   const hit = number("line-hit-tolerance");
   const mounted = number("max-mounted-pdf-pages");
   const zoom = number("viewer-zoom-percent");
-  const sidebar = number("sidebar-width-px");
-  const properties = number("properties-height-px");
   if (hit !== undefined) out.lineHitTolerancePx = clampLineHitTolerancePx(hit);
   if (mounted !== undefined) out.maxMountedPdfPages = clampMaxMountedPdfPages(mounted);
   if (zoom !== undefined) out.viewerZoomPercent = clampViewerZoomPercent(zoom);
-  if (sidebar !== undefined) out.sidebarWidthPx = clampSidebarWidthPx(sidebar);
-  if (properties !== undefined) out.propertiesHeightPx = clampPropertiesHeightPx(properties);
   return out;
 }
 
@@ -132,8 +133,7 @@ export const usePrefsStore = create<PrefsState>()(
       lineHitTolerancePx: DEFAULT_LINE_HIT_TOLERANCE_PX,
       maxMountedPdfPages: DEFAULT_MAX_MOUNTED_PDF_PAGES,
       viewerZoomPercent: DEFAULT_VIEWER_ZOOM_PERCENT,
-      sidebarWidthPx: DEFAULT_SIDEBAR_WIDTH_PX,
-      propertiesHeightPx: DEFAULT_PROPERTIES_HEIGHT_PX,
+      panels: defaultPanelPrefs(),
       ...readOldKeys(),
 
       setColorTheme: (theme) => {
@@ -152,13 +152,44 @@ export const usePrefsStore = create<PrefsState>()(
       setLineHitTolerancePx: (px) => set({ lineHitTolerancePx: clampLineHitTolerancePx(px) }),
       setMaxMountedPdfPages: (count) => set({ maxMountedPdfPages: clampMaxMountedPdfPages(count) }),
       setViewerZoomPercent: (percent) => set({ viewerZoomPercent: clampViewerZoomPercent(percent) }),
-      setSidebarWidthPx: (px) => set({ sidebarWidthPx: clampSidebarWidthPx(px, viewportWidth()) }),
-      setPropertiesHeightPx: (px, paneHeight) =>
-        set({ propertiesHeightPx: clampPropertiesHeightPx(px, paneHeight) }),
+      setPanelWidth: (panel, px) =>
+        set((s) => ({
+          panels: {
+            ...s.panels,
+            widthPx: { ...s.panels.widthPx, [panel]: clampPanelWidthPx(panel, px, viewportWidth()) },
+          },
+        })),
+      resetPanelWidth: (panel) =>
+        set((s) => ({
+          panels: {
+            ...s.panels,
+            widthPx: { ...s.panels.widthPx, [panel]: DEFAULT_PANEL_WIDTH_PX[panel] },
+          },
+        })),
+      setPanelCollapsed: (panel, collapsed) =>
+        set((s) => ({
+          panels: { ...s.panels, collapsed: { ...s.panels.collapsed, [panel]: collapsed } },
+        })),
+      setSwapSides: (swapSides) => set((s) => ({ panels: { ...s.panels, swapSides } })),
     }),
     {
       name: PREFS_STORAGE_KEY,
       version: 1,
+      // Saved panel settings may lack parts added later; fill those from the defaults.
+      merge: (saved, current) => {
+        const s = (saved ?? {}) as Partial<PrefsValues>;
+        const d = current.panels;
+        return {
+          ...current,
+          ...s,
+          panels: {
+            widthPx: { ...d.widthPx, ...s.panels?.widthPx },
+            collapsed: { ...d.collapsed, ...s.panels?.collapsed },
+            placement: { ...d.placement, ...s.panels?.placement },
+            swapSides: s.panels?.swapSides ?? d.swapSides,
+          },
+        };
+      },
       storage: createJSONStorage(storage),
       partialize: ({
         colorTheme,
@@ -167,8 +198,7 @@ export const usePrefsStore = create<PrefsState>()(
         lineHitTolerancePx,
         maxMountedPdfPages,
         viewerZoomPercent,
-        sidebarWidthPx,
-        propertiesHeightPx,
+        panels,
       }): PrefsValues => ({
         colorTheme,
         viewerLayoutMode,
@@ -176,8 +206,7 @@ export const usePrefsStore = create<PrefsState>()(
         lineHitTolerancePx,
         maxMountedPdfPages,
         viewerZoomPercent,
-        sidebarWidthPx,
-        propertiesHeightPx,
+        panels,
       }),
     }
   )
