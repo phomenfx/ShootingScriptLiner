@@ -47,6 +47,8 @@ export type Shot = {
   sync?: string;
   /** YYYY-MM-DD. Blank inherits the scene date. */
   scheduledDate?: string;
+  /** The finished caption, when the caller has already built it. */
+  captionText?: string;
   /** Keys that differ from the project line-label defaults. */
   lineLabelInclude?: Partial<Record<LineLabelFieldId, boolean>>;
 };

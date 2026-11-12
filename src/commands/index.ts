@@ -6,6 +6,7 @@
 import { placeUnplacedV1Marks } from "../io/migrateV1";
 import { buildProjectZip, downloadBlob, readProjectFile, scriptNameInJson } from "../io/projectFiles";
 import { readProjectJson } from "../io/readProject";
+import { buildShotListRows, rowsToCsv } from "../io/shotListCsv";
 import { compareScript, describeScript, scriptMismatchMessage } from "../io/scriptIdentity";
 import { projectFileStem } from "../io/writeProject";
 import { toLegacyProject } from "../legacy/legacyView";
@@ -240,8 +241,7 @@ export async function exportLinedPdf(): Promise<void> {
 }
 
 export async function exportShotListCsv(): Promise<void> {
-  const { buildShotListRows, rowsToCsv } = await import("../lib/shotListExport");
-  const csv = rowsToCsv(buildShotListRows(toLegacyProject(project())));
+  const csv = rowsToCsv(buildShotListRows(project()));
   downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${projectFileStem(project())}-shot-list.csv`);
 }
 

@@ -19,6 +19,7 @@ import {
   textFromV1,
   v1MarkContext,
 } from "../io/migrateV1";
+import { shotCaption } from "../model/captions";
 import { choiceLabel } from "../model/registry";
 import { findShot } from "../model/edits";
 import type * as V2 from "../model/types";
@@ -204,14 +205,21 @@ export function legacyShot(shot: V2.Shot, scene: V2.Scene, order: number): Shot 
   return result;
 }
 
-export function legacyScene(scene: V2.Scene, order: number): Scene {
+/** With `project`, each shot also carries its finished caption, new fields included. */
+export function legacyScene(scene: V2.Scene, order: number, project?: V2.Project): Scene {
   const { indicator, location, time } = scene.heading;
   return {
     id: scene.id,
     slugline: composeSlugline(indicator, location, time),
     order,
     visible: scene.visible,
-    shots: scene.shots.map((shot, index) => legacyShot(shot, scene, index)),
+    shots: scene.shots.map((shot, index) => {
+      const out = legacyShot(shot, scene, index);
+      if (project) {
+        out.captionText = shotCaption(project, { scene, shot, sceneIndex: order, shotIndex: index });
+      }
+      return out;
+    }),
     ...compact({
       indicator,
       location,
@@ -250,7 +258,7 @@ function legacyLabelFields(fields: V2.CaptionField[]): LineLabelField[] {
 
 /* Caches keep unchanged scenes, marks and settings identical between views,
    so the old screens re-render only what changed. */
-type SceneEntry = { order: number; out: Scene };
+type SceneEntry = { order: number; settings: V2.ProjectSettings; out: Scene };
 type MarkEntry = {
   size: V2.ScriptPage;
   shot: V2.Shot | undefined;
@@ -261,7 +269,7 @@ const sceneCache = new WeakMap<V2.Scene, SceneEntry>();
 const markCache = new WeakMap<V2.Mark, MarkEntry>();
 const defaultLineCache = new WeakMap<V2.LineDefaults, LineDefaults>();
 const labelFieldsCache = new WeakMap<V2.CaptionField[], LineLabelField[]>();
-let lastScenes: { from: V2.Scene[]; out: Scene[] } | null = null;
+let lastScenes: { from: V2.Scene[]; settings: V2.ProjectSettings; out: Scene[] } | null = null;
 
 function cached<K extends object, V>(cache: WeakMap<K, V>, key: K, build: () => V): V {
   let value = cache.get(key);
@@ -280,17 +288,17 @@ export function toLegacyProject(
   const s = project.settings;
 
   let scenes: Scene[];
-  if (lastScenes?.from === project.scenes) {
+  if (lastScenes?.from === project.scenes && lastScenes.settings === s) {
     scenes = lastScenes.out;
   } else {
     scenes = project.scenes.map((scene, order) => {
       const hit = sceneCache.get(scene);
-      if (hit && hit.order === order) return hit.out;
-      const out = legacyScene(scene, order);
-      sceneCache.set(scene, { order, out });
+      if (hit && hit.order === order && hit.settings === s) return hit.out;
+      const out = legacyScene(scene, order, project);
+      sceneCache.set(scene, { order, settings: s, out });
       return out;
     });
-    lastScenes = { from: project.scenes, out: scenes };
+    lastScenes = { from: project.scenes, settings: s, out: scenes };
   }
 
   const shotById = new Map<string, V2.Shot>();

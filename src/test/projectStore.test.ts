@@ -91,7 +91,7 @@ describe("projectStore: add", () => {
     const sceneId = scenes()[0]!.id;
     store().addShot(sceneId);
     const shot = scenes()[0]!.shots[0]!;
-    expect(shot).toEqual({ id: shot.id, order: 0, color: "#00AA55", visible: true });
+    expect(shot).toMatchObject({ id: shot.id, order: 0, color: "#00AA55", visible: true });
     expect(store().selection).toEqual({ kind: "shot", sceneId, shotId: shot.id });
   });
 

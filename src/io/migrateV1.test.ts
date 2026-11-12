@@ -54,7 +54,7 @@ function comparable(project: V1Project) {
     if (value && typeof value === "object") {
       const out: Record<string, unknown> = {};
       for (const [key, v] of Object.entries(value)) {
-        if (v === undefined || v === "" || v === false) continue;
+        if (v === undefined || v === "" || v === false || key === "captionText") continue;
         out[key] = strip(v);
       }
       return out;

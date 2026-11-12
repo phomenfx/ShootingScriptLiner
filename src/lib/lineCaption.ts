@@ -111,6 +111,7 @@ function formatAdditional(
 
 /** Caption drawn on a linked line and on shot-following text. */
 export function formatLineCaption(scene: Scene, shot: Shot, project: Project): string {
+  if (shot.captionText !== undefined) return shot.captionText;
   const fields = project.lineLabelFields.length > 0 ? project.lineLabelFields : DEFAULT_LINE_LABEL_FIELDS;
   const pieces: { id: LineLabelFieldId; text: string }[] = [];
   for (const field of fields) {
