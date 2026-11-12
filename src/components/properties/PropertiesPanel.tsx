@@ -52,7 +52,7 @@ export function PropertiesPanel() {
               </button>
             </div>
           )}
-          {showShot && linked ? <ShotInspector project={project} found={linked} asTab /> : own}
+          {showShot && linked ? <ShotInspector project={project} found={linked} asTab mark={mark.kind === "line" || mark.kind === "text" ? mark : undefined} /> : own}
         </div>
       );
     }

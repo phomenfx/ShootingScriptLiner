@@ -81,17 +81,16 @@ export function ScenePanel() {
   };
 
   /**
-   * Shows the shot's form. When the shot is on the script, its first line is
-   * selected and its page opened, with Properties on the Shot tab.
+   * The shot itself: its form is the base that linked lines and notes follow
+   * until one of them has its own text. The page moves to its first line, but
+   * the line stays unselected so the Line and Note tabs stay hidden.
    */
   const selectShot = (shot: Shot) => {
-    const mark = project.marks.find((m) => m.kind !== "image" && m.shotId === shot.id);
-    if (!mark) {
-      session().select("shot", shot.id);
-      return;
-    }
-    session().setMarkTab("shot");
-    session().select("mark", mark.id);
+    session().select("shot", shot.id);
+    const mark =
+      project.marks.find((m) => m.kind === "line" && m.shotId === shot.id) ??
+      project.marks.find((m) => m.kind !== "image" && m.shotId === shot.id);
+    if (!mark) return;
     session().setViewerPage(mark.page);
     session().setActivePage(mark.page);
   };

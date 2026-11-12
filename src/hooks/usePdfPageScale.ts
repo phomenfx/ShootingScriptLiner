@@ -1,20 +1,21 @@
 import { type RefObject, useEffect, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import {
-  PDF_SPREAD_GAP_PX,
-  scaleToFitTwoPages,
-  viewerScaleFromZoomPercent,
-} from "../lib/pdfViewport";
+import { scaleToFitBox, viewerScaleFromZoomPercent, type PageFit } from "../lib/pdfViewport";
 
-/** Per-page scale shared by single, scroll, and spread (each page = half pane width at 100%). */
+/** Page scale for the current view. 100% fits that view inside the script area. */
 export function usePdfPageScale(
   wrapRef: RefObject<HTMLElement | null>,
   pdf: PDFDocumentProxy | null,
-  zoomPercent: number
+  zoomPercent: number,
+  fit: PageFit
 ) {
   const [pageWidthPt, setPageWidthPt] = useState(0);
   const [pageHeightPt, setPageHeightPt] = useState(0);
   const [scale, setScale] = useState(1);
+  const pagesAcross = fit.pagesAcross;
+  const gapPx = fit.gapPx ?? 0;
+  const padX = fit.padX ?? 0;
+  const padY = fit.padY ?? 0;
 
   useEffect(() => {
     if (!pdf) {
@@ -36,13 +37,17 @@ export function usePdfPageScale(
 
   useEffect(() => {
     const el = wrapRef.current;
-    if (!el || pageWidthPt <= 0) return;
+    if (!el || pageWidthPt <= 0 || pageHeightPt <= 0) return;
 
     const update = () => {
-      const w = el.clientWidth - 32;
-      const fit = scaleToFitTwoPages(pageWidthPt, w, PDF_SPREAD_GAP_PX);
+      const fitted = scaleToFitBox(pageWidthPt, pageHeightPt, el.clientWidth, el.clientHeight, {
+        pagesAcross,
+        gapPx,
+        padX,
+        padY,
+      });
       const zoom = viewerScaleFromZoomPercent(zoomPercent);
-      const next = Math.max(0.2, Math.min(5, fit * zoom));
+      const next = Math.max(0.2, Math.min(5, fitted * zoom));
       setScale((prev) => (Math.abs(prev - next) < 0.002 ? prev : next));
     };
 
@@ -50,7 +55,7 @@ export function usePdfPageScale(
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [wrapRef, pageWidthPt, zoomPercent]);
+  }, [wrapRef, pageWidthPt, pageHeightPt, zoomPercent, pagesAcross, gapPx, padX, padY]);
 
   return { scale, pageWidthPt, pageHeightPt };
 }

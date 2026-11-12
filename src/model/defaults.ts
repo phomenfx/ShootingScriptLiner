@@ -1,4 +1,5 @@
 import { newId } from "../lib/ids";
+import { defaultDivider, isCaptionDivider } from "./captions";
 import { CAPTION_FIELDS, DEFAULT_TAGS, isCaptionFieldId } from "./registry";
 import type {
   CaptionField,
@@ -29,20 +30,28 @@ export function defaultTextStyle(): TextStyle {
 }
 
 export function defaultCaptionFields(): CaptionField[] {
-  return CAPTION_FIELDS.map(({ id, print }) => ({ id, print }));
+  return CAPTION_FIELDS.map(({ id, print }) => ({ id, print, divider: defaultDivider(id) }));
 }
 
+const CUSTOM_DIVIDER_LIMIT = 32;
+
 /** Keeps known fields in their saved order, drops repeats, and appends any that are missing. */
-export function completeCaptionFields(raw: unknown): CaptionField[] {
+export function completeCaptionFields(raw: unknown, additionalInfoStyle: "parens" | "hyphen" = "parens"): CaptionField[] {
   const result: CaptionField[] = [];
   const seen = new Set<string>();
   if (Array.isArray(raw)) {
     for (const item of raw) {
       if (!item || typeof item !== "object") continue;
-      const { id, print } = item as { id?: unknown; print?: unknown };
+      const record = item as { id?: unknown; print?: unknown; divider?: unknown; dividerText?: unknown };
+      const { id, print } = record;
       if (!isCaptionFieldId(id) || seen.has(id)) continue;
       seen.add(id);
-      result.push({ id, print: print === true });
+      const divider = isCaptionDivider(record.divider) ? record.divider : defaultDivider(id, additionalInfoStyle);
+      const field: CaptionField = { id, print: print === true, divider };
+      if (divider === "custom" && typeof record.dividerText === "string") {
+        field.dividerText = record.dividerText.slice(0, CUSTOM_DIVIDER_LIMIT);
+      }
+      result.push(field);
     }
   }
   for (const field of defaultCaptionFields()) {

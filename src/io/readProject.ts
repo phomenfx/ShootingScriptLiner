@@ -21,6 +21,7 @@ import type {
   LineMark,
   ListEntry,
   Mark,
+  MarkOwn,
   Outline,
   Point,
   Project,
@@ -129,6 +130,21 @@ function readTextStyle(raw: unknown, fallback: TextStyle): TextStyle {
     underline: bool(r.underline, fallback.underline),
     align: align(r.align) ?? fallback.align,
   };
+}
+
+function readMarkOwn(value: unknown): MarkOwn | undefined {
+  if (!isRecord(value)) return undefined;
+  const own: MarkOwn = {};
+  for (const key of ["type", "angle", "subject", "additionalInfo", "notes", "setup", "indicator", "location", "time", "fps", "sync", "date"] as const) {
+    if (typeof value[key] === "string") own[key] = value[key];
+  }
+  for (const key of ["cast", "tags", "movement", "audio"] as const) {
+    const list = stringList(value[key]);
+    if (list) own[key] = list;
+  }
+  const cameras = readCameras(value.cameras);
+  if (cameras) own.cameras = cameras;
+  return Object.keys(own).length > 0 ? own : undefined;
 }
 
 function readCameras(value: unknown): CameraRow[] | undefined {
@@ -304,7 +320,11 @@ function readLine(raw: Raw, ctx: MarkContext, notes: string[], what: string): Li
   };
   const shotId = readShotLink(raw, ctx, notes, what);
   const color = nonEmpty(raw.color);
-  if (shotId) line.shotId = shotId;
+  if (shotId) {
+    line.shotId = shotId;
+    const own = readMarkOwn(raw.own);
+    if (own) line.own = own;
+  }
   if (color) line.color = color;
   else if (!shotId) line.color = ctx.settings.general.newShotColor;
   if (Array.isArray(raw.segments)) {
@@ -337,7 +357,11 @@ function readText(raw: Raw, ctx: MarkContext, notes: string[], what: string): Te
   const shotId = readShotLink(raw, ctx, notes, what);
   const text = optString(raw.text);
   const color = nonEmpty(raw.color);
-  if (shotId) note.shotId = shotId;
+  if (shotId) {
+    note.shotId = shotId;
+    const own = readMarkOwn(raw.own);
+    if (own) note.own = own;
+  }
   if (text !== undefined) note.text = text;
   else if (!shotId) note.text = "";
   if (color) note.color = color;
@@ -429,7 +453,7 @@ function readSettings(raw: unknown): ProjectSettings {
     nonEmpty(general.newShotPriority) ?? settings.general.newShotPriority;
 
   const captions = isRecord(raw.captions) ? raw.captions : {};
-  settings.captions.fields = completeCaptionFields(captions.fields);
+  settings.captions.fields = completeCaptionFields(captions.fields, settings.general.additionalInfoStyle);
   for (const key of ["offsetAcrossPt", "offsetAbovePt", "contGapPt"] as const) {
     settings.captions[key] = num(captions[key]) ?? settings.captions[key];
   }

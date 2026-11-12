@@ -1,7 +1,7 @@
 import { formatLineCaption } from "./lineCaption";
 import { migrateCapName } from "./lineCaps";
 import { normalizeStroke } from "./lineStrokes";
-import type { LineAnnotation, LineEnding, LineStyle, TextAlign, TextAnnotation } from "../types/annotations";
+import type { LineAnnotation, LineEnding, LineStyle, NormalizedPoint, TextAlign, TextAnnotation } from "../types/annotations";
 import {
   DEFAULT_LINE_LOCKS,
   UNLINKED_LINE_LOCKS,
@@ -37,6 +37,7 @@ export function isAnnotationVisible(
 }
 
 export function getLineDisplayLabel(line: LineAnnotation, project: Project): string {
+  if (line.displayLabel !== undefined) return line.displayLabel;
   if (line.locks.label === false && line.label !== undefined && line.label !== "") {
     return line.label;
   }
@@ -50,6 +51,7 @@ export function getLineDisplayLabel(line: LineAnnotation, project: Project): str
 }
 
 export function getTextDisplayText(text: TextAnnotation, project: Project): string {
+  if (text.displayLabel !== undefined) return text.displayLabel;
   const found = text.shotId ? findShot(project, text.shotId) : null;
   const caption = found ? formatLineCaption(found.scene, found.shot, project) : "";
   if (text.followShot && found) return caption;
@@ -356,7 +358,7 @@ function templateForNewLine(
 
 export function createLineFromShot(
   page: number,
-  points: [LineAnnotation["points"][0], LineAnnotation["points"][1]],
+  points: NormalizedPoint[],
   project: Project,
   shotId: string | undefined
 ): LineAnnotation {
@@ -395,10 +397,7 @@ export function cloneLine(line: LineAnnotation, page?: number): LineAnnotation {
     ...line,
     id: newId(),
     page: page ?? line.page,
-    points: [
-      { x: line.points[0].x + offset, y: line.points[0].y + offset },
-      { x: line.points[1].x + offset, y: line.points[1].y + offset },
-    ],
+    points: line.points.map((point) => ({ x: point.x + offset, y: point.y + offset })),
     style: cloneLineStyle(line.style),
     locks: { ...line.locks },
     marginContinuation: undefined,
@@ -477,8 +476,11 @@ export function cloneText(text: TextAnnotation): TextAnnotation {
   };
 }
 
+export function cacheKeyFor(name: string, scriptFileName: string | undefined): string {
+  const safe = name.replace(/[^\w.-]+/g, "_") || "project";
+  return `${safe}__${scriptFileName ?? "none"}`;
+}
+
 export function getProjectCacheKey(project: Project): string {
-  const name = project.name.replace(/[^\w.-]+/g, "_") || "project";
-  const script = project.scriptFileName ?? "none";
-  return `${name}__${script}`;
+  return cacheKeyFor(project.name, project.scriptFileName);
 }

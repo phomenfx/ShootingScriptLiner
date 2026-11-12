@@ -1,5 +1,14 @@
 import type { NormalizedPoint } from "../types/annotations";
 
+/**
+ * Degrees to pass to `snapEndpoint`. The Snap button turns this off (Shift
+ * still snaps). When the button is on and the project angle is 0, use 15°.
+ */
+export function activeSnapDegrees(angleSnapDegrees: number, snapOn: boolean): number {
+  if (!snapOn) return 0;
+  return angleSnapDegrees > 0 ? angleSnapDegrees : 15;
+}
+
 /** Snap on when degrees > 0, or while Shift is held (PDF-XChange style). */
 export function isSnapEnabled(snapAngleDegrees: number, shiftKey: boolean): boolean {
   return shiftKey || snapAngleDegrees > 0;

@@ -115,11 +115,6 @@ body {
   user-select: none;
 }
 
-/* The script column fills its card. */
-.shell-script {
-  background: var(--color-bg);
-}
-
 /* The inner edge of a side panel sits in the gap next to the script. */
 .panel-resizer {
   position: absolute;

@@ -54,3 +54,26 @@ describe("pdfSpread", () => {
     expect(anchorPageForSpread(2)).toBe(4);
   });
 });
+
+describe("pdfSpread with facing pages", () => {
+  const paired = { firstPageAlone: false };
+
+  it("pairs from page 1", () => {
+    expect(spreadCount(4, paired)).toBe(2);
+    expect(spreadCount(5, paired)).toBe(3);
+    expect(pagesInSpread(0, 5, paired)).toEqual([1, 2]);
+    expect(pagesInSpread(1, 5, paired)).toEqual([3, 4]);
+    expect(pagesInSpread(2, 5, paired)).toEqual([5]);
+    expect(spreadSlots(0, 4, paired)).toEqual([1, 2]);
+    expect(spreadSlots(1, 4, paired)).toEqual([3, 4]);
+  });
+
+  it("maps a page to its pair and steps by two", () => {
+    expect(spreadIndexFromPage(1, paired)).toBe(0);
+    expect(spreadIndexFromPage(2, paired)).toBe(0);
+    expect(spreadIndexFromPage(3, paired)).toBe(1);
+    expect(anchorPageAfterSpreadDelta(1, 5, 1, paired)).toBe(3);
+    expect(anchorPageAfterSpreadDelta(3, 5, 1, paired)).toBe(5);
+    expect(anchorPageForSpread(2, paired)).toBe(5);
+  });
+});

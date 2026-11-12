@@ -13,14 +13,15 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { V2_CAPTION_FIELD_IDS, toLegacyProject } from "../../legacy/legacyView";
+import { toLegacyProject } from "../../legacy/legacyView";
 import { formatExcelDate } from "../../lib/dateFormat";
 import { getFontOptions, loadBundledFonts } from "../../lib/fonts";
 import { formatLineCaption } from "../../lib/lineCaption";
+import { CAPTION_DIVIDERS, customDividerSeed, isCaptionDivider } from "../../model/captions";
 import { defaultSettings } from "../../model/defaults";
 import { setName, updateSettings } from "../../model/edits";
-import { CAPTION_FIELDS, choiceEntries } from "../../model/registry";
-import type { Ending, LineDefaults, ProjectSettings } from "../../model/types";
+import { CAPTION_FIELDS, choiceEntries, isCaptionFieldId } from "../../model/registry";
+import type { CaptionDivider, Ending, LineDefaults, ProjectSettings } from "../../model/types";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -64,6 +65,7 @@ const FIXED_SHORTCUTS: [string, string][] = [
   ["Delete", "Del"],
   ["Deselect", "Esc"],
   ["Zoom in / out / fit", "Ctrl+= / - / 0"],
+  ["Toggle snap", "S"],
   ["Snap angle while drawing", "Hold Shift"],
 ];
 
@@ -243,8 +245,8 @@ export function SettingsDialog() {
       },
     }));
 
-  // Caption fields the app can print today; the newer ones appear with their shot fields.
-  const captionFields = s.captions.fields.filter((field) => field.id in V2_CAPTION_FIELD_IDS);
+  // Every caption field the project stores, including Angle, Cast, Tags and Setup.
+  const captionFields = s.captions.fields.filter((field) => isCaptionFieldId(field.id));
   const moveField = (id: string, step: -1 | 1) => {
     const index = captionFields.findIndex((field) => field.id === id);
     const other = captionFields[index + step];
@@ -353,11 +355,22 @@ export function SettingsDialog() {
         { label: "Preview", control: <span className="set-preview set-preview-mono">{captionPreview}</span> },
         {
           label: "Fields and order",
-          hint: "Each shot can still turn a field on or off for itself.",
+          hint: "The divider joins that field to the one before it. Parentheses, brackets, braces and quotes wrap the field, so the defaults read 1A-WS Subject (Info). Custom uses … for the value, as in “ (…)”. A shot can still turn a field off for itself.",
           control: (
             <ul className="set-fields">
               {captionFields.map((field, index) => {
                 const label = CAPTION_FIELDS.find((f) => f.id === field.id)?.label ?? field.id;
+                const chooseDivider = (divider: CaptionDivider) =>
+                  setCaptions({
+                    fields: s.captions.fields.map((item) => {
+                      if (item.id !== field.id) return item;
+                      if (divider !== "custom") {
+                        const { dividerText: _removed, ...rest } = item;
+                        return { ...rest, divider };
+                      }
+                      return { ...item, divider, dividerText: item.dividerText ?? customDividerSeed(item.divider) };
+                    }),
+                  });
                 return (
                   <li key={field.id}>
                     <label className="set-check">
@@ -372,6 +385,38 @@ export function SettingsDialog() {
                       />
                       {label}
                     </label>
+                    <select
+                      className="set-divider"
+                      aria-label={`Divider for ${label}`}
+                      title="Joins this field to the previous one. Wrapping choices surround the field."
+                      value={field.divider ?? "space"}
+                      onChange={(e) => {
+                        if (isCaptionDivider(e.target.value)) chooseDivider(e.target.value);
+                      }}
+                    >
+                      {CAPTION_DIVIDERS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {field.divider === "custom" && (
+                      <input
+                        type="text"
+                        className="set-divider-text"
+                        aria-label={`Custom divider for ${label}`}
+                        title="… stands for this field. “ (…)” wraps it, and “-…” joins it with a hyphen."
+                        value={field.dividerText ?? ""}
+                        maxLength={32}
+                        onChange={(e) =>
+                          setCaptions({
+                            fields: s.captions.fields.map((item) =>
+                              item.id === field.id ? { ...item, dividerText: e.target.value } : item
+                            ),
+                          })
+                        }
+                      />
+                    )}
                     <button type="button" aria-label={`Move ${label} up`} title="Move up" disabled={index === 0} onClick={() => moveField(field.id, -1)}>
                       <ArrowUp size={13} />
                     </button>
@@ -475,6 +520,20 @@ export function SettingsDialog() {
       icon: <BookOpen {...icon} />,
       rows: [
         {
+          label: "Book spread",
+          hint: "Page 1 sits by itself, like a title page. Only book spread uses this.",
+          control: (
+            <label className="set-check">
+              <input
+                type="checkbox"
+                checked={s.drawing.firstPageAlone}
+                onChange={(e) => setDrawing({ firstPageAlone: e.target.checked })}
+              />
+              First page alone
+            </label>
+          ),
+        },
+        {
           label: "Angle snap",
           hint: "A line within this many degrees of straight up or across snaps to it. 0 is off; holding Shift snaps at 15°.",
           control: <NumberField value={s.drawing.angleSnapDegrees} min={0} max={90} unit="°" onChange={(angleSnapDegrees) => setDrawing({ angleSnapDegrees })} />,
@@ -529,6 +588,17 @@ export function SettingsDialog() {
                 { value: "scenes", label: "Scenes left" },
               ]}
               onChange={(left) => prefs.setSwapSides(left === "scenes")}
+            />
+          ),
+        },
+        {
+          label: "Floating action bar",
+          hint: "Duplicate, link and delete beside the selected mark.",
+          control: (
+            <input
+              type="checkbox"
+              checked={prefs.showActionBar}
+              onChange={(e) => prefs.setShowActionBar(e.target.checked)}
             />
           ),
         },

@@ -212,6 +212,30 @@ export function ShotRow({
     data: { type: "shot" as const, sceneId },
     disabled: dragDisabled,
   });
+  const selectTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (selectTimer.current !== null) window.clearTimeout(selectTimer.current);
+    },
+    []
+  );
+  const onRowClick = (e: React.MouseEvent) => {
+    const onField = (e.target as HTMLElement).closest(".inline-value");
+    if (!onField) {
+      onSelect();
+      return;
+    }
+    if (e.detail > 1) {
+      if (selectTimer.current !== null) window.clearTimeout(selectTimer.current);
+      selectTimer.current = null;
+      return;
+    }
+    if (selectTimer.current !== null) window.clearTimeout(selectTimer.current);
+    selectTimer.current = window.setTimeout(() => {
+      selectTimer.current = null;
+      onSelect();
+    }, 250);
+  };
   const style = { transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition };
   const parens = project.settings.general.additionalInfoStyle === "parens";
   const statusLabel = choiceLabel("status", shot.status, lists);
@@ -246,7 +270,7 @@ export function ShotRow({
         shot.visible ? "" : "is-hidden",
         sortable.isDragging ? "is-dragging" : "",
       ].join(" ")}
-      onClick={onSelect}
+      onClick={onRowClick}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
         if (e.key === "F2") {

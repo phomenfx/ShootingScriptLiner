@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
+import { Expand, Minus, Plus } from "lucide-react";
+import * as commands from "../../commands";
 import {
   MAX_VIEWER_ZOOM_PERCENT,
   MIN_VIEWER_ZOOM_PERCENT,
   VIEWER_ZOOM_STEP_PERCENT,
 } from "../../types/appPreferences";
-import { useLegacyStore } from "../../legacy/legacyStore";
+import { usePrefsStore } from "../../stores/prefsStore";
 
+/** Zoom out, a typed percent, zoom in, and fit. Sits at the right of the script bottom bar. */
 export function PdfZoomControls() {
-  const viewerZoomPercent = useLegacyStore((s) => s.viewerZoomPercent);
-  const setViewerZoomPercent = useLegacyStore((s) => s.setViewerZoomPercent);
-  const adjustViewerZoom = useLegacyStore((s) => s.adjustViewerZoom);
+  const viewerZoomPercent = usePrefsStore((s) => s.viewerZoomPercent);
+  const setViewerZoomPercent = usePrefsStore((s) => s.setViewerZoomPercent);
   const [draft, setDraft] = useState(String(viewerZoomPercent));
 
   useEffect(() => {
@@ -26,20 +28,20 @@ export function PdfZoomControls() {
   };
 
   return (
-    <div className="pdf-zoom-controls" role="group" aria-label="Zoom">
+    <div className="script-zoom" role="group" aria-label="Zoom">
       <button
         type="button"
+        className="script-iconbtn"
         title="Zoom out"
         disabled={viewerZoomPercent <= MIN_VIEWER_ZOOM_PERCENT}
-        onClick={() => adjustViewerZoom(-VIEWER_ZOOM_STEP_PERCENT)}
+        onClick={() => setViewerZoomPercent(viewerZoomPercent - VIEWER_ZOOM_STEP_PERCENT)}
       >
-        −
+        <Minus size={14} strokeWidth={1.75} />
       </button>
-      <label className="pdf-zoom-input-wrap">
+      <label className="script-field script-zoom-field">
         <input
           type="text"
           inputMode="numeric"
-          className="pdf-zoom-input"
           value={draft}
           aria-label="Zoom percent"
           onChange={(e) => setDraft(e.target.value)}
@@ -56,15 +58,25 @@ export function PdfZoomControls() {
             }
           }}
         />
-        <span className="pdf-zoom-suffix">%</span>
+        <span>%</span>
       </label>
       <button
         type="button"
+        className="script-iconbtn"
         title="Zoom in"
         disabled={viewerZoomPercent >= MAX_VIEWER_ZOOM_PERCENT}
-        onClick={() => adjustViewerZoom(VIEWER_ZOOM_STEP_PERCENT)}
+        onClick={() => setViewerZoomPercent(viewerZoomPercent + VIEWER_ZOOM_STEP_PERCENT)}
       >
-        +
+        <Plus size={14} strokeWidth={1.75} />
+      </button>
+      <button
+        type="button"
+        className="script-iconbtn"
+        title="Fit page (Ctrl+0)"
+        aria-pressed={viewerZoomPercent === 100}
+        onClick={() => commands.zoomToFit()}
+      >
+        <Expand size={14} strokeWidth={1.75} />
       </button>
     </div>
   );

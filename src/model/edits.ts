@@ -205,6 +205,7 @@ export function unlinkMark<M extends Mark>(project: Project, mark: M, shotColor?
   const { shotId, ...rest } = mark;
   const color = mark.color ?? shotColor ?? findShot(project, shotId)?.shot.color ?? project.settings.general.newShotColor;
   const next = { ...rest, color } as M;
+  if (next.kind === "line" || next.kind === "text") delete next.own;
   if (next.kind === "text" && next.text === undefined) next.text = "";
   return next;
 }

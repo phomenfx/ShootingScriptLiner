@@ -66,6 +66,30 @@ export type ShotOwn = {
 
 export type ShotOwnField = keyof ShotOwn;
 
+/**
+ * Shot values a line or note replaces. A field that is present is unlocked,
+ * even when empty. A missing field follows the shot.
+ */
+export type MarkOwn = {
+  type?: string;
+  angle?: string;
+  subject?: string;
+  cast?: string[];
+  tags?: string[];
+  additionalInfo?: string;
+  notes?: string;
+  setup?: string;
+  indicator?: string;
+  location?: string;
+  time?: string;
+  movement?: string[];
+  cameras?: CameraRow[];
+  audio?: string[];
+  fps?: string;
+  sync?: string;
+  date?: string;
+};
+
 export type Shot = {
   id: string;
   color: string;
@@ -171,6 +195,8 @@ export type LineMark = MarkBase & {
   caption: Caption;
   contCaption?: ContCaption;
   marginContinuation?: MarginContinuation;
+  /** Present only for shot fields this line replaces. */
+  own?: MarkOwn;
 };
 
 export type TextMark = MarkBase & {
@@ -187,6 +213,8 @@ export type TextMark = MarkBase & {
   widthPt?: number;
   minHeightPt?: number;
   outline?: Outline;
+  /** Present only for shot fields this note replaces. */
+  own?: MarkOwn;
 };
 
 export type ShapeMark = MarkBase & {
@@ -243,7 +271,33 @@ export type Asset = {
 /** One entry of a choice list (status, tags, …). Custom keys start with `custom:`. */
 export type ListEntry = { key: string; label: string; icon?: string; color?: string };
 
-export type CaptionField = { id: string; print: boolean };
+/**
+ * How a caption field joins the piece before it.
+ * Wrapping kinds (parentheses, brackets, braces, quotes) also surround the field.
+ * Custom uses `dividerText`, where … stands for the field's value.
+ */
+export type CaptionDivider =
+  | "space"
+  | "none"
+  | "hyphen"
+  | "spacedHyphen"
+  | "comma"
+  | "slash"
+  | "dot"
+  | "parens"
+  | "brackets"
+  | "braces"
+  | "quotes"
+  | "custom";
+
+export type CaptionField = {
+  id: string;
+  print: boolean;
+  /** Missing means the usual one for this field: a hyphen for shot type, parentheses for additional info, a space otherwise. */
+  divider?: CaptionDivider;
+  /** Used when `divider` is custom. `…` is replaced by the field's text, so ` (…)` surrounds it. */
+  dividerText?: string;
+};
 
 export type LineDefaults = {
   stroke: Stroke;

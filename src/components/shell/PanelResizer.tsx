@@ -18,8 +18,20 @@ const KEY_STEP_PX = 16;
 /** The inner edge of a side panel: drag to resize, double-click to reset, arrow keys to nudge. */
 export function PanelResizer({ label, side, widthPx, onResize, onReset }: PanelResizerProps) {
   const drag = useRef<{ startX: number; startWidth: number } | null>(null);
+  const lastClickAt = useRef(0);
 
   const end = (e: React.PointerEvent<HTMLDivElement>) => {
+    const dragging = drag.current;
+    const moved = dragging !== null && Math.abs(e.clientX - dragging.startX) > 4;
+    const now = e.timeStamp;
+    if (!moved && now - lastClickAt.current < 400) {
+      lastClickAt.current = 0;
+      onReset();
+    } else if (!moved) {
+      lastClickAt.current = now;
+    } else {
+      lastClickAt.current = 0;
+    }
     if (!drag.current) return;
     drag.current = null;
     document.body.classList.remove("panel-resizing");

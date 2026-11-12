@@ -93,7 +93,8 @@ export type LineAnnotation = {
   id: string;
   kind: "line";
   page: number;
-  points: [NormalizedPoint, NormalizedPoint];
+  /** One vertex per end of a segment. A straight line has two. */
+  points: NormalizedPoint[];
   style: LineStyle;
   fontFamily: string;
   fontSizePt: number;
@@ -119,6 +120,11 @@ export type LineAnnotation = {
   secondaryAlign?: TextAlign;
   shotId?: string;
   label?: string;
+  /**
+   * Caption already resolved for this line, including any shot fields it overrides.
+   * Set by the version 2 view. The label lock still says whether the text is custom.
+   */
+  displayLabel?: string;
   showLabel: boolean;
   locks: LineFieldLocks;
   marginContinuation?: MarginContinuation;
@@ -144,6 +150,8 @@ export type TextAnnotation = {
   align?: TextAlign;
   /** When set with followShot, the note draws that shot's line caption. */
   shotId?: string;
+  /** Caption already resolved for this note, including any shot fields it overrides. */
+  displayLabel?: string;
   /** Locked to the shot caption. Unlock to edit this note's own text. */
   followShot?: boolean;
   /** When false, the note is hidden on the script and in the lined PDF. */

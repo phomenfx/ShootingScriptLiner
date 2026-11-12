@@ -1,5 +1,6 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { usePdfPageScale } from "../../hooks/usePdfPageScale";
+import { PDF_PAGE_PAD_X, PDF_PAGE_PAD_Y } from "../../lib/pdfViewport";
 import { PdfPageStack } from "./PdfPageStack";
 
 type Props = {
@@ -19,7 +20,11 @@ export function PdfSingleView({
   onFocus,
   wrapRef,
 }: Props) {
-  const { scale } = usePdfPageScale(wrapRef, pdf, zoomPercent);
+  const { scale } = usePdfPageScale(wrapRef, pdf, zoomPercent, {
+    pagesAcross: 1,
+    padX: PDF_PAGE_PAD_X,
+    padY: PDF_PAGE_PAD_Y,
+  });
 
   return (
     <div className="pdf-canvas-wrap pdf-single-wrap" ref={wrapRef}>

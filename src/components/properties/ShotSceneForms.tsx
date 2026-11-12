@@ -1,11 +1,12 @@
 import { Plus, X } from "lucide-react";
+import type { ReactNode } from "react";
 import * as commands from "../../commands";
 import { captionFieldText, printsField, shotCaption, withPrintField } from "../../model/captions";
 import { createShot } from "../../model/defaults";
 import * as edits from "../../model/edits";
 import { describeLength, formatEighths, formatPageRange, sceneLength, shotLength } from "../../model/pageLength";
 import { choiceEntries, choiceLabel, keyForText } from "../../model/registry";
-import type { CameraRow, Project, Scene, Shot, ShotOwn } from "../../model/types";
+import type {CameraRow, LineMark, MarkOwn, Project, Scene, Shot, ShotOwn, TextMark } from "../../model/types";
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
 import { usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -25,7 +26,7 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
 
 /* ---------- camera rows ---------- */
 
-function CameraRows({ cameras, disabled, onChange }: { cameras: CameraRow[]; disabled?: boolean; onChange: (cameras: CameraRow[]) => void }) {
+export function CameraRows({ cameras, disabled, onChange }: { cameras: CameraRow[]; disabled?: boolean; onChange: (cameras: CameraRow[]) => void }) {
   const setRow = (index: number, patch: Partial<CameraRow>) =>
     onChange(cameras.map((camera, i) => (i === index ? { ...camera, ...patch } : camera)));
   return (
@@ -75,9 +76,16 @@ type ShotInspectorProps = {
   found: edits.FoundShot;
   /** True when shown as the Shot tab of a selected mark. */
   asTab: boolean;
+  /**
+   * The linked line or note whose Shot tab this is. Its Shot fields then carry
+   * a lock: locked follows the shot, unlocked is that one mark's own value.
+   */
+  mark?: LineMark | TextMark;
 };
 
-export function ShotInspector({ project, found, asTab }: ShotInspectorProps) {
+type MarkField = "type" | "angle" | "subject" | "cast" | "tags" | "additionalInfo";
+
+export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProps) {
   const { scene, shot, sceneIndex } = found;
   const lists = project.settings.lists;
   const own = shot.own ?? {};
@@ -95,6 +103,54 @@ export function ShotInspector({ project, found, asTab }: ShotInspectorProps) {
         return next;
       })
     );
+  /* On a mark's Shot tab, each Shot field is either the shot's (locked) or that mark's own (unlocked). */
+  const markOwn = mark?.own ?? {};
+  const isOwn = (key: MarkField) => !!mark && markOwn[key] !== undefined;
+  const setMarkOwn = <K extends MarkField>(key: K, value: MarkOwn[K] | undefined) => {
+    if (!mark) return;
+    apply(
+      edits.updateMark(mark.id, (m) => {
+        if (m.kind !== "line" && m.kind !== "text") return m;
+        const next: MarkOwn = { ...m.own };
+        if (value === undefined) delete next[key];
+        else next[key] = value;
+        if (Object.keys(next).length > 0) return { ...m, own: next };
+        const { own: _removed, ...rest } = m;
+        return rest;
+      })
+    );
+  };
+  /** The value a Shot field shows: the mark's own when unlocked, else the shot's. */
+  const shown = <K extends MarkField>(key: K): MarkOwn[K] => (isOwn(key) ? markOwn[key] : (shot[key] as MarkOwn[K]));
+  /** Writes a Shot field to the mark when unlocked, else to the shot. */
+  const write = <K extends MarkField>(key: K, value: NonNullable<MarkOwn[K]>) => {
+    if (isOwn(key)) setMarkOwn(key, value);
+    else patch({ [key]: value } as Partial<Shot>);
+  };
+  /** Adds the mark's lock to a Shot field. Without a mark the field is shown as it is. */
+  const withMarkLock = (key: MarkField, field: ReactNode) => {
+    if (!mark) return field;
+    const locked = !isOwn(key);
+    const empty = key === "cast" || key === "tags" ? [] : "";
+    return (
+      <Lockable
+        locked={locked}
+        what={`shot ${id} (editing here changes the shot)`}
+        onToggle={() => {
+          breakUndoGroup();
+          setMarkOwn(key, locked ? (structuredClone(shot[key] ?? empty) as MarkOwn[typeof key]) : undefined);
+          breakUndoGroup();
+        }}
+      >
+        {field}
+      </Lockable>
+    );
+  };
+  /** An unlocked text field left empty goes back to following the shot. */
+  const relockMarkIfEmpty = (key: MarkField) => (value: string) => {
+    if (value.trim() === "" && isOwn(key)) setMarkOwn(key, undefined);
+  };
+
   const print = (fieldId: string) => ({
     print: printsField(project, shot, fieldId),
     onPrintChange: (on: boolean) => apply(edits.updateShot(shot.id, (current) => withPrintField(project, current, fieldId, on))),
@@ -152,7 +208,7 @@ export function ShotInspector({ project, found, asTab }: ShotInspectorProps) {
     if (added.length !== known.length) {
       apply(edits.updateSettings((s) => ({ ...s, lists: { ...s.lists, tags: added } })));
     }
-    patch({ tags: [...new Set(keys)] });
+    write("tags", [...new Set(keys)]);
   };
 
   const deleteShot = async () => {
@@ -185,33 +241,54 @@ export function ShotInspector({ project, found, asTab }: ShotInspectorProps) {
           <ColorField color={shot.color} label={`Color of shot ${id}`} onChange={(color) => patch({ color })} />
           <label className="pf-caption-preview" style={{ color: shot.color }} title="The caption drawn on this shot's lines">
             <input type="checkbox" checked={print("shotNumber").print} aria-label="Print the shot number in the caption" onChange={(e) => print("shotNumber").onPrintChange(e.target.checked)} />
-            {shotCaption(project, found) || id}
+            {shotCaption(project, found, mark?.own) || id}
           </label>
         </div>
 
         <Group name="shot" title="Shot">
           <Field label="Shot type" {...print("type")}>
-            <TextInput label="Shot type" value={shot.type ?? ""} placeholder="WS, MS, CU…" onChange={(type) => patch({ type })} />
+            {withMarkLock(
+              "type",
+              <TextInput label="Shot type" value={shown("type") ?? ""} placeholder="WS, MS, CU…" onChange={(type) => write("type", type)} onBlur={relockMarkIfEmpty("type")} />
+            )}
           </Field>
           <Field label="Angle" {...print("angle")}>
-            <TextInput
-              label="Angle"
-              value={choiceLabel("angle", shot.angle, lists)}
-              suggestions={choiceEntries("angle", lists).map((e) => e.label)}
-              onChange={(text) => patch({ angle: keyForText("angle", text, lists) })}
-            />
+            {withMarkLock(
+              "angle",
+              <TextInput
+                label="Angle"
+                value={choiceLabel("angle", shown("angle"), lists)}
+                suggestions={choiceEntries("angle", lists).map((e) => e.label)}
+                onChange={(text) => write("angle", keyForText("angle", text, lists))}
+                onBlur={relockMarkIfEmpty("angle")}
+              />
+            )}
           </Field>
           <Field label="Subject" wide {...print("subject")}>
-            <TextInput label="Subject" value={shot.subject ?? ""} onChange={(subject) => patch({ subject })} />
+            {withMarkLock(
+              "subject",
+              <TextInput label="Subject" value={shown("subject") ?? ""} onChange={(subject) => write("subject", subject)} onBlur={relockMarkIfEmpty("subject")} />
+            )}
           </Field>
           <Field label="Cast" wide {...print("cast")}>
-            <Chips values={shot.cast ?? []} label="Add cast" onChange={(cast) => patch({ cast })} />
+            {withMarkLock("cast", <Chips values={shown("cast") ?? []} label="Add cast" onChange={(cast) => write("cast", cast)} />)}
           </Field>
           <Field label="Tags" wide {...print("tags")}>
-            <Chips values={shot.tags ?? []} label="Add tag" display={tagLabel} suggestions={(lists.tags ?? []).map((t) => t.label)} onChange={setTags} />
+            {withMarkLock(
+              "tags",
+              <Chips values={shown("tags") ?? []} label="Add tag" display={tagLabel} suggestions={(lists.tags ?? []).map((t) => t.label)} onChange={setTags} />
+            )}
           </Field>
           <Field label="Additional info" wide {...print("additionalInfo")}>
-            <TextInput label="Additional info" value={shot.additionalInfo ?? ""} onChange={(additionalInfo) => patch({ additionalInfo })} />
+            {withMarkLock(
+              "additionalInfo",
+              <TextInput
+                label="Additional info"
+                value={shown("additionalInfo") ?? ""}
+                onChange={(additionalInfo) => write("additionalInfo", additionalInfo)}
+                onBlur={relockMarkIfEmpty("additionalInfo")}
+              />
+            )}
           </Field>
         </Group>
 

@@ -1,21 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import * as commands from "../../commands";
 import { useAnnotationKeyboard } from "../../hooks/useAnnotationKeyboard";
-import { usePdfControlsFit } from "../../hooks/usePdfControlsFit";
 import { usePdfDocument } from "../../hooks/usePdfDocument";
 import { usePdfPageNavigation } from "../../hooks/usePdfPageNavigation";
 import { usePdfZoomWheel } from "../../hooks/usePdfZoomWheel";
 import {
   anchorPageAfterSpreadDelta,
-  formatSpreadLabel,
+  anchorPageForSpread,
   pagesInSpread,
   spreadCount,
   spreadIndexFromPage,
 } from "../../lib/pdfSpread";
-import { useLegacyStore } from "../../legacy/legacyStore";
-import {
-  VIEWER_LAYOUT_LABELS,
-  VIEWER_LAYOUT_MODES,
-} from "../../types/viewerLayout";
+import { useProjectStore } from "../../stores/projectStore";
+import { usePrefsStore } from "../../stores/prefsStore";
+import { useSessionStore } from "../../stores/sessionStore";
+import { VIEWER_LAYOUT_LABELS, VIEWER_LAYOUT_MODES, VIEWER_LAYOUT_SHORT } from "../../types/viewerLayout";
+import { Menu, type MenuEntry } from "../topbar/Menu";
 import { PdfScrollView } from "./PdfScrollView";
 import { PdfSingleView } from "./PdfSingleView";
 import { PdfSpreadView } from "./PdfSpreadView";
@@ -28,19 +29,24 @@ type Props = {
 
 export function PdfViewer({ file }: Props) {
   const canvasWrapRef = useRef<HTMLDivElement>(null);
-  const viewerPage = useLegacyStore((s) => s.viewerPage);
-  const activePage = useLegacyStore((s) => s.activePage);
-  const pageCount = useLegacyStore((s) => s.pdfPageCount);
-  const layoutMode = useLegacyStore((s) => s.viewerLayoutMode);
-  const viewerZoomPercent = useLegacyStore((s) => s.viewerZoomPercent);
-  const setViewerPage = useLegacyStore((s) => s.setViewerPage);
-  const setActivePage = useLegacyStore((s) => s.setActivePage);
-  const setViewerLayoutMode = useLegacyStore((s) => s.setViewerLayoutMode);
-  const setPdfPageCount = useLegacyStore((s) => s.setPdfPageCount);
+  const viewerPage = useSessionStore((s) => s.viewerPage);
+  const activePage = useSessionStore((s) => s.activePage);
+  const pageCount = useSessionStore((s) => s.pdfPageCount);
+  const setViewerPage = useSessionStore((s) => s.setViewerPage);
+  const setActivePage = useSessionStore((s) => s.setActivePage);
+  const setPdfPageCount = useSessionStore((s) => s.setPdfPageCount);
+  const layoutMode = usePrefsStore((s) => s.viewerLayoutMode);
+  const viewerZoomPercent = usePrefsStore((s) => s.viewerZoomPercent);
+  const firstPageAlone = useProjectStore((s) => s.project.settings.drawing.firstPageAlone);
   const { pdf, error: loadError, loading } = usePdfDocument(file);
   const [scrollToPage, setScrollToPage] = useState<number | null>(null);
+  const [pageDraft, setPageDraft] = useState("");
+  const [pageEditing, setPageEditing] = useState(false);
 
   useAnnotationKeyboard(activePage);
+
+  const spread = { firstPageAlone };
+  const shownPage = layoutMode === "scroll" || layoutMode === "spread" ? activePage : viewerPage;
 
   const onScrollToPage = useCallback((page: number) => {
     setScrollToPage(page);
@@ -67,6 +73,7 @@ export function PdfViewer({ file }: Props) {
     setActivePage,
     onScrollToPage,
     enabled: Boolean(file && pdf && pageCount > 0),
+    firstPageAlone,
   });
 
   usePdfZoomWheel(canvasWrapRef, Boolean(file && pdf && pageCount > 0));
@@ -86,37 +93,43 @@ export function PdfViewer({ file }: Props) {
     if (pdf) setPdfPageCount(pdf.numPages);
   }, [pdf, setPdfPageCount]);
 
-  const goPrev = () => {
+  const goToPage = (page: number) => {
     if (pageCount <= 0) return;
+    const next = Math.max(1, Math.min(pageCount, page));
     if (layoutMode === "spread") {
-      const anchor = anchorPageAfterSpreadDelta(viewerPage, pageCount, -1);
-      const pages = pagesInSpread(spreadIndexFromPage(anchor), pageCount);
-      setViewerPage(anchor);
-      setActivePage(pages.includes(activePage) ? activePage : pages[0]);
+      const index = spreadIndexFromPage(next, spread);
+      setViewerPage(anchorPageForSpread(index, spread));
+      setActivePage(next);
     } else if (layoutMode === "scroll") {
-      const next = Math.max(1, activePage - 1);
       setActivePage(next);
       setViewerPage(next);
       onScrollToPage(next);
     } else {
-      setViewerPage(viewerPage - 1);
+      setViewerPage(next);
+    }
+  };
+
+  const goPrev = () => {
+    if (pageCount <= 0) return;
+    if (layoutMode === "spread") {
+      const anchor = anchorPageAfterSpreadDelta(viewerPage, pageCount, -1, spread);
+      const pages = pagesInSpread(spreadIndexFromPage(anchor, spread), pageCount, spread);
+      setViewerPage(anchor);
+      setActivePage(pages.includes(activePage) ? activePage : pages[0]!);
+    } else {
+      goToPage((layoutMode === "scroll" ? activePage : viewerPage) - 1);
     }
   };
 
   const goNext = () => {
     if (pageCount <= 0) return;
     if (layoutMode === "spread") {
-      const anchor = anchorPageAfterSpreadDelta(viewerPage, pageCount, 1);
-      const pages = pagesInSpread(spreadIndexFromPage(anchor), pageCount);
+      const anchor = anchorPageAfterSpreadDelta(viewerPage, pageCount, 1, spread);
+      const pages = pagesInSpread(spreadIndexFromPage(anchor, spread), pageCount, spread);
       setViewerPage(anchor);
-      setActivePage(pages.includes(activePage) ? activePage : pages[0]);
-    } else if (layoutMode === "scroll") {
-      const next = Math.min(pageCount, activePage + 1);
-      setActivePage(next);
-      setViewerPage(next);
-      onScrollToPage(next);
+      setActivePage(pages.includes(activePage) ? activePage : pages[0]!);
     } else {
-      setViewerPage(viewerPage + 1);
+      goToPage((layoutMode === "scroll" ? activePage : viewerPage) + 1);
     }
   };
 
@@ -124,87 +137,46 @@ export function PdfViewer({ file }: Props) {
     loading ||
     pageCount === 0 ||
     (layoutMode === "spread"
-      ? spreadIndexFromPage(viewerPage) <= 0
-      : layoutMode === "scroll"
-        ? activePage <= 1
-        : viewerPage <= 1);
+      ? spreadIndexFromPage(viewerPage, spread) <= 0
+      : shownPage <= 1);
 
   const nextDisabled =
     loading ||
     pageCount === 0 ||
     (layoutMode === "spread"
-      ? spreadIndexFromPage(viewerPage) >= spreadCount(pageCount) - 1
-      : layoutMode === "scroll"
-        ? activePage >= pageCount
-        : viewerPage >= pageCount);
+      ? spreadIndexFromPage(viewerPage, spread) >= spreadCount(pageCount, spread) - 1
+      : shownPage >= pageCount);
 
-  const statusLabel = (() => {
-    if (pageCount <= 0) return "—";
-    if (layoutMode === "spread") {
-      const pages = pagesInSpread(spreadIndexFromPage(viewerPage), pageCount);
-      return `${formatSpreadLabel(pages)} / ${pageCount}`;
-    }
-    if (layoutMode === "scroll") {
-      return `Page ${activePage} / ${pageCount}`;
-    }
-    return `Page ${viewerPage} / ${pageCount}`;
-  })();
+  const viewEntries: MenuEntry[] = VIEWER_LAYOUT_MODES.map((mode) => ({
+    kind: "radio" as const,
+    label: VIEWER_LAYOUT_LABELS[mode],
+    checked: layoutMode === mode,
+    onSelect: () => commands.setViewMode(mode),
+  }));
 
-  const navHint =
-    layoutMode === "scroll"
-      ? "Click a page to focus · PgUp/PgDn"
-      : layoutMode === "spread"
-        ? "Wheel · ← → · PgUp/PgDn (spread)"
-        : "Wheel · ← → · PgUp/PgDn";
-
-  const { fit: controlsFit, ref: controlsRef } = usePdfControlsFit(
-    `${navHint}\0${statusLabel}\0${Boolean(file)}`
-  );
-
-  if (!file) {
-    return (
-      <div className="pdf-placeholder-inner">
-        <p>Use Import PDF in the toolbar to load a script.</p>
-      </div>
-    );
-  }
+  const commitPageDraft = () => {
+    const n = Number.parseInt(pageDraft, 10);
+    if (Number.isFinite(n)) goToPage(n);
+    setPageEditing(false);
+  };
 
   return (
     <div className="pdf-viewer">
-      <div className="pdf-ribbon">
-        <ScriptToolbar />
-        <div className="pdf-controls" ref={controlsRef} data-fit={controlsFit}>
-          <div className="pdf-layout-toggle" role="group" aria-label="View layout">
-            {VIEWER_LAYOUT_MODES.map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={layoutMode === mode ? "active" : ""}
-                title={VIEWER_LAYOUT_LABELS[mode]}
-                onClick={() => setViewerLayoutMode(mode)}
-              >
-                {VIEWER_LAYOUT_LABELS[mode]}
-              </button>
-            ))}
-          </div>
-          <div className="pdf-controls-nav">
-            <button type="button" disabled={prevDisabled} onClick={goPrev}>
-              Prev
+      <ScriptToolbar />
+      {loadError && <p className="pdf-error">{loadError}</p>}
+      {!file && (
+        <div className="pdf-placeholder-inner">
+          <p>No script loaded.</p>
+          <div className="pdf-placeholder-actions">
+            <button type="button" onClick={() => void commands.requestImportPdf()}>
+              Import script
             </button>
-            <span className="pdf-page-status">{statusLabel}</span>
-            <button type="button" disabled={nextDisabled} onClick={goNext}>
-              Next
+            <button type="button" onClick={() => void commands.requestOpenProject()}>
+              Open project
             </button>
-          </div>
-          <div className="pdf-controls-trail">
-            <span className="pdf-nav-hint" title="Navigation shortcuts">
-              {navHint}
-            </span>
-            <PdfZoomControls />
           </div>
         </div>
-      </div>
-      {loadError && <p className="pdf-error">{loadError}</p>}
+      )}
       {pdf && layoutMode === "single" && (
         <PdfSingleView
           pdf={pdf}
@@ -236,8 +208,57 @@ export function PdfViewer({ file }: Props) {
           zoomPercent={viewerZoomPercent}
           onFocusPage={focusPage}
           wrapRef={canvasWrapRef}
+          spread={spread}
         />
       )}
+      <div className="script-bottombar">
+        <Menu
+          triggerClassName="script-view-picker"
+          triggerLabel="View"
+          trigger={
+            <>
+              <span>{VIEWER_LAYOUT_SHORT[layoutMode]}</span>
+              <ChevronDown size={12} strokeWidth={1.75} />
+            </>
+          }
+          entries={viewEntries}
+        />
+        <span className="script-spacer" />
+        <button type="button" className="script-iconbtn" title="Previous page" disabled={prevDisabled} onClick={goPrev}>
+          <ChevronLeft size={15} strokeWidth={1.75} />
+        </button>
+        <label className="script-field script-page-field">
+          <input
+            type="text"
+            inputMode="numeric"
+            aria-label="Page"
+            disabled={pageCount <= 0}
+            value={pageEditing ? pageDraft : pageCount > 0 ? String(shownPage) : "—"}
+            onFocus={() => {
+              setPageDraft(pageCount > 0 ? String(shownPage) : "");
+              setPageEditing(true);
+            }}
+            onChange={(e) => setPageDraft(e.target.value)}
+            onBlur={commitPageDraft}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitPageDraft();
+                (e.target as HTMLInputElement).blur();
+              } else if (e.key === "Escape") {
+                setPageEditing(false);
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+          />
+          <span>/ {pageCount > 0 ? pageCount : "—"}</span>
+        </label>
+        <button type="button" className="script-iconbtn" title="Next page" disabled={nextDisabled} onClick={goNext}>
+          <ChevronRight size={15} strokeWidth={1.75} />
+        </button>
+        <span className="script-sep" />
+        <PdfZoomControls />
+      </div>
     </div>
   );
 }

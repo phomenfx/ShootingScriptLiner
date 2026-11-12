@@ -139,11 +139,11 @@ describe("version 1 migration: each conversion", () => {
       dateFormat: "dddd, mmmm d",
     });
     expect(project.settings.captions.fields.slice(0, 5)).toEqual([
-      { id: "shotNumber", print: true },
-      { id: "type", print: true },
-      { id: "subject", print: true },
-      { id: "additionalInfo", print: true },
-      { id: "movement", print: false },
+      { id: "shotNumber", print: true, divider: "space" },
+      { id: "type", print: true, divider: "hyphen" },
+      { id: "subject", print: true, divider: "space" },
+      { id: "additionalInfo", print: true, divider: "parens" },
+      { id: "movement", print: false, divider: "space" },
     ]);
   });
 

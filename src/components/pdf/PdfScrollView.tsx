@@ -5,9 +5,11 @@ import { usePdfPageScale } from "../../hooks/usePdfPageScale";
 import {
   getFirstPageSizeAtScale,
   PDF_PAGE_GAP_PX,
+  PDF_PAGE_PAD_X,
+  PDF_SCROLL_PAD_Y,
 } from "../../lib/pdfViewport";
 import { PdfPageStack } from "./PdfPageStack";
-import { useLegacyStore } from "../../legacy/legacyStore";
+import { usePrefsStore } from "../../stores/prefsStore";
 
 type Props = {
   pdf: PDFDocumentProxy;
@@ -32,8 +34,12 @@ export function PdfScrollView({
 }: Props) {
   const slotRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [pageStridePx, setPageStridePx] = useState(0);
-  const maxMountedPdfPages = useLegacyStore((s) => s.maxMountedPdfPages);
-  const { scale } = usePdfPageScale(wrapRef, pdf, zoomPercent);
+  const maxMountedPdfPages = usePrefsStore((s) => s.maxMountedPdfPages);
+  const { scale } = usePdfPageScale(wrapRef, pdf, zoomPercent, {
+    pagesAcross: 1,
+    padX: PDF_PAGE_PAD_X,
+    padY: PDF_SCROLL_PAD_Y,
+  });
 
   useEffect(() => {
     let cancelled = false;

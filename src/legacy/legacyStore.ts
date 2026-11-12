@@ -7,8 +7,18 @@
 import { useSyncExternalStore } from "react";
 import * as commands from "../commands";
 import { migrateV1 } from "../io/migrateV1";
-import { getLineDisplayLabel } from "../lib/annotationUtils";
-import { computeMarginContinuationTrim } from "../lib/lineMarginContinuation";
+import {
+  addLine,
+  addText,
+  applyMarginContinuationTrim,
+  currentLineLabel,
+  noteShotTypeLock,
+  replaceLine,
+  selectMark,
+  shotTypeUnlocks,
+  subscribeShotTypeUnlock,
+  updateText,
+} from "../drawing/marks";
 import { splitSlugline } from "../lib/slugline";
 import { createScene, createShot } from "../model/defaults";
 import * as edits from "../model/edits";
@@ -27,9 +37,6 @@ import {
   applyLegacyScenePatch,
   applyLegacyShotPatch,
   legacyLine,
-  legacyText,
-  lineToV2,
-  textToV2,
   toLegacyProject,
 } from "./legacyView";
 import type { LegacyState, LineClipboard, Selection } from "./legacyTypes";
@@ -54,23 +61,6 @@ const settings = (recipe: (s: V2.ProjectSettings) => V2.ProjectSettings) =>
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const captionOffset = (value: number) => (Number.isFinite(Number(value)) ? clamp(Number(value), 0, 48) : 3);
-
-/* The old "shot type" lock only enabled or disabled an input. It has no place
-   in version 2, so it lives here for as long as the old line form does. */
-let shotTypeUnlocked: ReadonlySet<string> = new Set();
-const ownListeners = new Set<() => void>();
-
-function lineMark(id: string): V2.LineMark | null {
-  const mark = edits.findMark(v2(), id);
-  return mark?.kind === "line" ? mark : null;
-}
-
-function patchLine(id: string, patch: Partial<LegacyState["project"]["annotations"][number]>): void {
-  const base = lineMark(id);
-  if (!base) return;
-  const shown = legacyLine(base, v2(), shotTypeUnlocked.has(id));
-  apply(edits.replaceMark(lineToV2({ ...shown, ...patch } as typeof shown, v2(), base)));
-}
 
 function selectedSceneId(): string | null {
   const selection = session().selection;
@@ -112,6 +102,7 @@ const actions: Omit<
     const { project: loaded } = migrateV1({ ...project, version: 1 }, v2().script);
     session().reset();
     replaceProject(loaded);
+    commands.syncSnapFromProject();
   },
 
   toggleSceneCollapsed: (sceneId) =>
@@ -197,7 +188,7 @@ const actions: Omit<
     session().setSceneCollapsed(sceneId, false);
     session().select("shot", shotId);
   },
-  selectAnnotation: (id) => session().select("mark", id),
+  selectAnnotation: (id) => selectMark(id),
   clearSelection: () => session().clearSelection(),
 
   addScene: (slugline = "") => {
@@ -258,28 +249,17 @@ const actions: Omit<
     if (to >= 0) applyStep(edits.moveShot(activeId, sceneId, to));
   },
 
-  addLine: (line) => {
-    applyStep(edits.addMarks([lineToV2(line, v2())]));
-    session().select("mark", line.id);
-  },
-  updateLine: (id, patch) => patchLine(id, patch),
+  addLine,
+  updateLine: (id, patch) => replaceLine(id, patch),
   updateLineLocks: (id, locks) => {
-    if ("shotType" in locks) {
-      const next = new Set(shotTypeUnlocked);
-      if (locks.shotType) next.delete(id);
-      else next.add(id);
-      shotTypeUnlocked = next;
-      ownListeners.forEach((listener) => listener());
-    }
-    const base = lineMark(id);
-    if (!base || !("label" in locks || "color" in locks)) return;
-    const shown = legacyLine(base, v2(), false);
+    if ("shotType" in locks && typeof locks.shotType === "boolean") noteShotTypeLock(id, locks.shotType);
+    const mark = edits.findMark(v2(), id);
+    if (mark?.kind !== "line" || !("label" in locks || "color" in locks)) return;
+    const shown = legacyLine(mark, v2(), false);
     const patch: Partial<typeof shown> = { locks: { ...shown.locks, ...locks } };
     // Unlocking a caption starts from what the caption says now.
-    if (locks.label === false && shown.locks.label) {
-      patch.label = getLineDisplayLabel(shown, toLegacyProject(v2()));
-    }
-    patchLine(id, patch);
+    if (locks.label === false && shown.locks.label) patch.label = currentLineLabel(id);
+    replaceLine(id, patch);
   },
   deleteAnnotation: (id) => {
     const selection = session().selection;
@@ -292,7 +272,8 @@ const actions: Omit<
   },
   pasteLines: (page) => commands.paste(page),
   duplicateLine: (id) => {
-    const base = lineMark(id);
+    const found = edits.findMark(v2(), id);
+    const base = found?.kind === "line" ? found : null;
     if (!base) return;
     const clone = edits.cloneMark(base, { nudgePt: edits.CLONE_NUDGE_PT });
     applyStep(edits.addMarks([clone]));
@@ -309,29 +290,11 @@ const actions: Omit<
   setPdfPageCount: (count) => session().setPdfPageCount(count),
   setScriptPageHeightPt: (pt) => session().setScriptPageHeightPt(pt),
 
-  applyMarginContinuationTrim: (lineId, pageHeightPt, hint = "drawEnd") => {
-    const base = lineMark(lineId);
-    if (!base) return;
-    const shown = legacyLine(base, v2());
-    const { points, marginContinuation } = computeMarginContinuationTrim(
-      shown.points[0],
-      shown.points[1],
-      pageHeightPt ?? session().scriptPageHeightPt,
-      hint
-    );
-    patchLine(lineId, { points, marginContinuation });
-  },
+  applyMarginContinuationTrim: (lineId, pageHeightPt, hint = "drawEnd") =>
+    applyMarginContinuationTrim(lineId, pageHeightPt ?? session().scriptPageHeightPt, hint),
 
-  addText: (text) => {
-    applyStep(edits.addMarks([textToV2(text, v2())]));
-    session().select("mark", text.id);
-  },
-  updateText: (id, patch) => {
-    const base = edits.findMark(v2(), id);
-    if (base?.kind !== "text") return;
-    const shown = legacyText(base, v2());
-    apply(edits.replaceMark(textToV2({ ...shown, ...patch }, v2(), base)));
-  },
+  addText,
+  updateText,
   duplicateText: (id) => {
     const base = edits.findMark(v2(), id);
     if (base?.kind !== "text") return;
@@ -388,11 +351,11 @@ let snapshot: { key: unknown[]; state: LegacyState } | null = null;
 function getState(): LegacyState {
   const s = session();
   const p = prefs();
-  const key = [v2(), s, p, shotTypeUnlocked];
+  const key = [v2(), s, p, shotTypeUnlocks()];
   if (snapshot && snapshot.key.every((part, i) => part === key[i])) return snapshot.state;
   const state: LegacyState = {
     ...actions,
-    project: toLegacyProject(v2(), shotTypeUnlocked),
+    project: toLegacyProject(v2(), shotTypeUnlocks()),
     selection: legacySelection(),
     collapsedSceneIds: s.collapsedSceneIds,
     activeTool: s.activeTool,
@@ -421,10 +384,10 @@ function subscribe(listener: () => void): () => void {
     useSessionStore.subscribe(listener),
     usePrefsStore.subscribe(listener),
   ];
-  ownListeners.add(listener);
+  const stopUnlock = subscribeShotTypeUnlock(listener);
   return () => {
     stops.forEach((stop) => stop());
-    ownListeners.delete(listener);
+    stopUnlock();
   };
 }
 

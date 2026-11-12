@@ -51,6 +51,7 @@ function LinkGroup({ project, mark }: { project: Project; mark: LineMark | TextM
         next.shotId = shotId;
         // A newly linked mark follows its shot until told otherwise.
         delete next.color;
+        delete next.own;
         if (next.kind === "line") delete next.caption.text;
         else delete next.text;
         return next;
@@ -218,7 +219,7 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
         <Group name="line-caption" title="Caption" enabled={line.caption.show} onEnabledChange={(show) => caption({ show })}>
           <LinkedOrCustom
             label="Caption"
-            linkedCaption={linked ? shotCaption(project, linked) : undefined}
+            linkedCaption={linked ? shotCaption(project, linked, line.own) : undefined}
             text={line.caption.text}
             onChange={(text) =>
               update((l) => {
@@ -271,6 +272,12 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
           <Field label="Pattern" wide>
             <Select label="Pattern" value={line.stroke.pattern} options={patterns} onChange={(pattern) => update((l) => ({ ...l, stroke: { ...l.stroke, pattern } }))} />
           </Field>
+          <div className="pf-wide pf-link">
+            <FooterButton onClick={() => commands.splitSelection()}>Split</FooterButton>
+            <FooterButton onClick={() => commands.rejoinSelection()} disabled={line.points.length < 3}>
+              Rejoin
+            </FooterButton>
+          </div>
         </Group>
 
         <Group name="line-endings" title="Endings">
@@ -312,7 +319,7 @@ export function TextInspector({ project, note }: { project: Project; note: TextM
         <Group name="note-text" title="Text" enabled={note.show} onEnabledChange={(show) => update((n) => ({ ...n, show }))}>
           <LinkedOrCustom
             label="Text"
-            linkedCaption={linked ? shotCaption(project, linked) : undefined}
+            linkedCaption={linked ? shotCaption(project, linked, note.own) : undefined}
             text={note.text}
             onChange={(text) =>
               update((n) => {

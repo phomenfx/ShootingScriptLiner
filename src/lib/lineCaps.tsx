@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
+import { endingGeometry, type EndingPrimitive } from "./geometry";
 import type { LineCap, LineEnding } from "../types/annotations";
-import { capSupportsFill } from "../types/annotations";
 
 export const CAP_OPTIONS: { value: LineCap; label: string }[] = [
   { value: "none", label: "None" },
@@ -12,12 +12,6 @@ export const CAP_OPTIONS: { value: LineCap; label: string }[] = [
   { value: "arrowReversed", label: "Arrow (reversed)" },
   { value: "slash", label: "Slash" },
 ];
-
-const BASE = 8;
-
-function scale(s: number, pct: number): number {
-  return s * (pct / 100);
-}
 
 export function lineAngleRad(x1: number, y1: number, x2: number, y2: number): number {
   return Math.atan2(y2 - y1, x2 - x1);
@@ -31,105 +25,40 @@ export function renderLineCap(
   atStart: boolean,
   pxPerPt = 1
 ): { elements: ReactNode; key: string } | null {
-  const cap = ending.cap;
-  if (cap === "none") return null;
+  const widthPt = pxPerPt > 0 ? strokeWidth / pxPerPt : strokeWidth;
+  const geo = endingGeometry(ending, widthPt);
+  if (!geo) return null;
 
   const rot = (atStart ? angleRad + Math.PI : angleRad) * (180 / Math.PI);
-  const s = scale(BASE, ending.scalePercent) * pxPerPt;
-  const sw = Math.max(0.75, strokeWidth * 0.8);
-  const filled = ending.filled && capSupportsFill(ending.cap);
-  const key = `${cap}-${ending.scalePercent}-${filled}`;
+  const key = `${ending.cap}-${ending.scalePercent}-${ending.filled}`;
 
-  const gProps = {
-    transform: `rotate(${rot})`,
-    stroke: color,
-    strokeWidth: sw,
-    fill: filled ? color : "none",
-    strokeLinejoin: "round" as const,
-    strokeLinecap: "round" as const,
+  return {
+    key,
+    elements: (
+      <g
+        transform={`rotate(${rot}) scale(${pxPerPt})`}
+        stroke={color}
+        strokeWidth={geo.strokePt}
+        fill="none"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      >
+        {renderPrimitive(geo.primitive, color)}
+      </g>
+    ),
   };
+}
 
-  switch (cap) {
-    case "arrow": {
-      const d = filled
-        ? `M${-s},${-s * 0.55} L0,0 L${-s},${s * 0.55} Z`
-        : `M${-s},${-s * 0.55} L0,0 L${-s},${s * 0.55}`;
-      return {
-        key,
-        elements: (
-          <g {...gProps}>
-            <path d={d} />
-          </g>
-        ),
-      };
-    }
-    case "arrowReversed": {
-      const d = filled
-        ? `M${s},${-s * 0.55} L0,0 L${s},${s * 0.55} Z`
-        : `M${s},${-s * 0.55} L0,0 L${s},${s * 0.55}`;
-      return {
-        key,
-        elements: (
-          <g {...gProps}>
-            <path d={d} />
-          </g>
-        ),
-      };
-    }
-    case "square": {
-      const h = s * 0.7;
-      return {
-        key,
-        elements: (
-          <g {...gProps} fill={filled ? color : "none"}>
-            <rect x={-h / 2} y={-h / 2} width={h} height={h} />
-          </g>
-        ),
-      };
-    }
-    case "circle": {
-      const r = s * 0.4;
-      return {
-        key,
-        elements: (
-          <g {...gProps}>
-            <circle cx={0} cy={0} r={r} />
-          </g>
-        ),
-      };
-    }
-    case "diamond": {
-      const h = s * 0.55;
-      return {
-        key,
-        elements: (
-          <g {...gProps}>
-            <path d={`M0,${-h} L${h * 0.65},0 L0,${h} L${-h * 0.65},0 Z`} />
-          </g>
-        ),
-      };
-    }
-    case "butt":
-      return {
-        key,
-        elements: (
-          <g {...gProps} fill="none">
-            <line x1={0} y1={-s * 0.5} x2={0} y2={s * 0.5} />
-          </g>
-        ),
-      };
-    case "slash":
-      return {
-        key,
-        elements: (
-          <g {...gProps} fill="none">
-            <line x1={-s * 0.35} y1={-s * 0.5} x2={s * 0.35} y2={s * 0.5} />
-          </g>
-        ),
-      };
-    default:
-      return null;
+function renderPrimitive(primitive: EndingPrimitive, color: string): ReactNode {
+  if (primitive.kind === "circle") {
+    return <circle cx={0} cy={0} r={primitive.r} fill={primitive.filled ? color : "none"} />;
   }
+  if (primitive.kind === "path") {
+    return <path d={primitive.d} fill={primitive.filled ? color : "none"} />;
+  }
+  return primitive.segments.map(([a, b], index) => (
+    <line key={index} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
+  ));
 }
 
 export function migrateCapName(raw: string): LineCap {

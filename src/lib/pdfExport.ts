@@ -30,6 +30,7 @@ import {
   secondaryLabelPositionPdf,
   secondaryLayoutForLine,
 } from "./labelLayout";
+import { endingGeometry, shaftEnds } from "./geometry";
 import { strokeDashPatternPdf } from "./lineStrokes";
 import { drawPdfLineCap } from "./pdfLineCaps";
 import { resolvePdfExportFont, sanitizePdfExportText } from "./pdfExportFonts";
@@ -152,19 +153,37 @@ export async function buildLinedPdfBytes(
       if (!isLineAnnotation(line)) continue;
       const style = resolveLineStyle(line, project);
       const dash = strokeDashPatternPdf(style.stroke, style.widthPt);
-      const p0 = normToPdf(line.points[0].x, line.points[0].y, pw, ph);
-      const p1 = normToPdf(line.points[1].x, line.points[1].y, pw, ph);
-      page.drawLine({
-        start: p0,
-        end: p1,
-        thickness: Math.max(0.5, style.widthPt),
-        color: hexToRgb(style.color),
-        dashArray: dash,
-      });
+      const startNorm = line.points[0];
+      const endNorm = line.points[line.points.length - 1];
+      if (!startNorm || !endNorm || line.points.length < 2) continue;
+      const pts = line.points.map((point) => normToPdf(point.x, point.y, pw, ph));
+      const last = pts.length - 1;
+      const startInset = endingGeometry(style.start, style.widthPt)?.shaftInsetPt ?? 0;
+      const endInset = endingGeometry(style.end, style.widthPt)?.shaftInsetPt ?? 0;
+      for (let index = 0; index < last; index += 1) {
+        const start = pts[index]!;
+        const end = pts[index + 1]!;
+        const [shaftStart, shaftEnd] = shaftEnds(
+          start,
+          end,
+          index === 0 ? startInset : 0,
+          index === last - 1 ? endInset : 0
+        );
+        page.drawLine({
+          start: shaftStart,
+          end: shaftEnd,
+          thickness: Math.max(0.5, style.widthPt),
+          color: hexToRgb(style.color),
+          dashArray: dash,
+        });
+      }
 
-      const angle = Math.atan2(p1.y - p0.y, p1.x - p0.x);
-      drawPdfLineCap(page, p0.x, p0.y, angle, style.start, style.color, style.widthPt, true);
-      drawPdfLineCap(page, p1.x, p1.y, angle, style.end, style.color, style.widthPt, false);
+      const p0 = pts[0]!;
+      const p1 = pts[last]!;
+      const startAngle = Math.atan2(pts[1]!.y - p0.y, pts[1]!.x - p0.x);
+      const endAngle = Math.atan2(p1.y - pts[last - 1]!.y, p1.x - pts[last - 1]!.x);
+      drawPdfLineCap(page, p0.x, p0.y, startAngle, style.start, style.color, style.widthPt, true);
+      drawPdfLineCap(page, p1.x, p1.y, endAngle, style.end, style.color, style.widthPt, false);
 
       if (line.showLabel) {
         const { primary, secondary } = getLineScriptLabels(line, project);
@@ -181,7 +200,7 @@ export async function buildLinedPdfBytes(
         const italic = line.labelItalic === true;
         const underline = line.labelUnderline === true;
         if (primaryText) {
-          const parent = primaryLabelAnchor(line.points[0]);
+          const parent = primaryLabelAnchor(startNorm);
           const pos = primaryLabelPositionPdf(
             parent,
             pw,
@@ -205,8 +224,8 @@ export async function buildLinedPdfBytes(
         }
         if (secondaryText) {
           const parent = secondaryLabelAnchor(
-            line.points[0],
-            line.points[1],
+            startNorm,
+            endNorm,
             lineEndIndexForContLabel(line)
           );
           const pos = secondaryLabelPositionPdf(

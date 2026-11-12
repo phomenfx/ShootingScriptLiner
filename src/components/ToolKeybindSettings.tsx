@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { formatToolKeyDisplay } from "../lib/toolKeybinds";
-import { useLegacyStore } from "../legacy/legacyStore";
+import { usePrefsStore } from "../stores/prefsStore";
 import type { ScriptTool } from "../types/annotations";
 import { DEFAULT_TOOL_KEYBINDS, TOOL_KEYBIND_LABELS, TOOL_KEYBIND_ORDER } from "../types/toolKeybinds";
 
 export function ToolKeybindSettings() {
-  const toolKeybinds = useLegacyStore((s) => s.toolKeybinds);
-  const setToolKeybind = useLegacyStore((s) => s.setToolKeybind);
-  const resetToolKeybinds = useLegacyStore((s) => s.resetToolKeybinds);
+  const toolKeybinds = usePrefsStore((s) => s.toolKeybinds);
+  const setToolKeybind = usePrefsStore((s) => s.setToolKeybind);
+  const resetToolKeybinds = usePrefsStore((s) => s.resetToolKeybinds);
   const [listening, setListening] = useState<ScriptTool | null>(null);
   const [error, setError] = useState<string | null>(null);
 

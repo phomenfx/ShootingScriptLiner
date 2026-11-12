@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   annotationsForPage,
   cloneLine,
@@ -21,16 +21,18 @@ import {
   clientToNormalizedUnclamped,
   clamp01,
   distance,
-  MIN_DRAG_NORMALIZED,
   normalizedToPx,
-  offsetPointUnclamped,
-  snapEndpoint,
+  activeSnapDegrees,
 } from "../../lib/coords";
 import { newId } from "../../lib/ids";
-import { useLegacyStore } from "../../legacy/legacyStore";
+import * as commands from "../../commands";
+import { toLegacyProject } from "../../legacy/legacyView";
+import { addLine, addText, applyMarginContinuationTrim, replaceLine, selectMark, updateText } from "../../drawing/marks";
+import { useProjectStore } from "../../stores/projectStore";
+import { usePrefsStore } from "../../stores/prefsStore";
+import { useSessionStore } from "../../stores/sessionStore";
 import type { LineAnnotation, NormalizedPoint, TextAlign, TextAnnotation } from "../../types/annotations";
 import {
-  midpoint,
   primaryLabelAnchor,
   primaryLabelPositionPx,
   primaryLayoutForLine,
@@ -39,22 +41,21 @@ import {
   secondaryLayoutForLine,
   viewerScalePxPerPt,
 } from "../../lib/labelLayout";
+import { endingGeometry, shaftEnds } from "../../lib/geometry";
+import { actionBarPosition } from "../../lib/actionBarLayout";
 import { lineAngleRad, renderLineCap } from "../../lib/lineCaps";
 import { strokeDashArray } from "../../lib/lineStrokes";
+import { labelDragPatch } from "../../gestures/labelDrag";
+import { clonedLinePoints, closestOnLine, dragLinePoints, drawPreviewEnd, finishDrawEnd, type LineHandle } from "../../gestures/lineDrag";
+import { noteMovePatch, noteResizePatch } from "../../gestures/noteDrag";
+import { pickSelectTarget } from "../../gestures/priority";
+import { ScriptActionBar } from "./ScriptActionBar";
 import { ScriptTextBlock } from "./ScriptTextBlock";
 import {
-  ASCENT_EM,
-  alignmentPoint,
-  clampBoxHeightPt,
-  clampBoxWidthPt,
-  hitBoxHandle,
   layoutTextBlock,
   measureViewerText,
   pinBlockToOrigin,
   pointInFrame,
-  primaryOffsetFromPlacement,
-  resizeTextBox,
-  secondaryOffsetFromPlacement,
   viewerFontShorthand,
   type BoxHandle,
   type LaidOutRun,
@@ -69,7 +70,7 @@ type Props = {
 
 type DragMode =
   | { type: "draw"; start: NormalizedPoint }
-  | { type: "handle"; lineId: string; handle: "start" | "end" | "center"; origin: LineAnnotation }
+  | { type: "handle"; lineId: string; handle: LineHandle; origin: LineAnnotation }
   | { type: "alt-clone"; lineId: string; origin: LineAnnotation; offset: NormalizedPoint }
   | {
       type: "note-move";
@@ -127,46 +128,39 @@ type PlacedNote = {
   italic: boolean;
 };
 
-function hitHandle(
-  px: number,
-  py: number,
-  hx: number,
-  hy: number,
-  radius = 10
-): boolean {
-  return (px - hx) ** 2 + (py - hy) ** 2 <= radius * radius;
-}
-
-function hitOriginPoint(px: number, py: number, frame: TextFrame, align: TextAlign) {
-  const point = alignmentPoint(frame, align, true);
-  return (px - point.x) ** 2 + (py - point.y) ** 2 <= 64;
-}
-
 export function AnnotationLayer({ pageNum, width, height }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const project = useLegacyStore((s) => s.project);
-  const selection = useLegacyStore((s) => s.selection);
-  const activeTool = useLegacyStore((s) => s.activeTool);
+  const v2Project = useProjectStore((s) => s.project);
+  const project = useMemo(() => toLegacyProject(v2Project), [v2Project]);
+  const activeTool = useSessionStore((s) => s.activeTool);
+  const selectedId = useSessionStore((s) => (s.selection?.kind === "mark" ? s.selection.ids[0] : undefined));
   const cursorClass =
     activeTool === "line"
       ? "tool-draw"
       : activeTool === "text"
         ? "tool-text"
         : "tool-select";
-  const pageHeightPt = useLegacyStore((s) => s.scriptPageHeightPt);
-  const snapAngleDegrees = useLegacyStore((s) => s.project.snapAngleDegrees);
-  const addLine = useLegacyStore((s) => s.addLine);
-  const addText = useLegacyStore((s) => s.addText);
-  const updateLine = useLegacyStore((s) => s.updateLine);
-  const updateText = useLegacyStore((s) => s.updateText);
-  const applyMarginContinuationTrim = useLegacyStore((s) => s.applyMarginContinuationTrim);
-  const lineHitTolerancePx = useLegacyStore((s) => s.lineHitTolerancePx);
-  const selectAnnotation = useLegacyStore((s) => s.selectAnnotation);
-  const setSceneCollapsed = useLegacyStore((s) => s.setSceneCollapsed);
-  const setActivePage = useLegacyStore((s) => s.setActivePage);
-  const shotSelection = useLegacyStore((s) =>
-    s.selection?.kind === "shot" ? s.selection : null
+  const pageHeightPt = useSessionStore((s) => s.scriptPageHeightPt);
+  const snapDegrees = activeSnapDegrees(
+    v2Project.settings.drawing.angleSnapDegrees,
+    useSessionStore((s) => s.snapEnabled)
   );
+  const lineHitTolerancePx = usePrefsStore((s) => s.lineHitTolerancePx);
+  const showActionBar = usePrefsStore((s) => s.showActionBar);
+  const setActivePage = useSessionStore((s) => s.setActivePage);
+  const linkedShotId = useSessionStore((s) => (s.selection?.kind === "shot" ? s.selection.ids[0] : undefined));
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const block = (event: Event) => event.preventDefault();
+    svg.addEventListener("selectstart", block);
+    svg.addEventListener("dragstart", block);
+    return () => {
+      svg.removeEventListener("selectstart", block);
+      svg.removeEventListener("dragstart", block);
+    };
+  }, []);
 
   const dragRef = useRef<DragMode>(null);
   const [drag, setDragState] = useState<DragMode>(null);
@@ -190,12 +184,14 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   );
 
   const labelScale = viewerScalePxPerPt(height, pageHeightPt);
-  const selectedId = selection?.kind === "annotation" ? selection.annotationId : null;
 
   const placedLabels: PlacedLabel[] = lines.flatMap((line) => {
     const labels = getLineScriptLabels(line, project);
-    const p0 = normalizedToPx(line.points[0], width, height);
-    const p1 = normalizedToPx(line.points[1], width, height);
+    const startPoint = line.points[0];
+    const endPoint = line.points[line.points.length - 1];
+    if (!startPoint || !endPoint) return [];
+    const p0 = normalizedToPx(startPoint, width, height);
+    const p1 = normalizedToPx(endPoint, width, height);
     const fontSizePx = getLineFontSizePt(line, project) * labelScale;
     const fontFamily = getLineFontFamily(line, project);
     const bold = getLineLabelBold(line, project);
@@ -314,20 +310,16 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   const findLineAt = (p: NormalizedPoint): LineAnnotation | null => {
     const threshold = lineHitTolerancePx / Math.max(width, height);
     for (const line of [...lines].reverse()) {
-      const a = line.points[0];
-      const b = line.points[1];
-      const dist = pointToSegmentDistance(p, a, b);
-      if (dist < threshold) return line;
+      for (let index = 0; index < line.points.length - 1; index += 1) {
+        const a = line.points[index];
+        const b = line.points[index + 1];
+        if (a && b && pointToSegmentDistance(p, a, b) < threshold) return line;
+      }
     }
     return null;
   };
 
-  const selectLine = (line: LineAnnotation) => {
-    selectAnnotation(line.id);
-    if (!line.shotId) return;
-    const scene = project.scenes.find((sc) => sc.shots.some((sh) => sh.id === line.shotId));
-    if (scene) setSceneCollapsed(scene.id, false);
-  };
+  const selectLine = (line: LineAnnotation) => selectMark(line.id);
 
   const eventPx = (e: { clientX: number; clientY: number }) => {
     const svg = svgRef.current!;
@@ -339,7 +331,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       y: ((e.clientY - rect.top) / Math.max(rect.height, 1)) * h,
       w,
       h,
-      scale: viewerScalePxPerPt(h, useLegacyStore.getState().scriptPageHeightPt),
+      scale: viewerScalePxPerPt(h, useSessionStore.getState().scriptPageHeightPt),
     };
   };
 
@@ -349,6 +341,8 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    e.preventDefault();
+    window.getSelection()?.removeAllRanges();
     setActivePage(pageNum);
     const pu = getPointUnclamped(e);
     const p = { x: clamp01(pu.x), y: clamp01(pu.y) };
@@ -372,124 +366,101 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     const isDrawTool = activeTool === "line";
 
     if (activeTool === "select") {
-      const hitEarly = findLineAt(p);
-      if (e.altKey && hitEarly) {
-        selectAnnotation(hitEarly.id);
-        setDrag({
-          type: "alt-clone",
-          lineId: hitEarly.id,
-          origin: hitEarly,
-          offset: { x: 0, y: 0 },
-        });
-        capture(e);
-        return;
-      }
-
       const px = eventPx(e);
-      const selectedLine = lines.find((line) => line.id === selectedId);
-      if (selectedLine) {
-        const p0 = normalizedToPx(selectedLine.points[0], width, height);
-        const p1 = normalizedToPx(selectedLine.points[1], width, height);
-        const mid = midpoint(p0, p1);
-        const handle = hitHandle(px.x, px.y, p0.x, p0.y)
-          ? "start"
-          : hitHandle(px.x, px.y, p1.x, p1.y)
-            ? "end"
-            : hitHandle(px.x, px.y, mid.x, mid.y, 6)
-              ? "center"
-              : null;
-        if (handle) {
-          setDrag({ type: "handle", lineId: selectedLine.id, handle, origin: selectedLine });
-          capture(e);
-          return;
-        }
-      }
-
-      const selectedNote = placedNotes.find((note) => note.text.id === selectedId);
-      if (selectedNote) {
-        const handle = hitBoxHandle(px.x, px.y, selectedNote.frame);
-        if (handle) {
-          e.preventDefault();
-          setDrag({
-            type: "note-resize",
-            handle,
-            origin: selectedNote.text,
-            startPx: { x: px.x, y: px.y },
-            startFrame: selectedNote.frame,
-          });
-          capture(e);
-          return;
-        }
-      }
-
-      const selectedLabels = placedLabels.filter((label) => label.line.id === selectedId);
-      for (const label of selectedLabels) {
-        if (hitOriginPoint(px.x, px.y, label.frame, label.align)) {
-          e.preventDefault();
-          setDrag({
-            type: "label-move",
-            which: label.which,
-            origin: label.line,
-            startPx: { x: px.x, y: px.y },
-            startFrame: label.frame,
-            anchor: label.anchor,
-          });
-          capture(e);
-          return;
-        }
-        const handle = hitBoxHandle(px.x, px.y, label.frame);
-        if (handle) {
-          e.preventDefault();
-          setDrag({
-            type: "label-resize",
-            which: label.which,
-            handle,
-            origin: label.line,
-            startPx: { x: px.x, y: px.y },
-            startFrame: label.frame,
-            anchor: label.anchor,
-          });
-          capture(e);
-          return;
-        }
-      }
-
-      for (const note of [...placedNotes].reverse()) {
-        if (!pointInFrame(px.x, px.y, note.frame)) continue;
-        e.preventDefault();
-        selectAnnotation(note.text.id);
-        setDrag({
-          type: "note-move",
-          origin: note.text,
-          startPx: { x: px.x, y: px.y },
-          startFrame: note.frame,
-        });
+      const selectedLine = lines.find((line) => line.id === selectedId) ?? null;
+      const selectedPx = selectedLine ? selectedLine.points.map((point) => normalizedToPx(point, width, height)) : [];
+      const handles = selectedLine
+        ? {
+            vertices: selectedPx,
+            mids: selectedPx.slice(0, -1).map((point, index) => {
+              const next = selectedPx[index + 1]!;
+              return { x: (point.x + next.x) / 2, y: (point.y + next.y) / 2 };
+            }),
+          }
+        : null;
+      const asLabel = (label: PlacedLabel) => ({
+        which: label.which,
+        line: label.line,
+        frame: label.frame,
+        align: label.align,
+        anchor: label.anchor,
+      });
+      const hitId = (e.target as Element).closest?.("[data-hit-id]")?.getAttribute("data-hit-id") ?? null;
+      const target = pickSelectTarget({
+        altKey: e.altKey,
+        px,
+        selectedLine,
+        handles,
+        selectedNote: placedNotes.find((note) => note.text.id === selectedId) ?? null,
+        selectedLabels: placedLabels.filter((label) => label.line.id === selectedId).map(asLabel),
+        notesTopFirst: [...placedNotes].reverse(),
+        labelsTopFirst: [...placedLabels].reverse().map(asLabel),
+        hitId,
+        lineForHitId: hitId ? (lines.find((item) => item.id === hitId) ?? null) : null,
+        lineAtPoint: findLineAt(p),
+      });
+      const startPx = { x: px.x, y: px.y };
+      if (target.type === "alt-clone") {
+        selectMark(target.line.id);
+        setDrag({ type: "alt-clone", lineId: target.line.id, origin: target.line, offset: { x: 0, y: 0 } });
         capture(e);
         return;
       }
-
-      for (const label of [...placedLabels].reverse()) {
-        if (!pointInFrame(px.x, px.y, label.frame)) continue;
+      if (target.type === "handle") {
+        setDrag({ type: "handle", lineId: target.line.id, handle: target.handle, origin: target.line });
+        capture(e);
+        return;
+      }
+      if (target.type === "note-resize") {
         e.preventDefault();
-        selectLine(label.line);
+        setDrag({ type: "note-resize", handle: target.handle, origin: target.note, startPx, startFrame: target.frame });
+        capture(e);
+        return;
+      }
+      if (target.type === "label-move") {
+        e.preventDefault();
+        selectLine(target.label.line);
         setDrag({
           type: "label-move",
-          which: label.which,
-          origin: label.line,
-          startPx: { x: px.x, y: px.y },
-          startFrame: label.frame,
-          anchor: label.anchor,
+          which: target.label.which,
+          origin: target.label.line,
+          startPx,
+          startFrame: target.label.frame,
+          anchor: target.label.anchor,
         });
         capture(e);
         return;
       }
-
-      const hit = findLineAt(p);
-      if (hit) {
-        selectLine(hit);
+      if (target.type === "label-resize") {
+        e.preventDefault();
+        setDrag({
+          type: "label-resize",
+          which: target.label.which,
+          handle: target.handle,
+          origin: target.label.line,
+          startPx,
+          startFrame: target.label.frame,
+          anchor: target.label.anchor,
+        });
+        capture(e);
         return;
       }
-      useLegacyStore.getState().clearSelection();
+      if (target.type === "note-move") {
+        e.preventDefault();
+        selectMark(target.note.id);
+        setDrag({ type: "note-move", origin: target.note, startPx, startFrame: target.frame });
+        capture(e);
+        return;
+      }
+      if (target.type === "select-line") {
+        selectLine(target.line);
+        return;
+      }
+      if (target.type === "select-id") {
+        selectMark(target.id);
+        return;
+      }
+      useSessionStore.getState().clearSelection();
       return;
     }
 
@@ -506,27 +477,14 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     const pu = getPointUnclamped(e);
 
     if (current.type === "draw") {
-      const end = snapEndpoint(current.start, pu, snapAngleDegrees, e.shiftKey);
-      setPreviewEnd(end);
+      setPreviewEnd(drawPreviewEnd(current.start, pu, snapDegrees, e.shiftKey));
       return;
     }
 
     if (current.type === "handle") {
-      const { origin, handle } = current;
-      const [a, b] = origin.points;
-      if (handle === "start") {
-        const start = snapEndpoint(b, pu, snapAngleDegrees, e.shiftKey);
-        updateLine(current.lineId, { points: [start, b] });
-      } else if (handle === "end") {
-        const end = snapEndpoint(a, pu, snapAngleDegrees, e.shiftKey);
-        updateLine(current.lineId, { points: [a, end] });
-      } else {
-        const dx = pu.x - (a.x + b.x) / 2;
-        const dy = pu.y - (a.y + b.y) / 2;
-        updateLine(current.lineId, {
-          points: [offsetPointUnclamped(a, dx, dy), offsetPointUnclamped(b, dx, dy)],
-        });
-      }
+      replaceLine(current.lineId, {
+        points: dragLinePoints(current.origin.points, current.handle, pu, snapDegrees, e.shiftKey),
+      });
       return;
     }
 
@@ -539,135 +497,79 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     const dx = px.x - current.startPx.x;
     const dy = px.y - current.startPx.y;
     if (Math.hypot(dx, dy) < 1) return;
-    const live = useLegacyStore.getState().project;
+    const live = toLegacyProject(useProjectStore.getState().project);
 
     if (current.type === "note-move") {
-      const left = current.startFrame.left + dx;
-      const baseline = current.startFrame.top + dy + current.startFrame.fontSize * ASCENT_EM;
-      updateText(current.origin.id, { x: left / px.w, y: baseline / px.h });
+      updateText(current.origin.id, noteMovePatch(current.startFrame, dx, dy, px));
       return;
     }
 
     if (current.type === "note-resize") {
       const note = current.origin;
-      const bold = getTextLabelBold(note, live);
-      const italic = note.labelItalic === true;
       const family = note.fontFamily ?? live.defaultLine.fontFamily;
-      const resized = resizeTextBox(
-        current.startFrame,
-        current.handle,
-        dx,
-        dy,
-        getTextDisplayText(note, live),
-        note.align ?? "left",
-        (sample) =>
-          measureViewerText(
-            sample,
-            viewerFontShorthand(family, current.startFrame.fontSize, bold, italic)
-          )
+      updateText(
+        note.id,
+        noteResizePatch(
+          note,
+          current.startFrame,
+          current.handle,
+          dx,
+          dy,
+          px,
+          getTextDisplayText(note, live),
+          getTextLabelBold(note, live),
+          note.labelItalic === true,
+          family
+        )
       );
-      const baseline = resized.top + current.startFrame.fontSize * ASCENT_EM;
-      updateText(note.id, {
-        x: resized.left / px.w,
-        y: baseline / px.h,
-        ...(resized.widthChanged ? { widthPt: clampBoxWidthPt(resized.width / px.scale) } : {}),
-        ...(resized.heightChanged
-          ? {
-              minHeightPt:
-                resized.minHeight != null ? clampBoxHeightPt(resized.minHeight / px.scale) : undefined,
-            }
-          : {}),
-      });
       return;
     }
 
     if (current.type === "label-move" || current.type === "label-resize") {
       const line = current.origin;
       const labels = getLineScriptLabels(line, live);
-      const sampleText = current.which === "primary" ? labels.primary : labels.secondary ?? "";
-      const align: TextAlign =
-        current.which === "primary" ? line.labelAlign ?? "left" : line.secondaryAlign ?? "left";
       const bold = getLineLabelBold(line, live);
       const italic = line.labelItalic === true;
       const family = getLineFontFamily(line, live);
-      const moved =
-        current.type === "label-resize"
-          ? resizeTextBox(
-              current.startFrame,
-              current.handle,
-              dx,
-              dy,
-              sampleText,
-              align,
-              (sample) =>
-                measureViewerText(
-                  sample,
-                  viewerFontShorthand(family, current.startFrame.fontSize, bold, italic)
-                )
-            )
-          : {
-              left: current.startFrame.left + dx,
-              top: current.startFrame.top + dy,
-              width: current.startFrame.width,
-              height: current.startFrame.height,
-              minHeight: undefined as number | undefined,
-              widthChanged: false,
-              heightChanged: false,
-            };
-      const placedFrame: TextFrame = {
-        ...current.startFrame,
-        left: moved.left,
-        top: moved.top,
-        width: moved.width,
-        height: moved.height,
-      };
-      if (current.which === "primary") {
-        updateLine(line.id, {
-          ...primaryOffsetFromPlacement(current.anchor, placedFrame, align, px.scale),
-          ...(moved.widthChanged ? { labelWidthPt: clampBoxWidthPt(moved.width / px.scale) } : {}),
-          ...(moved.heightChanged
-            ? {
-                labelMinHeightPt:
-                  moved.minHeight != null ? clampBoxHeightPt(moved.minHeight / px.scale) : undefined,
-              }
-            : {}),
-        });
-      } else {
-        updateLine(line.id, {
-          ...secondaryOffsetFromPlacement(
-            current.anchor,
-            placedFrame,
-            align,
-            current.startFrame.fontSize,
-            px.scale
-          ),
-          ...(moved.widthChanged
-            ? { secondaryWidthPt: clampBoxWidthPt(moved.width / px.scale) }
-            : {}),
-          ...(moved.heightChanged
-            ? {
-                secondaryMinHeightPt:
-                  moved.minHeight != null ? clampBoxHeightPt(moved.minHeight / px.scale) : undefined,
-              }
-            : {}),
-        });
-      }
+      replaceLine(
+        line.id,
+        labelDragPatch({
+          which: current.which,
+          resizing: current.type === "label-resize",
+          handle: current.type === "label-resize" ? current.handle : null,
+          startFrame: current.startFrame,
+          anchor: current.anchor,
+          dx,
+          dy,
+          sampleText: current.which === "primary" ? labels.primary : labels.secondary ?? "",
+          align: current.which === "primary" ? line.labelAlign ?? "left" : line.secondaryAlign ?? "left",
+          scale: px.scale,
+          measure: (sample) =>
+            measureViewerText(sample, viewerFontShorthand(family, current.startFrame.fontSize, bold, italic)),
+        })
+      );
     }
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     const px = eventPx(e);
     if (placedNotes.some((note) => pointInFrame(px.x, px.y, note.frame))) {
-      useLegacyStore.getState().setActiveTool("select");
+      useSessionStore.getState().setActiveTool("select");
       return;
     }
     if (placedLabels.some((label) => pointInFrame(px.x, px.y, label.frame))) {
-      useLegacyStore.getState().setActiveTool("select");
+      useSessionStore.getState().setActiveTool("select");
       return;
     }
     const pu = getPointUnclamped(e);
     const p = { x: clamp01(pu.x), y: clamp01(pu.y) };
-    if (findLineAt(p)) useLegacyStore.getState().setActiveTool("select");
+    const hit = findLineAt(p);
+    if (hit && hit.id === selectedId) {
+      const spot = closestOnLine(hit.points, p);
+      if (spot) commands.splitSelection(spot.index, spot.point);
+      return;
+    }
+    if (hit) useSessionStore.getState().setActiveTool("select");
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -679,13 +581,9 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
 
     if (current.type === "draw") {
       const pu = getPointUnclamped(e);
-      let end = snapEndpoint(current.start, pu, snapAngleDegrees, e.shiftKey);
-      if (distance(current.start, end) < MIN_DRAG_NORMALIZED) {
-        end = { x: current.start.x, y: current.start.y + MIN_DRAG_NORMALIZED };
-      }
+      const end = finishDrawEnd(current.start, pu, snapDegrees, e.shiftKey);
 
-      const shotId = shotSelection?.shotId;
-      const line = createLineFromShot(pageNum, [current.start, end], project, shotId);
+      const line = createLineFromShot(pageNum, [current.start, end], project, linkedShotId);
       addLine(line);
       trimLineId = line.id;
       trimHint = "drawEnd";
@@ -693,14 +591,8 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
 
     if (current.type === "alt-clone") {
       const pu = getPointUnclamped(e);
-      const start = current.origin.points[0];
-      const dx = pu.x - start.x;
-      const dy = pu.y - start.y;
       const dup = cloneLine(current.origin, pageNum);
-      dup.points = [
-        offsetPointUnclamped(current.origin.points[0], dx, dy),
-        offsetPointUnclamped(current.origin.points[1], dx, dy),
-      ];
+      dup.points = clonedLinePoints(current.origin.points, pu);
       addLine(dup);
       trimLineId = dup.id;
       trimHint = "center";
@@ -709,7 +601,13 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     if (current.type === "handle") {
       trimLineId = current.lineId;
       trimHint =
-        current.handle === "start" ? "start" : current.handle === "end" ? "end" : "center";
+        current.handle.kind === "vertex"
+          ? current.handle.index === 0
+            ? "start"
+            : current.handle.index === current.origin.points.length - 1
+              ? "end"
+              : "center"
+          : "center";
     }
 
     if (trimLineId) {
@@ -723,13 +621,38 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     }
   };
 
+  const barLine = lines.find((line) => line.id === selectedId);
+  const barNote = placedNotes.find((note) => note.text.id === selectedId);
+  const barBounds = barLine
+    ? (() => {
+        const px = barLine.points.map((point) => normalizedToPx(point, width, height));
+        return {
+          left: Math.min(...px.map((point) => point.x)),
+          top: Math.min(...px.map((point) => point.y)),
+          right: Math.max(...px.map((point) => point.x)),
+          bottom: Math.max(...px.map((point) => point.y)),
+        };
+      })()
+    : barNote
+      ? {
+          left: barNote.frame.left,
+          top: barNote.frame.top,
+          right: barNote.frame.left + barNote.frame.width,
+          bottom: barNote.frame.top + barNote.frame.height,
+        }
+      : null;
+  const barPos = barBounds && showActionBar ? actionBarPosition(barBounds, width, height) : null;
+
   return (
+    <>
     <svg
       ref={svgRef}
       className={`annotation-layer ${cursorClass}`}
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
+      onDragStart={(e) => e.preventDefault()}
+      onMouseDown={(e) => e.preventDefault()}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -737,27 +660,43 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     >
       {lines.map((line) => {
         const style = resolveLineStyle(line, project);
-        const p0 = normalizedToPx(line.points[0], width, height);
-        const p1 = normalizedToPx(line.points[1], width, height);
+        const pts = line.points.map((point) => normalizedToPx(point, width, height));
+        const last = pts.length - 1;
+        if (last < 1) return null;
         const isSel = line.id === selectedId;
-        const ang = lineAngleRad(p0.x, p0.y, p1.x, p1.y);
         const strokePx = style.widthPt * labelScale;
-        const startCap = renderLineCap(style.start, style.color, strokePx, ang, true, labelScale);
-        const endCap = renderLineCap(style.end, style.color, strokePx, ang, false, labelScale);
+        const startInset = (endingGeometry(style.start, style.widthPt)?.shaftInsetPt ?? 0) * labelScale;
+        const endInset = (endingGeometry(style.end, style.widthPt)?.shaftInsetPt ?? 0) * labelScale;
+        const startAng = lineAngleRad(pts[0]!.x, pts[0]!.y, pts[1]!.x, pts[1]!.y);
+        const endAng = lineAngleRad(pts[last - 1]!.x, pts[last - 1]!.y, pts[last]!.x, pts[last]!.y);
+        const startCap = renderLineCap(style.start, style.color, strokePx, startAng, true, labelScale);
+        const endCap = renderLineCap(style.end, style.color, strokePx, endAng, false, labelScale);
 
         return (
           <g key={line.id} className={isSel ? "line-selected" : undefined}>
-            <line
-              x1={p0.x}
-              y1={p0.y}
-              x2={p1.x}
-              y2={p1.y}
-              stroke={style.color}
-              strokeWidth={strokePx}
-              strokeDasharray={strokeDashArray(style.stroke, strokePx)}
-            />
-            {startCap && <g transform={`translate(${p0.x}, ${p0.y})`}>{startCap.elements}</g>}
-            {endCap && <g transform={`translate(${p1.x}, ${p1.y})`}>{endCap.elements}</g>}
+            {pts.slice(0, -1).map((start, index) => {
+              const end = pts[index + 1]!;
+              const [shaftStart, shaftEnd] = shaftEnds(
+                start,
+                end,
+                index === 0 ? startInset : 0,
+                index === last - 1 ? endInset : 0
+              );
+              return (
+                <line
+                  key={index}
+                  x1={shaftStart.x}
+                  y1={shaftStart.y}
+                  x2={shaftEnd.x}
+                  y2={shaftEnd.y}
+                  stroke={style.color}
+                  strokeWidth={strokePx}
+                  strokeDasharray={strokeDashArray(style.stroke, strokePx)}
+                />
+              );
+            })}
+            {startCap && <g transform={`translate(${pts[0]!.x}, ${pts[0]!.y})`}>{startCap.elements}</g>}
+            {endCap && <g transform={`translate(${pts[last]!.x}, ${pts[last]!.y})`}>{endCap.elements}</g>}
           </g>
         );
       })}
@@ -771,20 +710,31 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
           bold={label.bold}
           italic={label.italic}
           selected={label.line.id === selectedId}
+          hitId={label.line.id}
           align={label.align}
           anchor={label.anchor}
         />
       ))}
       {lines.map((line) => {
         if (line.id !== selectedId) return null;
-        const p0 = normalizedToPx(line.points[0], width, height);
-        const p1 = normalizedToPx(line.points[1], width, height);
-        const mid = midpoint(p0, p1);
+        const pts = line.points.map((point) => normalizedToPx(point, width, height));
         return (
           <g key={`${line.id}-handles`}>
-            <circle className="line-handle" cx={p0.x} cy={p0.y} r={6} />
-            <circle className="line-handle" cx={p1.x} cy={p1.y} r={6} />
-            <circle className="line-handle line-handle-center" cx={mid.x} cy={mid.y} r={6} />
+            {pts.map((point, index) => (
+              <circle key={`v${index}`} className="line-handle" cx={point.x} cy={point.y} r={6} />
+            ))}
+            {pts.slice(0, -1).map((point, index) => {
+              const next = pts[index + 1]!;
+              return (
+                <circle
+                  key={`m${index}`}
+                  className="line-handle line-handle-center"
+                  cx={(point.x + next.x) / 2}
+                  cy={(point.y + next.y) / 2}
+                  r={6}
+                />
+              );
+            })}
           </g>
         );
       })}
@@ -798,6 +748,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
           bold={note.bold}
           italic={note.italic}
           selected={note.text.id === selectedId}
+          hitId={note.text.id}
         />
       ))}
       {drag?.type === "draw" && previewEnd && (
@@ -813,6 +764,18 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         />
       )}
     </svg>
+    {barPos && selectedId && (
+      <ScriptActionBar
+        markId={selectedId}
+        shotId={barLine?.shotId ?? barNote?.text.shotId}
+        isLine={Boolean(barLine)}
+        anchorLeft={barPos.left}
+        anchorTop={barPos.top}
+        pageWidth={width}
+        pageHeight={height}
+      />
+    )}
+    </>
   );
 }
 

@@ -47,8 +47,10 @@ type PrefsValues = {
   lineHitTolerancePx: number;
   /** Max page stacks mounted in scroll view. */
   maxMountedPdfPages: number;
-  /** 100 = fit. */
+  /** 100 fits the current view (one page, or the open spread) in the script area. */
   viewerZoomPercent: number;
+  /** Bar beside the selected mark: Duplicate, Link, Delete. */
+  showActionBar: boolean;
   /** Side panel widths, collapse state and order. */
   panels: PanelPrefs;
   /** Groups folded in the Properties forms, by group name. */
@@ -67,6 +69,7 @@ type PrefsState = PrefsValues & {
   setLineHitTolerancePx: (px: number) => void;
   setMaxMountedPdfPages: (count: number) => void;
   setViewerZoomPercent: (percent: number) => void;
+  setShowActionBar: (show: boolean) => void;
   setPanelWidth: (panel: SidePanel, px: number) => void;
   resetPanelWidth: (panel: SidePanel) => void;
   setPanelCollapsed: (panel: SidePanel, collapsed: boolean) => void;
@@ -143,11 +146,12 @@ export const usePrefsStore = create<PrefsState>()(
       colorTheme: DEFAULT_COLOR_THEME,
       uiScale: DEFAULT_UI_SCALE,
       confirmDeletes: true,
-      viewerLayoutMode: "single",
+      viewerLayoutMode: "spread",
       toolKeybinds: { ...DEFAULT_TOOL_KEYBINDS },
       lineHitTolerancePx: DEFAULT_LINE_HIT_TOLERANCE_PX,
       maxMountedPdfPages: DEFAULT_MAX_MOUNTED_PDF_PAGES,
       viewerZoomPercent: DEFAULT_VIEWER_ZOOM_PERCENT,
+      showActionBar: true,
       panels: defaultPanelPrefs(),
       foldedGroups: {},
       ...readOldKeys(),
@@ -176,6 +180,7 @@ export const usePrefsStore = create<PrefsState>()(
       setLineHitTolerancePx: (px) => set({ lineHitTolerancePx: clampLineHitTolerancePx(px) }),
       setMaxMountedPdfPages: (count) => set({ maxMountedPdfPages: clampMaxMountedPdfPages(count) }),
       setViewerZoomPercent: (percent) => set({ viewerZoomPercent: clampViewerZoomPercent(percent) }),
+      setShowActionBar: (showActionBar) => set({ showActionBar }),
       setPanelWidth: (panel, px) =>
         set((s) => ({
           panels: {
@@ -231,6 +236,7 @@ export const usePrefsStore = create<PrefsState>()(
         lineHitTolerancePx,
         maxMountedPdfPages,
         viewerZoomPercent,
+        showActionBar,
         panels,
         foldedGroups,
       }): PrefsValues => ({
@@ -242,6 +248,7 @@ export const usePrefsStore = create<PrefsState>()(
         lineHitTolerancePx,
         maxMountedPdfPages,
         viewerZoomPercent,
+        showActionBar,
         panels,
         foldedGroups,
       }),

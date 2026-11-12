@@ -471,7 +471,12 @@ function settingsFromV1(raw: Raw): ProjectSettings {
       raw.lineLabelFields.filter(isRecord).map((field) => ({
         id: V1_CAPTION_FIELD_IDS[str(field.id)],
         print: field.enabled === true,
-      }))
+      })),
+      settings.general.additionalInfoStyle
+    );
+  } else if (settings.general.additionalInfoStyle === "hyphen") {
+    settings.captions.fields = settings.captions.fields.map((field) =>
+      field.id === "additionalInfo" ? { ...field, divider: "spacedHyphen" } : field
     );
   }
   const offset = (value: unknown, fallback: number) => clamp(finite(value) ?? fallback, 0, 48);

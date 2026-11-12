@@ -17,7 +17,7 @@ export const DEFAULT_MAX_MOUNTED_PDF_PAGES = 10;
 export const MIN_MAX_MOUNTED_PDF_PAGES = 3;
 export const MAX_MAX_MOUNTED_PDF_PAGES = 30;
 
-/** PDF viewer zoom as percent (100 = fit spread page size at current pane width). */
+/** PDF viewer zoom as percent. 100 fits the current view in the script area. */
 export const DEFAULT_VIEWER_ZOOM_PERCENT = 100;
 
 export const MIN_VIEWER_ZOOM_PERCENT = 25;

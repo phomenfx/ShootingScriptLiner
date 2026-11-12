@@ -91,9 +91,27 @@ describe("shot captions", () => {
     const project = sample();
     expect(shotCaption(project, found(project, "a"))).toBe("1A-WS Kitchen");
     expect(shotCaption(project, found(project, "b"))).toBe("1B-CU Alice (Moving)");
-    project.settings.general.additionalInfoStyle = "hyphen";
     project.settings.general.shotIdStyle = "decimal";
+    const info = project.settings.captions.fields.find((field) => field.id === "additionalInfo");
+    if (info) info.divider = "spacedHyphen";
     expect(shotCaption(project, found(project, "b"))).toBe("1.2-CU Alice - Moving");
+  });
+
+  it("lets a divider sit between fields or surround one", () => {
+    const project = sample();
+    const set = (id: string, divider: "brackets" | "slash" | "custom", dividerText?: string) => {
+      project.settings.captions.fields = project.settings.captions.fields.map((field) =>
+        field.id === id ? { ...field, divider, dividerText } : field
+      );
+    };
+    set("additionalInfo", "brackets");
+    expect(shotCaption(project, found(project, "b"))).toBe("1B-CU Alice [Moving]");
+    set("subject", "slash");
+    expect(shotCaption(project, found(project, "b"))).toBe("1B-CU / Alice [Moving]");
+    set("additionalInfo", "custom", " (…) ");
+    expect(shotCaption(project, found(project, "b"))).toBe("1B-CU / Alice (Moving) ");
+    set("type", "custom", "-…");
+    expect(shotCaption(project, found(project, "a"))).toBe("1A-WS / Kitchen");
   });
 
   it("prints the new fields, multi-values and scene values when they are switched on", () => {
@@ -105,6 +123,19 @@ describe("shot captions", () => {
     );
     // Shot a has its scene's audio; shot b deliberately has none.
     expect(shotCaption(project, found(project, "a"))).toContain("Boom");
+  });
+
+  it("a line or note can replace the shot's own fields", () => {
+    const project = sample();
+    const b = found(project, "b");
+    expect(shotCaption(project, b, { subject: "Bob" })).toBe("1B-CU Bob (Moving)");
+    expect(shotCaption(project, b, { type: "MS" })).toBe("1B-MS Alice (Moving)");
+    expect(shotCaption(project, b, { additionalInfo: "" })).toBe("1B-CU Alice");
+    project.settings.captions.fields = project.settings.captions.fields.map((field) =>
+      field.id === "audio" ? { ...field, print: true } : field
+    );
+    expect(shotCaption(project, b, { audio: ["Lav"] })).toContain("Lav");
+    expect(shotCaption(project, b)).toBe("1B-CU Alice (Moving)");
   });
 
   it("a shot's own print checkbox wins, and matching the project setting clears it", () => {

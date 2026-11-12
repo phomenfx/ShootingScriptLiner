@@ -6,7 +6,7 @@ import { formatExcelDate } from "../lib/dateFormat";
 import type { FoundShot } from "./edits";
 import { CAPTION_FIELDS, choiceLabel } from "./registry";
 import { shotIdLabel } from "./shotList";
-import type { CameraRow, Project, Scene, Shot, ShotOwn } from "./types";
+import type { CameraRow, CaptionDivider, CaptionField, MarkOwn, Project, Scene, Shot, ShotOwn } from "./types";
 
 export type EffectiveShot = Required<Pick<ShotOwn, "indicator" | "location" | "time" | "movement" | "cameras" | "audio">> &
   Pick<ShotOwn, "fps" | "sync" | "date">;
@@ -60,85 +60,191 @@ export function withPrintField(project: Project, shot: Shot, fieldId: string, pr
   return { ...shot, print: next };
 }
 
-/** The text one caption field contributes for a shot. Empty when it has nothing to say. */
-export function captionFieldText(project: Project, found: FoundShot, fieldId: string): string {
+/** The text one caption field contributes for a shot. A mark's own value wins when that field is unlocked. */
+export function captionFieldText(project: Project, found: FoundShot, fieldId: string, own?: MarkOwn): string {
   const { scene, shot, sceneIndex, shotIndex } = found;
   const lists = project.settings.lists;
   const e = effectiveShot(scene, shot);
   const list = (values: string[] | undefined) => (values ?? []).filter(Boolean).join(", ");
+  const text = (markValue: string | undefined, shotValue: string | undefined) => (markValue !== undefined ? markValue : shotValue)?.trim() ?? "";
   switch (fieldId) {
     case "shotNumber":
       return shotIdLabel(sceneIndex, shotIndex, project.settings.general.shotIdStyle);
     case "type":
-      return shot.type?.trim() ?? "";
+      return text(own?.type, shot.type);
     case "angle":
-      return choiceLabel("angle", shot.angle?.trim(), lists);
+      return choiceLabel("angle", text(own?.angle, shot.angle), lists);
     case "subject":
-      return shot.subject?.trim() ?? "";
+      return text(own?.subject, shot.subject);
     case "cast":
-      return list(shot.cast);
+      return list(own?.cast ?? shot.cast);
     case "additionalInfo":
-      return shot.additionalInfo?.trim() ?? "";
+      return text(own?.additionalInfo, shot.additionalInfo);
     case "tags":
-      return list(shot.tags?.map((tag) => choiceLabel("tags", tag, lists)));
+      return list((own?.tags ?? shot.tags)?.map((tag) => choiceLabel("tags", tag, lists)));
     case "movement":
-      return list(e.movement);
+      return list(own?.movement ?? e.movement);
     case "lens":
-      return list(cameraLenses(e.cameras));
+      return list(cameraLenses(own?.cameras ?? e.cameras));
     case "camera":
-      return list(cameraNames(e.cameras));
+      return list(cameraNames(own?.cameras ?? e.cameras));
     case "audio":
-      return list(e.audio);
+      return list(own?.audio ?? e.audio);
     case "indicator":
-      return e.indicator.trim();
+      return text(own?.indicator, e.indicator);
     case "location":
-      return e.location.trim();
+      return text(own?.location, e.location);
     case "time":
-      return e.time.trim();
+      return text(own?.time, e.time);
     case "fps":
-      return e.fps?.trim() ?? "";
+      return text(own?.fps, e.fps);
     case "sync":
-      return choiceLabel("sync", e.sync, lists);
-    case "date":
-      return e.date ? formatExcelDate(e.date, project.settings.captions.dateFormat) : "";
+      return choiceLabel("sync", own?.sync !== undefined ? own.sync : e.sync, lists);
+    case "date": {
+      const date = own?.date !== undefined ? own.date : e.date;
+      return date ? formatExcelDate(date, project.settings.captions.dateFormat) : "";
+    }
     case "notes":
-      return shot.notes?.trim() ?? "";
+      return text(own?.notes, shot.notes);
     case "setup":
-      return shot.setup?.trim() ?? "";
+      return text(own?.setup, shot.setup);
     default:
       return "";
   }
 }
 
+/** Choices shown beside each caption field. Wrapping ones surround the value. */
+export const CAPTION_DIVIDERS: { id: CaptionDivider; label: string }[] = [
+  { id: "space", label: "Space" },
+  { id: "none", label: "No space" },
+  { id: "hyphen", label: "Hyphen" },
+  { id: "spacedHyphen", label: "Spaced hyphen" },
+  { id: "comma", label: "Comma" },
+  { id: "slash", label: "Slash" },
+  { id: "dot", label: "Dot" },
+  { id: "parens", label: "Parentheses" },
+  { id: "brackets", label: "Brackets" },
+  { id: "braces", label: "Braces" },
+  { id: "quotes", label: "Quotes" },
+  { id: "custom", label: "Custom" },
+];
+
+const DIVIDER_IDS = new Set<string>(CAPTION_DIVIDERS.map((item) => item.id));
+
+export function isCaptionDivider(value: unknown): value is CaptionDivider {
+  return typeof value === "string" && DIVIDER_IDS.has(value);
+}
+
+/** The divider a field uses when the project has not chosen one. */
+export function defaultDivider(id: string, additionalInfoStyle: "parens" | "hyphen" = "parens"): CaptionDivider {
+  if (id === "type") return "hyphen";
+  if (id === "additionalInfo") return additionalInfoStyle === "hyphen" ? "spacedHyphen" : "parens";
+  return "space";
+}
+
+/** A custom pattern that keeps the caption looking the way the current divider does. `…` is the value. */
+export function customDividerSeed(divider: CaptionDivider | undefined): string {
+  switch (divider) {
+    case "none":
+      return "…";
+    case "hyphen":
+      return "-…";
+    case "spacedHyphen":
+      return " - …";
+    case "comma":
+      return ", …";
+    case "slash":
+      return " / …";
+    case "dot":
+      return " · …";
+    case "parens":
+      return " (…)";
+    case "brackets":
+      return " […]";
+    case "braces":
+      return " {…}";
+    case "quotes":
+      return ' "…"';
+    default:
+      return " …";
+  }
+}
+
+function wrapped(text: string, open: string, close: string): string {
+  return `${open}${text}${close}`;
+}
+
+/** The field's own text, surrounded when the divider wraps it. */
+function fieldBody(text: string, field: CaptionField): string {
+  switch (field.divider ?? defaultDivider(field.id)) {
+    case "parens":
+      return wrapped(text, "(", ")");
+    case "brackets":
+      return wrapped(text, "[", "]");
+    case "braces":
+      return wrapped(text, "{", "}");
+    case "quotes":
+      return wrapped(text, '"', '"');
+    default:
+      return text;
+  }
+}
+
 /**
- * The caption for a shot, built from the fields that print, in the project's
- * order. The shot number and type join with a hyphen (2A-WS), and additional
- * info attaches to the subject in the project's style: "Alice (Moving)".
+ * Custom text. An ellipsis stands for the value, so ` (…)` surrounds it and
+ * `-…` joins it with a hyphen. Without an ellipsis the text is only a separator
+ * and is left off when this field is the first thing printed.
  */
-export function shotCaption(project: Project, found: FoundShot): string {
-  const pieces: { id: string; text: string }[] = [];
+function customBody(text: string, pattern: string, first: boolean): string {
+  const token = pattern.includes("…") ? "…" : pattern.includes("...") ? "..." : "";
+  if (!token) return first ? text : pattern + text;
+  const rendered = pattern.split(token).join(text);
+  return first ? rendered.replace(/^ /, "") : rendered;
+}
+
+function appendField(previous: string, text: string, field: CaptionField): string {
+  const kind = field.divider ?? defaultDivider(field.id);
+  if (kind === "custom") return previous + customBody(text, field.dividerText ?? "", false);
+  const body = fieldBody(text, field);
+  switch (kind) {
+    case "none":
+      return previous + body;
+    case "hyphen":
+      return `${previous}-${body}`;
+    case "spacedHyphen":
+      return `${previous} - ${body}`;
+    case "comma":
+      return `${previous}, ${body}`;
+    case "slash":
+      return `${previous} / ${body}`;
+    case "dot":
+      return `${previous} · ${body}`;
+    default:
+      return `${previous} ${body}`;
+  }
+}
+
+/**
+ * The caption for a shot, in the project's field order. Each field brings its
+ * own divider, so the usual settings read "1A-WS Subject (Info)" and any other
+ * arrangement is made the same way.
+ */
+export function shotCaption(project: Project, found: FoundShot, own?: MarkOwn): string {
+  let caption = "";
+  let started = false;
   for (const field of project.settings.captions.fields) {
     if (!printsField(project, found.shot, field.id)) continue;
-    const text = captionFieldText(project, found, field.id);
-    if (text) pieces.push({ id: field.id, text });
-  }
-  const parens = project.settings.general.additionalInfoStyle === "parens";
-  const parts: string[] = [];
-  for (let i = 0; i < pieces.length; i += 1) {
-    const current = pieces[i]!;
-    const next = pieces[i + 1];
-    if (current.id === "shotNumber" && next?.id === "type") {
-      parts.push(`${current.text}-${next.text}`);
-      i += 1;
-    } else if (current.id === "additionalInfo") {
-      const extra = parens ? `(${current.text})` : `- ${current.text}`;
-      if (pieces[i - 1]?.id === "subject" && parts.length > 0) parts.push(`${parts.pop()} ${extra}`);
-      else parts.push(extra);
+    const text = captionFieldText(project, found, field.id, own);
+    if (!text) continue;
+    if (!started) {
+      const kind = field.divider ?? defaultDivider(field.id);
+      caption = kind === "custom" ? customBody(text, field.dividerText ?? "", true) : fieldBody(text, field);
+      started = true;
     } else {
-      parts.push(current.text);
+      caption = appendField(caption, text, field);
     }
   }
-  return parts.join(" ");
+  return caption;
 }
 
 /** Short name for a shot in pickers and tabs: "2A WS Alice". */

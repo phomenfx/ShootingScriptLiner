@@ -3,6 +3,7 @@
  * shortcuts and the action bar all call these, so each action has one
  * implementation.
  */
+import { rejoinLine, splitLine } from "../drawing/marks";
 import { placeUnplacedV1Marks } from "../io/migrateV1";
 import { buildProjectZip, downloadBlob, readProjectFile, scriptNameInJson } from "../io/projectFiles";
 import { readProjectJson } from "../io/readProject";
@@ -12,7 +13,7 @@ import { projectFileStem } from "../io/writeProject";
 import { toLegacyProject } from "../legacy/legacyView";
 import { loadPdfFromCache, savePdfToCache } from "../lib/pdfCache";
 import { createProject } from "../model/defaults";
-import { CLONE_NUDGE_PT, addMarks, cloneMark, deleteMarks, findShot, setScript } from "../model/edits";
+import { CLONE_NUDGE_PT, addMarks, cloneMark, deleteMarks, findShot, setScript, unlinkMark, updateMark, updateSettings } from "../model/edits";
 import type { Mark, Project, ScriptInfo } from "../model/types";
 import {
   applyWithoutUndo,
@@ -94,9 +95,15 @@ function hasUnsavedWork(): boolean {
 
 /* ---------- project files ---------- */
 
+/** The Snap button starts on when the project's angle snap is on. */
+export function syncSnapFromProject(): void {
+  session().setSnapEnabled(project().settings.drawing.angleSnapDegrees > 0);
+}
+
 export function newProject(): void {
   session().reset();
   replaceProject(createProject());
+  syncSnapFromProject();
 }
 
 /** New project from the menu: asks first when there is unsaved work. */
@@ -158,6 +165,7 @@ export async function openProject(file: File): Promise<void> {
 
     session().reset();
     replaceProject(opened);
+    syncSnapFromProject();
     session().setScriptPdfFile(pdfFile);
     notify(...notices);
     if (pdfFile) await cacheScript(opened, pdfFile);
@@ -260,13 +268,14 @@ function addAndSelect(marks: Mark[]): void {
   session().select("mark", marks[marks.length - 1]!.id);
 }
 
-/** Opens the page of a shot's first mark and selects that mark. Returns false when it has none. */
+/** Opens the page of a shot's first line and keeps the shot selected. Returns false when it has none. */
 export function jumpToShot(shotId: string): boolean {
-  const mark = project().marks.find((m) => m.kind !== "image" && m.shotId === shotId);
+  const marks = project().marks.filter((m) => m.kind !== "image" && m.shotId === shotId);
+  const mark = marks.find((m) => m.kind === "line") ?? marks[0];
   if (!mark) return false;
   session().setViewerPage(mark.page);
   session().setActivePage(mark.page);
-  session().select("mark", mark.id);
+  session().select("shot", shotId);
   return true;
 }
 
@@ -280,6 +289,38 @@ export function deleteSelection(): void {
 
 export function duplicateSelection(): void {
   addAndSelect(selectedMarks().map((mark) => cloneMark(mark, { nudgePt: CLONE_NUDGE_PT })));
+}
+
+/** Adds a vertex on the longest segment, or on the segment under a double-click. */
+export function splitSelection(segmentIndex?: number, atNormalized?: { x: number; y: number }): void {
+  const line = selectedMarks().find((mark) => mark.kind === "line");
+  if (line) splitLine(line.id, segmentIndex, atNormalized);
+}
+
+/** Removes the middle vertex so two segments become one. */
+export function rejoinSelection(): void {
+  const line = selectedMarks().find((mark) => mark.kind === "line");
+  if (line) rejoinLine(line.id);
+}
+
+/** Links the mark to a shot, or unlinks it when `shotId` is empty. Linking follows the shot. */
+export function linkMarkToShot(markId: string, shotId: string): void {
+  const p = project();
+  breakUndoGroup();
+  useProjectStore.getState().apply(
+    updateMark(markId, (mark) => {
+      if (mark.kind !== "line" && mark.kind !== "text") return mark;
+      if (!shotId) return mark.shotId ? unlinkMark(p, mark) : mark;
+      if (mark.shotId === shotId || !findShot(p, shotId)) return mark;
+      const next = structuredClone(mark);
+      next.shotId = shotId;
+      delete next.color;
+      delete next.own;
+      if (next.kind === "line") delete next.caption.text;
+      else delete next.text;
+      return next;
+    })
+  );
 }
 
 export function copy(): void {
@@ -343,7 +384,7 @@ export function zoomOut(): void {
   prefs.setViewerZoomPercent(prefs.viewerZoomPercent - ZOOM_STEP_PERCENT);
 }
 
-/** 100% fits the page to the script area. */
+/** 100% fits the current view in the script area. */
 export function zoomToFit(): void {
   usePrefsStore.getState().setViewerZoomPercent(100);
 }
@@ -351,6 +392,19 @@ export function zoomToFit(): void {
 export function setViewMode(mode: ViewerLayoutMode): void {
   usePrefsStore.getState().setViewerLayoutMode(mode);
   if (mode === "single") session().setActivePage(session().viewerPage);
+}
+
+/** Book spread: page 1 sits alone, like a title page. Saved with the project. */
+export function setFirstPageAlone(firstPageAlone: boolean): void {
+  breakUndoGroup();
+  useProjectStore.getState().apply(
+    updateSettings((settings) => ({ ...settings, drawing: { ...settings.drawing, firstPageAlone } }))
+  );
+}
+
+export function toggleSnap(): void {
+  const current = session();
+  current.setSnapEnabled(!current.snapEnabled);
 }
 
 /* ---------- undo ---------- */

@@ -29,6 +29,8 @@ type Options = {
   setActivePage: (page: number) => void;
   onScrollToPage: (page: number) => void;
   enabled: boolean;
+  /** Book spread: page 1 sits alone. */
+  firstPageAlone: boolean;
 };
 
 export function usePdfPageNavigation({
@@ -41,6 +43,7 @@ export function usePdfPageNavigation({
   setActivePage,
   onScrollToPage,
   enabled,
+  firstPageAlone,
 }: Options) {
   const pageNumRef = useRef(pageNum);
   const activePageRef = useRef(activePage);
@@ -50,6 +53,8 @@ export function usePdfPageNavigation({
   useEffect(() => {
     if (!enabled || pageCount <= 0) return;
 
+    const spread = { firstPageAlone };
+
     const goPage = (delta: number) => {
       const base = mode === "scroll" ? activePageRef.current : pageNumRef.current;
       const next = Math.max(1, Math.min(pageCount, base + delta));
@@ -58,8 +63,8 @@ export function usePdfPageNavigation({
         setViewerPage(next);
         onScrollToPage(next);
       } else if (mode === "spread") {
-        const anchor = anchorPageAfterSpreadDelta(pageNumRef.current, pageCount, delta);
-        const pages = pagesInSpread(spreadIndexFromPage(anchor), pageCount);
+        const anchor = anchorPageAfterSpreadDelta(pageNumRef.current, pageCount, delta, spread);
+        const pages = pagesInSpread(spreadIndexFromPage(anchor, spread), pageCount, spread);
         setViewerPage(anchor);
         setActivePage(
           pages.includes(activePageRef.current) ? activePageRef.current : pages[0]
@@ -82,10 +87,11 @@ export function usePdfPageNavigation({
         const anchor = anchorPageAfterSpreadDelta(
           pageNumRef.current,
           pageCount,
-          e.deltaY > 0 ? 1 : -1
+          e.deltaY > 0 ? 1 : -1,
+          spread
         );
         setViewerPage(anchor);
-        const pages = pagesInSpread(spreadIndexFromPage(anchor), pageCount);
+        const pages = pagesInSpread(spreadIndexFromPage(anchor, spread), pageCount, spread);
         setActivePage(pages[0]);
       } else {
         goPage(e.deltaY > 0 ? 1 : -1);
@@ -120,5 +126,6 @@ export function usePdfPageNavigation({
     setActivePage,
     onScrollToPage,
     enabled,
+    firstPageAlone,
   ]);
 }

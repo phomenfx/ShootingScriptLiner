@@ -11,141 +11,214 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding: 8px;
+  background: var(--color-bg);
 }
 
-.pdf-ribbon {
-  flex-shrink: 0;
-  margin: 0 -8px 8px;
+.script-toolbar,
+.script-bottombar {
+  display: flex;
+  align-items: center;
+  flex: none;
+  background: var(--color-card);
+}
+
+.script-toolbar {
+  gap: 2px;
+  padding: 5px 8px;
   border-bottom: 1px solid var(--color-border);
 }
 
-.pdf-controls {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 8px;
+.script-bottombar {
+  gap: 6px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
 }
 
-.pdf-controls[data-fit="full"] .pdf-controls-nav,
-.pdf-controls[data-fit="compact"] .pdf-controls-nav {
-  position: absolute;
-  left: 50%;
-  z-index: 1;
-  transform: translateX(-50%);
+.script-spacer {
+  flex: 1;
 }
 
-.pdf-controls[data-fit="compact"] .pdf-nav-hint {
-  display: none;
+.script-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+  margin: 0 2px;
+  flex: none;
 }
 
-.pdf-controls[data-fit="wrap"] {
-  flex-wrap: wrap;
-  justify-content: flex-start;
-}
-
-.pdf-controls-nav {
-  display: flex;
+.script-tool {
+  width: 2rem;
+  height: 1.875rem;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  flex: 0 0 auto;
-}
-
-.pdf-controls-trail {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  flex: 0 0 auto;
-}
-
-.pdf-controls[data-fit="wrap"] .pdf-layout-toggle,
-.pdf-controls[data-fit="wrap"] .pdf-controls-trail {
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  max-width: 100%;
-}
-
-.pdf-nav-hint {
-  color: var(--color-text-dim);
-  font-size: var(--font-size-sm);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.pdf-controls button,
-.pdf-page-status,
-.pdf-zoom-controls {
-  flex-shrink: 0;
-}
-
-.pdf-controls button {
+  border-radius: 5px;
+  color: var(--color-text-muted);
+  border: 1px solid transparent;
+  background: transparent;
   cursor: pointer;
-  background: var(--color-btn);
+  padding: 0;
+}
+
+.script-tool:hover:not(:disabled) {
+  background: var(--color-row-hover);
   color: var(--color-text);
+}
+
+.script-tool.on {
+  background: var(--color-accent-tint);
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+.script-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.script-tool:focus-visible,
+.script-iconbtn:focus-visible,
+.script-view-picker:focus-visible,
+.script-field input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.script-iconbtn {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+}
+
+.script-iconbtn:hover:not(:disabled) {
+  background: var(--color-row-hover);
+  color: var(--color-text);
+}
+
+.script-iconbtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.script-iconbtn[aria-pressed="true"] {
+  color: var(--color-accent);
+  background: var(--color-accent-tint);
+}
+
+.script-view-picker {
+  height: 1.5rem;
+  min-width: 6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 7px;
+  background: var(--color-input);
   border: 1px solid var(--color-border-input);
   border-radius: var(--radius-md);
-  padding: 6px 10px;
-}
-
-.pdf-layout-toggle {
-  display: flex;
-  gap: 4px;
-  flex: 0 0 auto;
-}
-
-.pdf-layout-toggle button {
+  color: var(--color-text);
+  font: inherit;
   font-size: var(--font-size-sm);
-  padding: 4px 8px;
+  cursor: pointer;
 }
 
-.pdf-layout-toggle button.active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-on-accent);
+.script-field {
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  background: var(--color-input);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  color: var(--color-text-dim);
+  font-size: var(--font-size-sm);
+  flex: none;
 }
 
-.pdf-zoom-controls {
+.script-field input {
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: inherit;
+  padding: 0;
+  min-width: 0;
+}
+
+.script-field input:focus {
+  outline: none;
+}
+
+.script-page-field {
+  width: 4.5rem;
+  justify-content: center;
+}
+
+.script-page-field input {
+  width: 1.6rem;
+  text-align: right;
+}
+
+.script-zoom {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.pdf-zoom-controls button {
-  min-width: 28px;
-  padding: 4px 8px;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.pdf-zoom-input-wrap {
+.script-actionbar {
+  position: absolute;
+  z-index: 4;
   display: flex;
   align-items: center;
   gap: 2px;
-}
-
-.pdf-zoom-input {
-  width: 3.25rem;
-  padding: 4px 6px;
-  text-align: right;
-  background: var(--color-btn);
-  color: var(--color-text);
-  border: 1px solid var(--color-border-input);
+  padding: 2px;
+  box-sizing: border-box;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
 }
 
-.pdf-zoom-suffix {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+.script-actionbar-handle {
+  width: 0.75rem;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  cursor: grab;
+  color: var(--color-text-dim);
+  border-radius: var(--radius-sm);
+  touch-action: none;
 }
 
-.pdf-page-status {
-  min-width: 8rem;
-  text-align: center;
+.script-actionbar-handle:hover {
+  color: var(--color-text);
+  background: var(--color-row-hover);
+}
+
+.script-actionbar-handle:active {
+  cursor: grabbing;
+}
+
+.script-zoom-field {
+  width: 4rem;
+  justify-content: center;
+}
+
+.script-zoom-field input {
+  width: 2rem;
+  text-align: right;
 }
 
 .pdf-canvas-wrap {
@@ -153,12 +226,6 @@
   background: var(--color-bg);
   flex: 1;
   min-height: 0;
-}
-
-.pdf-single-wrap,
-.pdf-scroll-wrap,
-.pdf-spread-wrap {
-  max-height: calc(100vh - 180px);
 }
 
 .pdf-scroll-column {
@@ -200,6 +267,8 @@
   margin: 0 auto;
   border-radius: 2px;
   outline: 2px solid transparent;
+  user-select: none;
+  -webkit-user-select: none;
   outline-offset: 3px;
   transition: outline-color 0.15s ease;
 }
@@ -219,6 +288,8 @@
 .pdf-page-stack canvas {
   display: block;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .annotation-layer {
@@ -247,6 +318,7 @@
   stroke: #fff;
   stroke-width: 1.5;
   cursor: grab;
+  -webkit-user-drag: none;
 }
 
 .annotation-layer .line-handle-center {
@@ -294,27 +366,6 @@
   cursor: move;
 }
 
-.script-toolbar {
-  display: flex;
-  gap: 6px;
-  padding: 6px 8px;
-}
-
-.script-toolbar button {
-  cursor: pointer;
-  padding: 4px 12px;
-  background: var(--color-btn);
-  border: 1px solid var(--color-border-input);
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-}
-
-.script-toolbar button.active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-on-accent);
-}
-
 .pdf-cache-hint {
   margin: 0;
   padding: 8px 12px;
@@ -330,9 +381,40 @@
 }
 
 .pdf-placeholder-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   padding: 24px;
   text-align: center;
-  color: var(--color-text-dim);
+  color: var(--color-text-muted);
+}
+
+.pdf-placeholder-inner p {
+  margin: 0;
+}
+
+.pdf-placeholder-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pdf-placeholder-actions button {
+  height: 1.75rem;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-input);
+  background: var(--color-btn);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.pdf-placeholder-actions button:hover {
+  background: var(--color-btn-hover);
 }
 
 .pdf-hint {

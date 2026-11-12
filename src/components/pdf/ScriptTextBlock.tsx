@@ -16,6 +16,8 @@ type Props = {
   bold: boolean;
   italic: boolean;
   selected: boolean;
+  /** Selects this line or note when the click lands on the glyphs. */
+  hitId?: string;
   /** Line labels only. The box alignment point is the origin; this is the line point it is offset from. */
   anchor?: { x: number; y: number };
   align?: TextAlign;
@@ -29,6 +31,7 @@ export function ScriptTextBlock({
   bold,
   italic,
   selected,
+  hitId,
   anchor,
   align = "left",
 }: Props) {
@@ -36,7 +39,7 @@ export function ScriptTextBlock({
   const stroke = Math.max(0.75, frame.fontSize * UNDERLINE_THICKNESS_EM);
 
   return (
-    <g className={selected ? "text-selected" : undefined}>
+    <g className={selected ? "text-selected" : undefined} data-hit-id={hitId}>
       <text
         fill={fill}
         fontFamily={fontFamily}

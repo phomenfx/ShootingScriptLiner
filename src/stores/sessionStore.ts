@@ -26,6 +26,10 @@ type SessionState = {
   /** Scenes folded in the Scenes list. */
   collapsedSceneIds: Record<string, true>;
   activeTool: ScriptTool;
+  /** Snap button. Shift still snaps while this is off. Not saved with the project. */
+  snapEnabled: boolean;
+  /** How far the action bar has been dragged from its automatic spot, in page pixels. */
+  actionBarOffset: { x: number; y: number };
   /** In-app clipboard for marks. */
   clipboard: Mark[] | null;
   settingsOpen: boolean;
@@ -47,6 +51,8 @@ type SessionState = {
   setSceneCollapsed: (sceneId: string, collapsed: boolean) => void;
   setCollapsedScenes: (sceneIds: string[]) => void;
   setActiveTool: (tool: ScriptTool) => void;
+  setSnapEnabled: (on: boolean) => void;
+  setActionBarOffset: (offset: { x: number; y: number }) => void;
   setClipboard: (marks: Mark[] | null) => void;
   setSettingsOpen: (open: boolean) => void;
   setConfirm: (confirm: ConfirmRequest | null) => void;
@@ -71,6 +77,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   markTab: "own",
   collapsedSceneIds: {},
   activeTool: "select",
+  snapEnabled: true,
+  actionBarOffset: { x: 0, y: 0 },
   clipboard: null,
   settingsOpen: false,
   confirm: null,
@@ -81,7 +89,12 @@ export const useSessionStore = create<SessionState>((set) => ({
   scriptPageHeightPt: 792,
   scriptPdfFile: null,
 
-  select: (kind, id) => set({ selection: { kind, ids: [id] } }),
+  select: (kind, id) =>
+    set({
+      selection: { kind, ids: [id] },
+      // A line or note opens its own form. A shot opens the shot, with no mark tabs.
+      ...(kind === "mark" ? { markTab: "own" as const } : {}),
+    }),
   clearSelection: () => set({ selection: null }),
   setMarkTab: (markTab) => set({ markTab }),
   setSceneCollapsed: (sceneId, collapsed) =>
@@ -95,6 +108,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   setCollapsedScenes: (sceneIds) =>
     set({ collapsedSceneIds: Object.fromEntries(sceneIds.map((id) => [id, true as const])) }),
   setActiveTool: (activeTool) => set({ activeTool }),
+  setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
+  setActionBarOffset: (actionBarOffset) => set({ actionBarOffset }),
   setClipboard: (clipboard) => set({ clipboard }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setConfirm: (confirm) => set({ confirm }),
@@ -125,6 +140,8 @@ export const useSessionStore = create<SessionState>((set) => ({
       selection: null,
       collapsedSceneIds: {},
       activeTool: "select",
+      snapEnabled: true,
+      actionBarOffset: { x: 0, y: 0 },
       clipboard: null,
       notices: [],
       viewerPage: 1,

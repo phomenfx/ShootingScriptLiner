@@ -66,17 +66,12 @@ export function legacyLine(
 ): LineAnnotation {
   const size = pageSize(project, mark.page);
   const linked = findShot(project, mark.shotId);
-  const first = mark.points[0]!;
-  const last = mark.points[mark.points.length - 1]!;
   const c = mark.caption;
   const line: LineAnnotation = {
     id: mark.id,
     kind: "line",
     page: mark.page,
-    points: [
-      { x: first.x / size.widthPt, y: first.y / size.heightPt },
-      { x: last.x / size.widthPt, y: last.y / size.heightPt },
-    ],
+    points: mark.points.map((point) => ({ x: point.x / size.widthPt, y: point.y / size.heightPt })),
     style: {
       stroke: legacyStroke(mark.stroke.pattern),
       widthPt: mark.stroke.widthPt,
@@ -89,6 +84,10 @@ export function legacyLine(
     labelBold: c.bold,
     shotId: linked ? mark.shotId : undefined,
     label: c.text,
+    displayLabel:
+      c.text === undefined && linked && mark.own && Object.keys(mark.own).length > 0
+        ? shotCaption(project, linked, mark.own)
+        : undefined,
     showLabel: c.show,
     locks: linked
       ? {
@@ -143,6 +142,9 @@ export function legacyText(mark: V2.TextMark, project: V2.Project): TextAnnotati
     text.shotId = mark.shotId;
     text.followShot = mark.text === undefined;
     text.locks = { shotId: true, color: mark.color === undefined };
+    if (mark.text === undefined && mark.own && Object.keys(mark.own).length > 0) {
+      text.displayLabel = shotCaption(project, linked, mark.own);
+    }
   }
   return text;
 }
@@ -263,6 +265,7 @@ type MarkEntry = {
   size: V2.ScriptPage;
   shot: V2.Shot | undefined;
   unlocked: boolean;
+  settings: V2.ProjectSettings;
   out: Annotation;
 };
 const sceneCache = new WeakMap<V2.Scene, SceneEntry>();
@@ -311,13 +314,13 @@ export function toLegacyProject(
     const shot = mark.shotId ? shotById.get(mark.shotId) : undefined;
     const unlocked = shotTypeUnlocked.has(mark.id);
     const hit = markCache.get(mark);
-    if (hit && hit.size === size && hit.shot === shot && hit.unlocked === unlocked) {
+    if (hit && hit.size === size && hit.shot === shot && hit.unlocked === unlocked && hit.settings === s) {
       annotations.push(hit.out);
       continue;
     }
     const out =
       mark.kind === "line" ? legacyLine(mark, project, unlocked) : legacyText(mark, project);
-    markCache.set(mark, { size, shot, unlocked, out });
+    markCache.set(mark, { size, shot, unlocked, settings: s, out });
     annotations.push(out);
   }
 
@@ -363,18 +366,17 @@ export function lineToV2(line: LineAnnotation, project: V2.Project, base?: V2.Li
   if (base.stroke.patternSizePct !== undefined) mark.stroke.patternSizePct = base.stroke.patternSizePct;
   mark.start.type = keepUnlessChanged(base.start.type, (k) => legacyEnding({ ...base.start, type: k }).cap, line.style.start.cap, mark.start.type);
   mark.end.type = keepUnlessChanged(base.end.type, (k) => legacyEnding({ ...base.end, type: k }).cap, line.style.end.cap, mark.end.type);
-  if (base.points.length > 2) {
-    mark.points = [mark.points[0]!, ...base.points.slice(1, -1), mark.points[mark.points.length - 1]!];
-  }
-  if (base.segments) mark.segments = base.segments;
+  if (base.segments && base.segments.length === mark.points.length - 1) mark.segments = base.segments;
   if (base.outline) mark.outline = base.outline;
   if (base.caption.outline) mark.caption.outline = base.caption.outline;
+  if (base.own) mark.own = structuredClone(base.own);
   return mark;
 }
 
 export function textToV2(text: TextAnnotation, project: V2.Project, base?: V2.TextMark): V2.TextMark {
   const mark = textFromV1(text as unknown as Record<string, unknown>, v1MarkContext(project, true));
   if (base?.outline) mark.outline = base.outline;
+  if (base?.own) mark.own = structuredClone(base.own);
   return mark;
 }
 

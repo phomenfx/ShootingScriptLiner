@@ -25,7 +25,7 @@ export function sanitizeToolKeybinds(binds: ToolKeybinds): ToolKeybinds {
 
   for (const tool of TOOL_KEYBIND_ORDER) {
     const norm = normalizeToolKey(binds[tool] ?? "");
-    const key = norm && !used.has(norm) ? norm : DEFAULT_TOOL_KEYBINDS[tool];
+    const key = norm && norm !== "s" && !used.has(norm) ? norm : DEFAULT_TOOL_KEYBINDS[tool];
     out[tool] = key;
     used.add(key);
   }
@@ -49,6 +49,9 @@ export function validateToolKeybindChange(
   const norm = normalizeToolKey(newKey);
   if (!norm) {
     return { ok: false, reason: "Use a single letter key (A–Z)." };
+  }
+  if (norm === "s") {
+    return { ok: false, reason: "S toggles snap." };
   }
   for (const other of TOOL_KEYBIND_ORDER) {
     if (other !== tool && binds[other] === norm) {

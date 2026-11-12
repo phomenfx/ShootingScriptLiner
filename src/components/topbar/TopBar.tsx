@@ -26,6 +26,7 @@ export function TopBar() {
   const hasClipboard = useSessionStore((s) => !!s.clipboard?.length);
   const openSettings = useSessionStore((s) => s.setSettingsOpen);
   const prefs = usePrefsStore();
+  const firstPageAlone = useProjectStore((s) => s.project.settings.drawing.firstPageAlone);
 
   const exportEntries: MenuEntry[] = [
     { label: "Lined script PDF", shortcut: "Ctrl+E", onSelect: () => void commands.exportLinedPdf() },
@@ -66,6 +67,13 @@ export function TopBar() {
     { kind: "radio", label: "Single page", checked: prefs.viewerLayoutMode === "single", onSelect: () => commands.setViewMode("single") },
     { kind: "radio", label: "Continuous scroll", checked: prefs.viewerLayoutMode === "scroll", onSelect: () => commands.setViewMode("scroll") },
     { kind: "radio", label: "Book spread", checked: prefs.viewerLayoutMode === "spread", onSelect: () => commands.setViewMode("spread") },
+    {
+      kind: "check",
+      label: "First page alone",
+      checked: firstPageAlone,
+      disabled: prefs.viewerLayoutMode !== "spread",
+      onChange: commands.setFirstPageAlone,
+    },
     SEPARATOR,
     { label: "Zoom in", shortcut: "Ctrl+=", onSelect: commands.zoomIn },
     { label: "Zoom out", shortcut: "Ctrl+-", onSelect: commands.zoomOut },
@@ -82,6 +90,12 @@ export function TopBar() {
       label: "Scenes panel",
       checked: !prefs.panels.collapsed.scenes,
       onChange: (shown) => prefs.setPanelCollapsed("scenes", !shown),
+    },
+    {
+      kind: "check",
+      label: "Action bar",
+      checked: prefs.showActionBar,
+      onChange: prefs.setShowActionBar,
     },
     { kind: "check", label: "Shot list table", checked: false, disabled: true, onChange: () => {} },
     { kind: "check", label: "Swap side panels", checked: prefs.panels.swapSides, onChange: prefs.setSwapSides },

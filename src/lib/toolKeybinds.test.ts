@@ -22,6 +22,12 @@ describe("toolKeybinds", () => {
     expect(r.ok).toBe(false);
   });
 
+  it("keeps S for the snap toggle", () => {
+    const r = validateToolKeybindChange(DEFAULT_TOOL_KEYBINDS, "line", "s");
+    expect(r.ok).toBe(false);
+    expect(sanitizeToolKeybinds({ select: "s", line: "l", text: "t" }).select).toBe("v");
+  });
+
   it("sanitizes invalid stored binds", () => {
     const s = sanitizeToolKeybinds({ select: "1", line: "l", text: "l" });
     expect(s.line).toBe("l");
