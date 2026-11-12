@@ -5,7 +5,6 @@
 @import "./styles/topbar.css";
 @import "./styles/settings.css";
 @import "./styles/scenes.css";
-@import "./styles/inspector.css";
+@import "./styles/properties.css";
 @import "./styles/dialogs.css";
 @import "./styles/pdf.css";
-@import "./styles/line-properties.css";

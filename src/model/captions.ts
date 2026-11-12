@@ -103,6 +103,8 @@ export function captionFieldText(project: Project, found: FoundShot, fieldId: st
       return e.date ? formatExcelDate(e.date, project.settings.captions.dateFormat) : "";
     case "notes":
       return shot.notes?.trim() ?? "";
+    case "setup":
+      return shot.setup?.trim() ?? "";
     default:
       return "";
   }

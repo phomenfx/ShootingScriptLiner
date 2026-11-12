@@ -181,6 +181,7 @@ export const CAPTION_FIELDS: { id: string; label: string; print: boolean }[] = [
   { id: "angle", label: "Angle", print: false },
   { id: "cast", label: "Cast", print: false },
   { id: "tags", label: "Tags", print: false },
+  { id: "setup", label: "Setup", print: false },
 ];
 
 const CAPTION_FIELD_IDS = new Set(CAPTION_FIELDS.map((f) => f.id));

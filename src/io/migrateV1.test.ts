@@ -505,7 +505,7 @@ describe("version 2 reader and writer", () => {
   it("fills in settings that are missing", () => {
     const { project: back } = read({ version: 2, name: "Bare" });
     expect(back.settings.general.newShotColor).toBe("#FF0000");
-    expect(back.settings.captions.fields).toHaveLength(18);
+    expect(back.settings.captions.fields).toHaveLength(19);
     expect(back.settings.lists.tags).toHaveLength(7);
     expect(back).toMatchObject({ scenes: [], marks: [], assets: [] });
   });

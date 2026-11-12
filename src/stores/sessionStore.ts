@@ -21,6 +21,8 @@ export type ConfirmRequest = {
 
 type SessionState = {
   selection: Selection;
+  /** Which tab a linked mark shows in Properties: its own form or its shot's. */
+  markTab: "own" | "shot";
   /** Scenes folded in the Scenes list. */
   collapsedSceneIds: Record<string, true>;
   activeTool: ScriptTool;
@@ -41,6 +43,7 @@ type SessionState = {
 
   select: (kind: "scene" | "shot" | "mark", id: string) => void;
   clearSelection: () => void;
+  setMarkTab: (tab: "own" | "shot") => void;
   setSceneCollapsed: (sceneId: string, collapsed: boolean) => void;
   setCollapsedScenes: (sceneIds: string[]) => void;
   setActiveTool: (tool: ScriptTool) => void;
@@ -65,6 +68,7 @@ function clampPage(page: number, pageCount: number): number {
 
 export const useSessionStore = create<SessionState>((set) => ({
   selection: null,
+  markTab: "own",
   collapsedSceneIds: {},
   activeTool: "select",
   clipboard: null,
@@ -79,6 +83,7 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   select: (kind, id) => set({ selection: { kind, ids: [id] } }),
   clearSelection: () => set({ selection: null }),
+  setMarkTab: (markTab) => set({ markTab }),
   setSceneCollapsed: (sceneId, collapsed) =>
     set((s) => {
       if (!!s.collapsedSceneIds[sceneId] === collapsed) return s;

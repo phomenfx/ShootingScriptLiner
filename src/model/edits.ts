@@ -196,10 +196,20 @@ export const deleteShot =
   };
 
 /**
- * Unlinks every mark of the given shots. A mark that followed its shot's color
- * keeps that color as its own, so nothing changes on the page except that the
+ * A mark without its shot link. A mark that followed its shot's color keeps
+ * that color as its own, so nothing changes on the page except that the
  * shot's caption is gone.
  */
+export function unlinkMark<M extends Mark>(project: Project, mark: M, shotColor?: string): M {
+  if (mark.kind === "image" || !mark.shotId) return mark;
+  const { shotId, ...rest } = mark;
+  const color = mark.color ?? shotColor ?? findShot(project, shotId)?.shot.color ?? project.settings.general.newShotColor;
+  const next = { ...rest, color } as M;
+  if (next.kind === "text" && next.text === undefined) next.text = "";
+  return next;
+}
+
+/** Unlinks every mark of the given shots. */
 function unlinkShots(project: Project, shots: Shot[]): Project {
   const colors = new Map(shots.map((shot) => [shot.id, shot.color]));
   if (colors.size === 0) return project;
@@ -207,10 +217,7 @@ function unlinkShots(project: Project, shots: Shot[]): Project {
   const marks = project.marks.map((mark) => {
     if (mark.kind === "image" || !mark.shotId || !colors.has(mark.shotId)) return mark;
     changed = true;
-    const { shotId, ...rest } = mark;
-    const next = { ...rest, color: mark.color ?? colors.get(shotId)! } as Mark;
-    if (next.kind === "text" && next.text === undefined) next.text = "";
-    return next;
+    return unlinkMark(project, mark, colors.get(mark.shotId));
   });
   return changed ? { ...project, marks } : project;
 }

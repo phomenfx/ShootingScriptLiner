@@ -80,14 +80,20 @@ export function ScenePanel() {
     session().select("shot", shot.id);
   };
 
-  /** Selects the shot and brings the page with its first line into view. */
+  /**
+   * Shows the shot's form. When the shot is on the script, its first line is
+   * selected and its page opened, with Properties on the Shot tab.
+   */
   const selectShot = (shot: Shot) => {
-    session().select("shot", shot.id);
     const mark = project.marks.find((m) => m.kind !== "image" && m.shotId === shot.id);
-    if (mark) {
-      session().setViewerPage(mark.page);
-      session().setActivePage(mark.page);
+    if (!mark) {
+      session().select("shot", shot.id);
+      return;
     }
+    session().setMarkTab("shot");
+    session().select("mark", mark.id);
+    session().setViewerPage(mark.page);
+    session().setActivePage(mark.page);
   };
 
   const deleteScene = async (scene: Scene, number: number) => {

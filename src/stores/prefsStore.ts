@@ -51,6 +51,8 @@ type PrefsValues = {
   viewerZoomPercent: number;
   /** Side panel widths, collapse state and order. */
   panels: PanelPrefs;
+  /** Groups folded in the Properties forms, by group name. */
+  foldedGroups: Record<string, true>;
 };
 
 type PrefsState = PrefsValues & {
@@ -69,6 +71,7 @@ type PrefsState = PrefsValues & {
   resetPanelWidth: (panel: SidePanel) => void;
   setPanelCollapsed: (panel: SidePanel, collapsed: boolean) => void;
   setSwapSides: (swap: boolean) => void;
+  setGroupFolded: (group: string, folded: boolean) => void;
 };
 
 const memory = new Map<string, string>();
@@ -146,6 +149,7 @@ export const usePrefsStore = create<PrefsState>()(
       maxMountedPdfPages: DEFAULT_MAX_MOUNTED_PDF_PAGES,
       viewerZoomPercent: DEFAULT_VIEWER_ZOOM_PERCENT,
       panels: defaultPanelPrefs(),
+      foldedGroups: {},
       ...readOldKeys(),
 
       setColorTheme: (theme) => {
@@ -191,6 +195,13 @@ export const usePrefsStore = create<PrefsState>()(
           panels: { ...s.panels, collapsed: { ...s.panels.collapsed, [panel]: collapsed } },
         })),
       setSwapSides: (swapSides) => set((s) => ({ panels: { ...s.panels, swapSides } })),
+      setGroupFolded: (group, folded) =>
+        set((s) => {
+          const foldedGroups = { ...s.foldedGroups };
+          if (folded) foldedGroups[group] = true;
+          else delete foldedGroups[group];
+          return { foldedGroups };
+        }),
     }),
     {
       name: PREFS_STORAGE_KEY,
@@ -221,6 +232,7 @@ export const usePrefsStore = create<PrefsState>()(
         maxMountedPdfPages,
         viewerZoomPercent,
         panels,
+        foldedGroups,
       }): PrefsValues => ({
         colorTheme,
         uiScale,
@@ -231,6 +243,7 @@ export const usePrefsStore = create<PrefsState>()(
         maxMountedPdfPages,
         viewerZoomPercent,
         panels,
+        foldedGroups,
       }),
     }
   )
