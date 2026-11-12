@@ -3,12 +3,14 @@
  * Pins add, link, reorder and delete as they work today.
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import * as commands from "../commands";
+import { isProjectUnsaved, useProjectStore } from "../stores/projectStore";
 import { formatShotLabel } from "../lib/labelUtils";
-import { useProjectStore } from "../stores/projectStore";
+import { useLegacyStore } from "../legacy/legacyStore";
 import { DEFAULT_LINE_ENDING, DEFAULT_LINE_LOCKS } from "../types/annotations";
 import type { LineAnnotation, TextAnnotation } from "../types/annotations";
 
-const store = () => useProjectStore.getState();
+const store = () => useLegacyStore.getState();
 const project = () => store().project;
 const scenes = () => project().scenes;
 
@@ -137,8 +139,9 @@ describe("projectStore: link", () => {
 
   it("a line with the color lock off keeps its own color", () => {
     const { s1, a } = seed();
-    store().addLine(makeLine("line-1", a, "#8800CC"));
+    store().addLine(makeLine("line-1", a));
     store().updateLineLocks("line-1", { color: false });
+    store().updateLine("line-1", { style: { ...store().getSelectedLine()!.style, color: "#8800CC" } });
     store().updateShot(s1, a, { color: "#3366FF" });
     const line = store().getSelectedLine()!;
     expect(line.locks).toEqual({ shotId: true, shotType: true, label: true, color: false });
@@ -231,12 +234,35 @@ describe("projectStore: delete", () => {
     expect(store().selection).toBeNull();
   });
 
-  it("deleting a shot leaves its lines in place, still pointing at it", () => {
+  it("deleting a shot leaves its lines in place, unlinked and keeping the shot's color", () => {
     const { s1, a } = seed();
+    store().updateShot(s1, a, { color: "#3366FF" });
     store().addLine(makeLine("line-1", a));
     store().deleteShot(s1, a);
     expect(project().annotations).toHaveLength(1);
+    const line = project().annotations[0] as LineAnnotation;
+    expect(line.shotId).toBeUndefined();
+    expect(line.style.color).toBe("#3366FF");
+  });
+
+  it("undo brings a deleted shot back with its lines linked again, and redo removes it", () => {
+    const { s1, a } = seed();
+    store().addLine(makeLine("line-1", a));
+    store().deleteShot(s1, a);
+    commands.undo();
+    expect(shotLabels()).toEqual(["1A a", "1B b", "1C c", "2A d"]);
     expect(project().annotations[0]).toMatchObject({ id: "line-1", shotId: a });
+    commands.redo();
+    expect(shotLabels()).toEqual(["1A b", "1B c", "2A d"]);
+  });
+
+  it("the project is unsaved after an edit and saved again after undoing it", () => {
+    const unsaved = () => isProjectUnsaved(useProjectStore.getState());
+    expect(unsaved()).toBe(false);
+    store().addScene("INT. HALL - NIGHT");
+    expect(unsaved()).toBe(true);
+    commands.undo();
+    expect(unsaved()).toBe(false);
   });
 
   it("deleteLinesForShot removes only that shot's lines", () => {

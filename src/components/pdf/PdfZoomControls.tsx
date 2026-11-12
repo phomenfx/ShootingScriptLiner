@@ -4,12 +4,12 @@ import {
   MIN_VIEWER_ZOOM_PERCENT,
   VIEWER_ZOOM_STEP_PERCENT,
 } from "../../types/appPreferences";
-import { useProjectStore } from "../../stores/projectStore";
+import { useLegacyStore } from "../../legacy/legacyStore";
 
 export function PdfZoomControls() {
-  const viewerZoomPercent = useProjectStore((s) => s.viewerZoomPercent);
-  const setViewerZoomPercent = useProjectStore((s) => s.setViewerZoomPercent);
-  const adjustViewerZoom = useProjectStore((s) => s.adjustViewerZoom);
+  const viewerZoomPercent = useLegacyStore((s) => s.viewerZoomPercent);
+  const setViewerZoomPercent = useLegacyStore((s) => s.setViewerZoomPercent);
+  const adjustViewerZoom = useLegacyStore((s) => s.adjustViewerZoom);
   const [draft, setDraft] = useState(String(viewerZoomPercent));
 
   useEffect(() => {

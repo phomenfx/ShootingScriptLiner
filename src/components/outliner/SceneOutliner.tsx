@@ -14,7 +14,7 @@ import {
 import { useState } from "react";
 import { outlinerCollisionDetection } from "../../lib/dndCollision";
 import { getSortedScenes, getSortedShots } from "../../lib/labelUtils";
-import { useProjectStore, type Selection } from "../../stores/projectStore";
+import { useLegacyStore, type Selection } from "../../legacy/legacyStore";
 import type { Project, Scene } from "../../types/project";
 import { DragOverlayPreview } from "./DragOverlayPreview";
 import { SortableSceneRow } from "./SortableSceneRow";
@@ -32,24 +32,24 @@ function selectedShotInScene(selection: Selection, project: Project, scene: Scen
 }
 
 export function SceneOutliner() {
-  const project = useProjectStore((s) => s.project);
-  const selection = useProjectStore((s) => s.selection);
-  const collapsedSceneIds = useProjectStore((s) => s.collapsedSceneIds);
-  const addScene = useProjectStore((s) => s.addScene);
-  const addShot = useProjectStore((s) => s.addShot);
-  const selectScene = useProjectStore((s) => s.selectScene);
-  const selectShot = useProjectStore((s) => s.selectShot);
-  const updateScene = useProjectStore((s) => s.updateScene);
-  const updateShot = useProjectStore((s) => s.updateShot);
-  const deleteScene = useProjectStore((s) => s.deleteScene);
-  const setConfirm = useProjectStore((s) => s.setConfirm);
-  const reorderScenes = useProjectStore((s) => s.reorderScenes);
-  const moveShotWithinScene = useProjectStore((s) => s.moveShotWithinScene);
-  const reorderShots = useProjectStore((s) => s.reorderShots);
-  const getLastSelectedSceneId = useProjectStore((s) => s.getLastSelectedSceneId);
-  const toggleSceneCollapsed = useProjectStore((s) => s.toggleSceneCollapsed);
-  const collapseAllScenes = useProjectStore((s) => s.collapseAllScenes);
-  const expandAllScenes = useProjectStore((s) => s.expandAllScenes);
+  const project = useLegacyStore((s) => s.project);
+  const selection = useLegacyStore((s) => s.selection);
+  const collapsedSceneIds = useLegacyStore((s) => s.collapsedSceneIds);
+  const addScene = useLegacyStore((s) => s.addScene);
+  const addShot = useLegacyStore((s) => s.addShot);
+  const selectScene = useLegacyStore((s) => s.selectScene);
+  const selectShot = useLegacyStore((s) => s.selectShot);
+  const updateScene = useLegacyStore((s) => s.updateScene);
+  const updateShot = useLegacyStore((s) => s.updateShot);
+  const deleteScene = useLegacyStore((s) => s.deleteScene);
+  const setConfirm = useLegacyStore((s) => s.setConfirm);
+  const reorderScenes = useLegacyStore((s) => s.reorderScenes);
+  const moveShotWithinScene = useLegacyStore((s) => s.moveShotWithinScene);
+  const reorderShots = useLegacyStore((s) => s.reorderShots);
+  const getLastSelectedSceneId = useLegacyStore((s) => s.getLastSelectedSceneId);
+  const toggleSceneCollapsed = useLegacyStore((s) => s.toggleSceneCollapsed);
+  const collapseAllScenes = useLegacyStore((s) => s.collapseAllScenes);
+  const expandAllScenes = useLegacyStore((s) => s.expandAllScenes);
 
   const [dragItem, setDragItem] = useState<DragItem | null>(null);
 

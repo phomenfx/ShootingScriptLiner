@@ -27,7 +27,7 @@ import {
   snapEndpoint,
 } from "../../lib/coords";
 import { newId } from "../../lib/ids";
-import { useProjectStore } from "../../stores/projectStore";
+import { useLegacyStore } from "../../legacy/legacyStore";
 import type { LineAnnotation, NormalizedPoint, TextAlign, TextAnnotation } from "../../types/annotations";
 import {
   midpoint,
@@ -144,27 +144,27 @@ function hitOriginPoint(px: number, py: number, frame: TextFrame, align: TextAli
 
 export function AnnotationLayer({ pageNum, width, height }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const project = useProjectStore((s) => s.project);
-  const selection = useProjectStore((s) => s.selection);
-  const activeTool = useProjectStore((s) => s.activeTool);
+  const project = useLegacyStore((s) => s.project);
+  const selection = useLegacyStore((s) => s.selection);
+  const activeTool = useLegacyStore((s) => s.activeTool);
   const cursorClass =
     activeTool === "line"
       ? "tool-draw"
       : activeTool === "text"
         ? "tool-text"
         : "tool-select";
-  const pageHeightPt = useProjectStore((s) => s.scriptPageHeightPt);
-  const snapAngleDegrees = useProjectStore((s) => s.project.snapAngleDegrees);
-  const addLine = useProjectStore((s) => s.addLine);
-  const addText = useProjectStore((s) => s.addText);
-  const updateLine = useProjectStore((s) => s.updateLine);
-  const updateText = useProjectStore((s) => s.updateText);
-  const applyMarginContinuationTrim = useProjectStore((s) => s.applyMarginContinuationTrim);
-  const lineHitTolerancePx = useProjectStore((s) => s.lineHitTolerancePx);
-  const selectAnnotation = useProjectStore((s) => s.selectAnnotation);
-  const setSceneCollapsed = useProjectStore((s) => s.setSceneCollapsed);
-  const setActivePage = useProjectStore((s) => s.setActivePage);
-  const shotSelection = useProjectStore((s) =>
+  const pageHeightPt = useLegacyStore((s) => s.scriptPageHeightPt);
+  const snapAngleDegrees = useLegacyStore((s) => s.project.snapAngleDegrees);
+  const addLine = useLegacyStore((s) => s.addLine);
+  const addText = useLegacyStore((s) => s.addText);
+  const updateLine = useLegacyStore((s) => s.updateLine);
+  const updateText = useLegacyStore((s) => s.updateText);
+  const applyMarginContinuationTrim = useLegacyStore((s) => s.applyMarginContinuationTrim);
+  const lineHitTolerancePx = useLegacyStore((s) => s.lineHitTolerancePx);
+  const selectAnnotation = useLegacyStore((s) => s.selectAnnotation);
+  const setSceneCollapsed = useLegacyStore((s) => s.setSceneCollapsed);
+  const setActivePage = useLegacyStore((s) => s.setActivePage);
+  const shotSelection = useLegacyStore((s) =>
     s.selection?.kind === "shot" ? s.selection : null
   );
 
@@ -339,7 +339,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       y: ((e.clientY - rect.top) / Math.max(rect.height, 1)) * h,
       w,
       h,
-      scale: viewerScalePxPerPt(h, useProjectStore.getState().scriptPageHeightPt),
+      scale: viewerScalePxPerPt(h, useLegacyStore.getState().scriptPageHeightPt),
     };
   };
 
@@ -489,7 +489,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         selectLine(hit);
         return;
       }
-      useProjectStore.getState().clearSelection();
+      useLegacyStore.getState().clearSelection();
       return;
     }
 
@@ -539,7 +539,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     const dx = px.x - current.startPx.x;
     const dy = px.y - current.startPx.y;
     if (Math.hypot(dx, dy) < 1) return;
-    const live = useProjectStore.getState().project;
+    const live = useLegacyStore.getState().project;
 
     if (current.type === "note-move") {
       const left = current.startFrame.left + dx;
@@ -658,16 +658,16 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   const handleDoubleClick = (e: React.MouseEvent) => {
     const px = eventPx(e);
     if (placedNotes.some((note) => pointInFrame(px.x, px.y, note.frame))) {
-      useProjectStore.getState().setActiveTool("select");
+      useLegacyStore.getState().setActiveTool("select");
       return;
     }
     if (placedLabels.some((label) => pointInFrame(px.x, px.y, label.frame))) {
-      useProjectStore.getState().setActiveTool("select");
+      useLegacyStore.getState().setActiveTool("select");
       return;
     }
     const pu = getPointUnclamped(e);
     const p = { x: clamp01(pu.x), y: clamp01(pu.y) };
-    if (findLineAt(p)) useProjectStore.getState().setActiveTool("select");
+    if (findLineAt(p)) useLegacyStore.getState().setActiveTool("select");
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ensureViewerFontLoaded, getFontOptions, loadBundledFonts } from "../lib/fonts";
 import { CAP_OPTIONS } from "../lib/lineCaps";
 import { STROKE_OPTIONS } from "../lib/lineStrokes";
-import { useProjectStore } from "../stores/projectStore";
+import { useLegacyStore } from "../legacy/legacyStore";
 import type { AdditionalInfoStyle, LabelMode } from "../types/project";
 import { LINE_LABEL_FIELD_LABELS } from "../types/lineLabelFields";
 import { formatExcelDate } from "../lib/dateFormat";
@@ -77,28 +77,28 @@ function DefaultEndingFields({
 }
 
 export function SettingsModal() {
-  const open = useProjectStore((s) => s.settingsOpen);
-  const project = useProjectStore((s) => s.project);
-  const setSettingsOpen = useProjectStore((s) => s.setSettingsOpen);
-  const setProjectName = useProjectStore((s) => s.setProjectName);
-  const setLabelMode = useProjectStore((s) => s.setLabelMode);
-  const setAdditionalInfoStyle = useProjectStore((s) => s.setAdditionalInfoStyle);
-  const setDefaultShotColor = useProjectStore((s) => s.setDefaultShotColor);
-  const setScheduledDateFormat = useProjectStore((s) => s.setScheduledDateFormat);
-  const setLineLabelFieldEnabled = useProjectStore((s) => s.setLineLabelFieldEnabled);
-  const moveLineLabelField = useProjectStore((s) => s.moveLineLabelField);
-  const setSnapAngleDegrees = useProjectStore((s) => s.setSnapAngleDegrees);
-  const setInheritLineFromPrevious = useProjectStore((s) => s.setInheritLineFromPrevious);
-  const setDefaultLine = useProjectStore((s) => s.setDefaultLine);
-  const setLabelOffsetXPt = useProjectStore((s) => s.setLabelOffsetXPt);
-  const setLabelOffsetYPt = useProjectStore((s) => s.setLabelOffsetYPt);
-  const setLabelSecondaryGapPt = useProjectStore((s) => s.setLabelSecondaryGapPt);
-  const colorTheme = useProjectStore((s) => s.colorTheme);
-  const setColorTheme = useProjectStore((s) => s.setColorTheme);
-  const lineHitTolerancePx = useProjectStore((s) => s.lineHitTolerancePx);
-  const setLineHitTolerancePx = useProjectStore((s) => s.setLineHitTolerancePx);
-  const maxMountedPdfPages = useProjectStore((s) => s.maxMountedPdfPages);
-  const setMaxMountedPdfPages = useProjectStore((s) => s.setMaxMountedPdfPages);
+  const open = useLegacyStore((s) => s.settingsOpen);
+  const project = useLegacyStore((s) => s.project);
+  const setSettingsOpen = useLegacyStore((s) => s.setSettingsOpen);
+  const setProjectName = useLegacyStore((s) => s.setProjectName);
+  const setLabelMode = useLegacyStore((s) => s.setLabelMode);
+  const setAdditionalInfoStyle = useLegacyStore((s) => s.setAdditionalInfoStyle);
+  const setDefaultShotColor = useLegacyStore((s) => s.setDefaultShotColor);
+  const setScheduledDateFormat = useLegacyStore((s) => s.setScheduledDateFormat);
+  const setLineLabelFieldEnabled = useLegacyStore((s) => s.setLineLabelFieldEnabled);
+  const moveLineLabelField = useLegacyStore((s) => s.moveLineLabelField);
+  const setSnapAngleDegrees = useLegacyStore((s) => s.setSnapAngleDegrees);
+  const setInheritLineFromPrevious = useLegacyStore((s) => s.setInheritLineFromPrevious);
+  const setDefaultLine = useLegacyStore((s) => s.setDefaultLine);
+  const setLabelOffsetXPt = useLegacyStore((s) => s.setLabelOffsetXPt);
+  const setLabelOffsetYPt = useLegacyStore((s) => s.setLabelOffsetYPt);
+  const setLabelSecondaryGapPt = useLegacyStore((s) => s.setLabelSecondaryGapPt);
+  const colorTheme = useLegacyStore((s) => s.colorTheme);
+  const setColorTheme = useLegacyStore((s) => s.setColorTheme);
+  const lineHitTolerancePx = useLegacyStore((s) => s.lineHitTolerancePx);
+  const setLineHitTolerancePx = useLegacyStore((s) => s.setLineHitTolerancePx);
+  const maxMountedPdfPages = useLegacyStore((s) => s.maxMountedPdfPages);
+  const setMaxMountedPdfPages = useLegacyStore((s) => s.setMaxMountedPdfPages);
 
   const [fontOptions, setFontOptions] = useState(getFontOptions());
 

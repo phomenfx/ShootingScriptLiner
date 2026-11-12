@@ -38,3 +38,36 @@
 .toolbar-actions button:hover {
   background: var(--color-btn-hover);
 }
+
+.toolbar-unsaved-dot {
+  color: #e0a040;
+}
+
+.notice-area {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 12px;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid #e0a040;
+  border-radius: 4px;
+  background: var(--color-surface);
+  font-size: 13px;
+}
+
+.notice button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}

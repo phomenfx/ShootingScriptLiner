@@ -2,13 +2,13 @@ import { useEffect } from "react";
 import { ensureViewerFontsForProject } from "../../lib/fonts";
 import { loadPdfForProject } from "../../lib/pdfCache";
 import { collectProjectFontFamilies } from "../../lib/projectFonts";
-import { useProjectStore } from "../../stores/projectStore";
+import { useLegacyStore } from "../../legacy/legacyStore";
 import { PdfViewer } from "./PdfViewer";
 
 export function ScriptPane() {
-  const project = useProjectStore((s) => s.project);
-  const scriptPdfFile = useProjectStore((s) => s.scriptPdfFile);
-  const setScriptPdfFile = useProjectStore((s) => s.setScriptPdfFile);
+  const project = useLegacyStore((s) => s.project);
+  const scriptPdfFile = useLegacyStore((s) => s.scriptPdfFile);
+  const setScriptPdfFile = useLegacyStore((s) => s.setScriptPdfFile);
 
   const cacheHint =
     project.scriptFileName && !scriptPdfFile

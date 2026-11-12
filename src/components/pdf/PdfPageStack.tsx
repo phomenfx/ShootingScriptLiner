@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
-import { useProjectStore } from "../../stores/projectStore";
+import { useLegacyStore } from "../../legacy/legacyStore";
 import { AnnotationLayer } from "./AnnotationLayer";
 
 type Props = {
@@ -32,7 +32,7 @@ export function PdfPageStack({
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
-  const setScriptPageHeightPt = useProjectStore((s) => s.setScriptPageHeightPt);
+  const setScriptPageHeightPt = useLegacyStore((s) => s.setScriptPageHeightPt);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [renderError, setRenderError] = useState<string | null>(null);
 

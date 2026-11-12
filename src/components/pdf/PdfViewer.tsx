@@ -11,7 +11,7 @@ import {
   spreadCount,
   spreadIndexFromPage,
 } from "../../lib/pdfSpread";
-import { useProjectStore } from "../../stores/projectStore";
+import { useLegacyStore } from "../../legacy/legacyStore";
 import {
   VIEWER_LAYOUT_LABELS,
   VIEWER_LAYOUT_MODES,
@@ -28,15 +28,15 @@ type Props = {
 
 export function PdfViewer({ file }: Props) {
   const canvasWrapRef = useRef<HTMLDivElement>(null);
-  const viewerPage = useProjectStore((s) => s.viewerPage);
-  const activePage = useProjectStore((s) => s.activePage);
-  const pageCount = useProjectStore((s) => s.pdfPageCount);
-  const layoutMode = useProjectStore((s) => s.viewerLayoutMode);
-  const viewerZoomPercent = useProjectStore((s) => s.viewerZoomPercent);
-  const setViewerPage = useProjectStore((s) => s.setViewerPage);
-  const setActivePage = useProjectStore((s) => s.setActivePage);
-  const setViewerLayoutMode = useProjectStore((s) => s.setViewerLayoutMode);
-  const setPdfPageCount = useProjectStore((s) => s.setPdfPageCount);
+  const viewerPage = useLegacyStore((s) => s.viewerPage);
+  const activePage = useLegacyStore((s) => s.activePage);
+  const pageCount = useLegacyStore((s) => s.pdfPageCount);
+  const layoutMode = useLegacyStore((s) => s.viewerLayoutMode);
+  const viewerZoomPercent = useLegacyStore((s) => s.viewerZoomPercent);
+  const setViewerPage = useLegacyStore((s) => s.setViewerPage);
+  const setActivePage = useLegacyStore((s) => s.setActivePage);
+  const setViewerLayoutMode = useLegacyStore((s) => s.setViewerLayoutMode);
+  const setPdfPageCount = useLegacyStore((s) => s.setPdfPageCount);
   const { pdf, error: loadError, loading } = usePdfDocument(file);
   const [scrollToPage, setScrollToPage] = useState<number | null>(null);
 

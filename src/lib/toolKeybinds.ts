@@ -6,8 +6,6 @@ import {
   type ToolKeybinds,
 } from "../types/toolKeybinds";
 
-const STORAGE_KEY = "shooting-script-liner-tool-keybinds";
-
 /** Normalize a captured key to a single lowercase letter (a–z). */
 export function normalizeToolKey(key: string): string | null {
   if (key.length !== 1) return null;
@@ -18,22 +16,6 @@ export function normalizeToolKey(key: string): string | null {
 
 export function formatToolKeyDisplay(key: string): string {
   return key.length === 1 ? key.toUpperCase() : key;
-}
-
-export function loadToolKeybinds(): ToolKeybinds {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_TOOL_KEYBINDS };
-    const parsed = JSON.parse(raw) as Partial<ToolKeybinds>;
-    const merged = { ...DEFAULT_TOOL_KEYBINDS, ...parsed };
-    return sanitizeToolKeybinds(merged);
-  } catch {
-    return { ...DEFAULT_TOOL_KEYBINDS };
-  }
-}
-
-export function saveToolKeybinds(binds: ToolKeybinds): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(binds));
 }
 
 /** Ensure single letters; fall back to defaults on invalid or duplicate keys. */

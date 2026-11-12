@@ -1,10 +1,10 @@
 import { useEffect, type RefObject } from "react";
-import { useProjectStore } from "../stores/projectStore";
+import { useLegacyStore } from "../legacy/legacyStore";
 import { VIEWER_ZOOM_STEP_PERCENT } from "../types/appPreferences";
 
 /** Ctrl/Cmd + wheel over the PDF area adjusts zoom. */
 export function usePdfZoomWheel(wrapRef: RefObject<HTMLElement | null>, enabled: boolean) {
-  const adjustViewerZoom = useProjectStore((s) => s.adjustViewerZoom);
+  const adjustViewerZoom = useLegacyStore((s) => s.adjustViewerZoom);
 
   useEffect(() => {
     if (!enabled) return;

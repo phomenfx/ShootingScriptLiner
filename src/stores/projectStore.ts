@@ -1,882 +1,114 @@
-import { arrayMove } from "@dnd-kit/sortable";
+/**
+ * The project being edited, with undo and redo.
+ *
+ * Every change goes through `apply` with a pure edit from `model/edits`.
+ * Undo steps are grouped: changes that follow each other quickly (a drag,
+ * typing in a field) make one step. `breakUndoGroup` ends a group early.
+ */
 import { create } from "zustand";
-import { cloneLine, cloneText, migrateLineDefaults } from "../lib/annotationUtils";
-import {
-  computeMarginContinuationTrim,
-  type MarginTrimHint,
-} from "../lib/lineMarginContinuation";
-import { newId } from "../lib/ids";
-import { applyScenePatch, migrateSceneSlugline } from "../lib/slugline";
-import {
-  assignShotOrders,
-  getSortedScenes,
-  getSortedShots,
-  renumberAll,
-} from "../lib/labelUtils";
-import type { LineAnnotation, LineFieldLocks, ScriptTool, TextAnnotation } from "../types/annotations";
-import type {
-  AdditionalInfoStyle,
-  LabelMode,
-  Project,
-  Scene,
-  Shot,
-} from "../types/project";
-import { DEFAULT_PROJECT } from "../types/project";
-import {
-  DEFAULT_SCHEDULED_DATE_FORMAT,
-  migrateLineLabelFields,
-  type LineLabelFieldId,
-} from "../types/lineLabelFields";
-import type { LineDefaults } from "../types/lineDefaults";
-import { DEFAULT_LINE_DEFAULTS } from "../types/lineDefaults";
-import { loadToolKeybinds, saveToolKeybinds, validateToolKeybindChange } from "../lib/toolKeybinds";
-import { DEFAULT_TOOL_KEYBINDS, type ToolKeybinds } from "../types/toolKeybinds";
-import {
-  applyColorTheme,
-  clampLineHitTolerancePx,
-  clampMaxMountedPdfPages,
-  clampPropertiesHeightPx,
-  clampSidebarWidthPx,
-  clampViewerZoomPercent,
-  loadColorTheme,
-  normalizeColorTheme,
-  loadLineHitTolerancePx,
-  loadMaxMountedPdfPages,
-  loadPropertiesHeightPx,
-  loadSidebarWidthPx,
-  loadViewerLayoutMode,
-  loadViewerZoomPercent,
-  saveColorTheme,
-  saveLineHitTolerancePx,
-  saveMaxMountedPdfPages,
-  savePropertiesHeightPx,
-  saveSidebarWidthPx,
-  saveViewerLayoutMode,
-  saveViewerZoomPercent,
-} from "../lib/appPreferences";
-import type { ColorTheme } from "../types/appPreferences";
-import type { ViewerLayoutMode } from "../types/viewerLayout";
-import { clampLabelOffsetPt, migrateLabelLayout } from "../types/labelLayout";
+import { temporal } from "zundo";
+import { createProject } from "../model/defaults";
+import type { Edit } from "../model/edits";
+import type { Project } from "../model/types";
 
-export type Selection =
-  | { kind: "scene"; sceneId: string }
-  | { kind: "shot"; sceneId: string; shotId: string }
-  | { kind: "annotation"; annotationId: string }
-  | null;
-
-export type ConfirmRequest = {
-  message: string;
-  onYes: () => void;
-};
-
-type LineClipboard = { kind: "line"; lines: LineAnnotation[] };
+/** A pause this long between changes starts a new undo step. */
+const UNDO_GROUP_MS = 400;
+const UNDO_LIMIT = 200;
 
 type ProjectState = {
   project: Project;
-  selection: Selection;
-  /** Session-only: scene IDs whose shot lists are folded in the outliner. */
-  collapsedSceneIds: Record<string, true>;
-  activeTool: ScriptTool;
-  lineClipboard: LineClipboard | null;
-  settingsOpen: boolean;
-  confirm: ConfirmRequest | null;
-  /** Primary navigation page (1-based); spread mode uses left/anchor page. */
-  viewerPage: number;
-  /** Page receiving keyboard paste and focus outline (1-based). */
-  activePage: number;
-  viewerLayoutMode: ViewerLayoutMode;
-  pdfPageCount: number;
-  /** PDF page height in points (72 pt = 1 in); used for margin continuation inset. */
-  scriptPageHeightPt: number;
-  toolKeybinds: ToolKeybinds;
-  /** Chrome theme (dark/light); app preference in localStorage. Not part of the project file. */
-  colorTheme: ColorTheme;
-  /** Perpendicular click slop for selecting lines (px); app preference in localStorage. */
-  lineHitTolerancePx: number;
-  /** Max page stacks mounted in scroll view; app preference in localStorage. */
-  maxMountedPdfPages: number;
-  /** PDF zoom as percent (100 = scale 1.0); app preference in localStorage. */
-  viewerZoomPercent: number;
-  /** Right sidebar width (px); app preference in localStorage. */
-  sidebarWidthPx: number;
-  /** Properties panel height (px); app preference in localStorage. */
-  propertiesHeightPx: number;
-  /** Active script PDF in memory (for viewer + Save ZIP when cache key mismatches). */
-  scriptPdfFile: File | null;
-
-  newProject: () => void;
-  loadProject: (project: Project) => void;
-  toggleSceneCollapsed: (sceneId: string) => void;
-  setSceneCollapsed: (sceneId: string, collapsed: boolean) => void;
-  collapseAllScenes: () => void;
-  expandAllScenes: () => void;
-  setProjectName: (name: string) => void;
-  setScriptFileName: (scriptFileName: string) => void;
-  setLabelMode: (mode: LabelMode) => void;
-  setAdditionalInfoStyle: (style: AdditionalInfoStyle) => void;
-  setDefaultShotColor: (color: string) => void;
-  setSnapAngleDegrees: (degrees: number) => void;
-  setInheritLineFromPrevious: (inherit: boolean) => void;
-  setLabelOffsetXPt: (pt: number) => void;
-  setLabelOffsetYPt: (pt: number) => void;
-  setLabelSecondaryGapPt: (pt: number) => void;
-  setScheduledDateFormat: (format: string) => void;
-  setLineLabelFieldEnabled: (id: LineLabelFieldId, enabled: boolean) => void;
-  moveLineLabelField: (id: LineLabelFieldId, direction: "up" | "down") => void;
-  setDefaultLine: (patch: Partial<LineDefaults>) => void;
-  setSettingsOpen: (open: boolean) => void;
-  setConfirm: (confirm: ConfirmRequest | null) => void;
-  setActiveTool: (tool: ScriptTool) => void;
-  setToolKeybind: (tool: ScriptTool, key: string) => string | null;
-  resetToolKeybinds: () => void;
-  setColorTheme: (theme: ColorTheme) => void;
-  setLineHitTolerancePx: (px: number) => void;
-  setMaxMountedPdfPages: (count: number) => void;
-  setViewerZoomPercent: (percent: number) => void;
-  adjustViewerZoom: (deltaPercent: number) => void;
-  setSidebarWidthPx: (px: number) => void;
-  setPropertiesHeightPx: (px: number, paneHeight?: number) => void;
-  setScriptPdfFile: (file: File | null) => void;
-
-  selectScene: (sceneId: string) => void;
-  selectShot: (sceneId: string, shotId: string) => void;
-  selectAnnotation: (annotationId: string) => void;
-  clearSelection: () => void;
-
-  addScene: (slugline?: string) => void;
-  updateScene: (
-    sceneId: string,
-    patch: Partial<Omit<Scene, "id" | "order" | "shots">>
-  ) => void;
-  deleteScene: (sceneId: string) => void;
-  reorderScenes: (activeId: string, overId: string) => void;
-
-  addShot: (sceneId?: string) => void;
-  updateShot: (
-    sceneId: string,
-    shotId: string,
-    patch: Partial<
-      Pick<
-        Shot,
-        | "shotType"
-        | "subject"
-        | "slug"
-        | "color"
-        | "visible"
-        | "notes"
-        | "cameraSupport"
-        | "lens"
-        | "audioSource"
-        | "indicator"
-        | "location"
-        | "timeOfDay"
-        | "camera"
-        | "fps"
-        | "sync"
-        | "scheduledDate"
-        | "lineLabelInclude"
-      >
-    >
-  ) => void;
-  deleteShot: (sceneId: string, shotId: string) => void;
-  reorderShots: (shotId: string, fromSceneId: string, toSceneId: string, overShotId: string | null) => void;
-  moveShotWithinScene: (sceneId: string, activeId: string, overId: string) => void;
-
-  addLine: (line: LineAnnotation) => void;
-  updateLine: (id: string, patch: Partial<Omit<LineAnnotation, "id" | "kind">>) => void;
-  updateLineLocks: (id: string, locks: Partial<LineFieldLocks>) => void;
-  deleteAnnotation: (id: string) => void;
-  deleteLinesForShot: (shotId: string) => void;
-  copySelectedLines: () => void;
-  pasteLines: (page: number) => void;
-  duplicateLine: (id: string) => void;
-
-  setViewerPage: (page: number) => void;
-  setActivePage: (page: number) => void;
-  setViewerLayoutMode: (mode: ViewerLayoutMode) => void;
-  setPdfPageCount: (count: number) => void;
-  setScriptPageHeightPt: (pt: number) => void;
-
-  applyMarginContinuationTrim: (
-    lineId: string,
-    pageHeightPt?: number,
-    hint?: MarginTrimHint
-  ) => void;
-
-  addText: (text: TextAnnotation) => void;
-  updateText: (id: string, patch: Partial<Omit<TextAnnotation, "id" | "kind">>) => void;
-  duplicateText: (id: string) => void;
-
-  getLastSelectedSceneId: () => string | null;
-  getSelectedLine: () => LineAnnotation | null;
+  /** The project as last saved or opened. The project is unsaved when it differs. */
+  savedProject: Project;
+  apply: (edit: Edit) => void;
 };
 
-function applyScenes(project: Project, scenes: Scene[]): Project {
-  return { ...project, scenes: renumberAll(scenes) };
+let groupTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Makes the next change its own undo step, however soon it comes. */
+export function breakUndoGroup(): void {
+  clearTimeout(groupTimer);
+  groupTimer = undefined;
 }
 
-function syncLockedLinesFromShots(project: Project): Project {
-  let annotations = project.annotations;
-  let changed = false;
-
-  annotations = annotations.map((a) => {
-    if (a.kind !== "line" || !a.shotId) return a;
-    const scene = project.scenes.find((sc) => sc.shots.some((sh) => sh.id === a.shotId));
-    const shot = scene?.shots.find((sh) => sh.id === a.shotId);
-    if (!scene || !shot) return a;
-
-    const line = { ...a };
-    let lineChanged = false;
-
-    if (line.locks.color) {
-      const color = shot.color;
-      if (line.style.color !== color) {
-        line.style = { ...line.style, color };
-        lineChanged = true;
-      }
-    }
-    if (lineChanged) changed = true;
-    return lineChanged ? line : a;
-  });
-
-  annotations = annotations.map((a) => {
-    if (a.kind !== "text" || !a.shotId || !a.locks?.color) return a;
-    const shot = project.scenes
-      .flatMap((sc) => sc.shots)
-      .find((sh) => sh.id === a.shotId);
-    if (!shot || a.color === shot.color) return a;
-    changed = true;
-    return { ...a, color: shot.color };
-  });
-
-  return changed ? { ...project, annotations } : project;
-}
-
-function createShot(project: Project, order: number): Shot {
-  return {
-    id: newId(),
-    order,
-    color: project.defaultShotColor,
-    visible: true,
-  };
-}
-
-function createScene(order: number, slugline = ""): Scene {
-  return migrateSceneSlugline({
-    id: newId(),
-    slugline,
-    order,
-    visible: true,
-    shots: [],
-  });
-}
-
-export const useProjectStore = create<ProjectState>((set, get) => ({
-  project: { ...DEFAULT_PROJECT },
-  selection: null,
-  collapsedSceneIds: {},
-  activeTool: "select",
-  lineClipboard: null,
-  settingsOpen: false,
-  confirm: null,
-  viewerPage: 1,
-  activePage: 1,
-  viewerLayoutMode: loadViewerLayoutMode(),
-  pdfPageCount: 0,
-  scriptPageHeightPt: 792,
-  toolKeybinds: loadToolKeybinds(),
-  colorTheme: loadColorTheme(),
-  lineHitTolerancePx: loadLineHitTolerancePx(),
-  maxMountedPdfPages: loadMaxMountedPdfPages(),
-  viewerZoomPercent: loadViewerZoomPercent(),
-  sidebarWidthPx: loadSidebarWidthPx(),
-  propertiesHeightPx: loadPropertiesHeightPx(),
-  scriptPdfFile: null,
-
-  newProject: () =>
-    set({
-      project: { ...DEFAULT_PROJECT, scenes: [] },
-      selection: null,
-      collapsedSceneIds: {},
-      activeTool: "select",
-      lineClipboard: null,
-      viewerPage: 1,
-      activePage: 1,
-      pdfPageCount: 0,
-      scriptPageHeightPt: 792,
-      scriptPdfFile: null,
-    }),
-
-  loadProject: (project) =>
-    set({
-      project: applyScenes(
-        {
-          ...DEFAULT_PROJECT,
-          ...project,
-          defaultLine: migrateLineDefaults(
-            (project.defaultLine ?? {}) as Partial<typeof DEFAULT_LINE_DEFAULTS> &
-              Record<string, unknown>,
-            (project as { labelBold?: boolean }).labelBold
-          ),
-          inheritLineFromPrevious: project.inheritLineFromPrevious ?? false,
-          lineLabelFields: migrateLineLabelFields(project.lineLabelFields),
-          scheduledDateFormat:
-            typeof project.scheduledDateFormat === "string" && project.scheduledDateFormat.trim()
-              ? project.scheduledDateFormat
-              : DEFAULT_SCHEDULED_DATE_FORMAT,
-          snapAngleDegrees:
-            project.snapAngleDegrees ??
-            ((project as { snapLineAngles?: boolean }).snapLineAngles === false ? 0 : 15),
-          annotations: project.annotations ?? [],
-          ...migrateLabelLayout(project),
-        },
-        project.scenes.map((scene) => migrateSceneSlugline(scene))
-      ),
-      selection: null,
-      collapsedSceneIds: {},
-      activeTool: "select",
-      viewerPage: 1,
-      activePage: 1,
-      pdfPageCount: 0,
-      scriptPageHeightPt: 792,
-      scriptPdfFile: null,
-    }),
-
-  toggleSceneCollapsed: (sceneId) =>
-    set((s) => {
-      const next = { ...s.collapsedSceneIds };
-      if (next[sceneId]) delete next[sceneId];
-      else next[sceneId] = true;
-      return { collapsedSceneIds: next };
-    }),
-
-  setSceneCollapsed: (sceneId, collapsed) =>
-    set((s) => {
-      if (collapsed) {
-        if (s.collapsedSceneIds[sceneId]) return s;
-        return { collapsedSceneIds: { ...s.collapsedSceneIds, [sceneId]: true } };
-      }
-      if (!s.collapsedSceneIds[sceneId]) return s;
-      const next = { ...s.collapsedSceneIds };
-      delete next[sceneId];
-      return { collapsedSceneIds: next };
-    }),
-
-  collapseAllScenes: () =>
-    set((s) => {
-      const collapsedSceneIds: Record<string, true> = {};
-      for (const sc of s.project.scenes) collapsedSceneIds[sc.id] = true;
-      return { collapsedSceneIds };
-    }),
-
-  expandAllScenes: () => set({ collapsedSceneIds: {} }),
-
-  setProjectName: (name) =>
-    set((s) => ({ project: { ...s.project, name } })),
-
-  setScriptFileName: (scriptFileName) =>
-    set((s) => ({ project: { ...s.project, scriptFileName } })),
-
-  setLabelMode: (labelMode) =>
-    set((s) => ({ project: { ...s.project, labelMode } })),
-
-  setAdditionalInfoStyle: (additionalInfoStyle) =>
-    set((s) => ({ project: { ...s.project, additionalInfoStyle } })),
-
-  setDefaultShotColor: (defaultShotColor) =>
-    set((s) => ({ project: { ...s.project, defaultShotColor } })),
-
-  setSnapAngleDegrees: (snapAngleDegrees) =>
-    set((s) => ({
-      project: {
-        ...s.project,
-        snapAngleDegrees: Math.max(0, Math.min(90, Math.round(snapAngleDegrees))),
-      },
-    })),
-
-  setInheritLineFromPrevious: (inheritLineFromPrevious) =>
-    set((s) => ({ project: { ...s.project, inheritLineFromPrevious } })),
-
-  setLabelOffsetXPt: (labelOffsetXPt) =>
-    set((s) => ({
-      project: { ...s.project, labelOffsetXPt: clampLabelOffsetPt(labelOffsetXPt) },
-    })),
-
-  setLabelOffsetYPt: (labelOffsetYPt) =>
-    set((s) => ({
-      project: { ...s.project, labelOffsetYPt: clampLabelOffsetPt(labelOffsetYPt) },
-    })),
-
-  setLabelSecondaryGapPt: (labelSecondaryGapPt) =>
-    set((s) => ({
-      project: {
-        ...s.project,
-        labelSecondaryGapPt: clampLabelOffsetPt(labelSecondaryGapPt),
-      },
-    })),
-
-  setScheduledDateFormat: (scheduledDateFormat) =>
-    set((s) => ({ project: { ...s.project, scheduledDateFormat } })),
-
-  setLineLabelFieldEnabled: (id, enabled) =>
-    set((s) => ({
-      project: {
-        ...s.project,
-        lineLabelFields: s.project.lineLabelFields.map((field) =>
-          field.id === id ? { ...field, enabled } : field
-        ),
-      },
-    })),
-
-  moveLineLabelField: (id, direction) =>
-    set((s) => {
-      const fields = s.project.lineLabelFields;
-      const index = fields.findIndex((field) => field.id === id);
-      const nextIndex = index + (direction === "up" ? -1 : 1);
-      if (index < 0 || nextIndex < 0 || nextIndex >= fields.length) return s;
+export const useProjectStore = create<ProjectState>()(
+  temporal(
+    (set) => {
+      const project = createProject();
       return {
-        project: { ...s.project, lineLabelFields: arrayMove(fields, index, nextIndex) },
+        project,
+        savedProject: project,
+        apply: (edit) =>
+          set((state) => {
+            const next = edit(state.project);
+            return next === state.project ? state : { project: next };
+          }),
       };
-    }),
-
-  setDefaultLine: (patch) =>
-    set((s) => ({
-      project: {
-        ...s.project,
-        defaultLine: { ...s.project.defaultLine, ...patch },
-      },
-    })),
-
-  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
-
-  setConfirm: (confirm) => set({ confirm }),
-
-  setActiveTool: (activeTool) => set({ activeTool }),
-
-  setToolKeybind: (tool, key) => {
-    let error: string | null = null;
-    set((s) => {
-      const result = validateToolKeybindChange(s.toolKeybinds, tool, key);
-      if (!result.ok) {
-        error = result.reason;
-        return s;
-      }
-      saveToolKeybinds(result.next);
-      return { toolKeybinds: result.next };
-    });
-    return error;
-  },
-
-  resetToolKeybinds: () => {
-    const next = { ...DEFAULT_TOOL_KEYBINDS };
-    saveToolKeybinds(next);
-    set({ toolKeybinds: next });
-  },
-
-  setColorTheme: (theme) => {
-    const next = normalizeColorTheme(theme);
-    saveColorTheme(next);
-    applyColorTheme(next);
-    set({ colorTheme: next });
-  },
-
-  setLineHitTolerancePx: (px) => {
-    const next = clampLineHitTolerancePx(px);
-    saveLineHitTolerancePx(next);
-    set({ lineHitTolerancePx: next });
-  },
-
-  setMaxMountedPdfPages: (count) => {
-    const next = clampMaxMountedPdfPages(count);
-    saveMaxMountedPdfPages(next);
-    set({ maxMountedPdfPages: next });
-  },
-
-  setViewerZoomPercent: (percent) => {
-    const next = clampViewerZoomPercent(percent);
-    saveViewerZoomPercent(next);
-    set({ viewerZoomPercent: next });
-  },
-
-  adjustViewerZoom: (deltaPercent) => {
-    const next = clampViewerZoomPercent(get().viewerZoomPercent + deltaPercent);
-    saveViewerZoomPercent(next);
-    set({ viewerZoomPercent: next });
-  },
-
-  setSidebarWidthPx: (px) => {
-    const next = clampSidebarWidthPx(px, typeof window !== "undefined" ? window.innerWidth : undefined);
-    saveSidebarWidthPx(next);
-    set({ sidebarWidthPx: next });
-  },
-
-  setPropertiesHeightPx: (px, paneHeight) => {
-    const next = clampPropertiesHeightPx(px, paneHeight);
-    savePropertiesHeightPx(next, paneHeight);
-    set({ propertiesHeightPx: next });
-  },
-
-  setScriptPdfFile: (scriptPdfFile) => set({ scriptPdfFile }),
-
-  setViewerPage: (page) =>
-    set((s) => {
-      const max = s.pdfPageCount > 0 ? s.pdfPageCount : 9999;
-      const clamped = Math.max(1, Math.min(max, Math.floor(page)));
-      const syncActive = s.viewerLayoutMode === "single";
-      return {
-        viewerPage: clamped,
-        ...(syncActive ? { activePage: clamped } : {}),
-      };
-    }),
-
-  setActivePage: (page) =>
-    set((s) => {
-      const max = s.pdfPageCount > 0 ? s.pdfPageCount : 9999;
-      const clamped = Math.max(1, Math.min(max, Math.floor(page)));
-      return { activePage: clamped };
-    }),
-
-  setViewerLayoutMode: (mode) => {
-    saveViewerLayoutMode(mode);
-    set((s) => {
-      const syncActive = mode === "single";
-      return {
-        viewerLayoutMode: mode,
-        ...(syncActive ? { activePage: s.viewerPage } : {}),
-      };
-    });
-  },
-
-  setPdfPageCount: (count) =>
-    set((s) => {
-      const n = Math.max(0, Math.floor(count));
-      const viewerPage = n > 0 ? Math.min(s.viewerPage, n) : 1;
-      const activePage = n > 0 ? Math.min(s.activePage, n) : 1;
-      return { pdfPageCount: n, viewerPage, activePage };
-    }),
-
-  setScriptPageHeightPt: (pt) =>
-    set({ scriptPageHeightPt: Math.max(1, Number(pt) || 792) }),
-
-  selectScene: (sceneId) => set({ selection: { kind: "scene", sceneId } }),
-
-  selectShot: (sceneId, shotId) =>
-    set((s) => {
-      const collapsedSceneIds = s.collapsedSceneIds[sceneId]
-        ? (() => {
-            const next = { ...s.collapsedSceneIds };
-            delete next[sceneId];
-            return next;
-          })()
-        : s.collapsedSceneIds;
-      return {
-        selection: { kind: "shot", sceneId, shotId },
-        collapsedSceneIds,
-      };
-    }),
-
-  selectAnnotation: (annotationId) =>
-    set({ selection: { kind: "annotation", annotationId } }),
-
-  clearSelection: () => set({ selection: null }),
-
-  getSelectedLine: () => {
-    const sel = get().selection;
-    if (sel?.kind !== "annotation") return null;
-    const a = get().project.annotations.find((x) => x.id === sel.annotationId);
-    return a?.kind === "line" ? a : null;
-  },
-
-  getLastSelectedSceneId: () => {
-    const sel = get().selection;
-    if (sel?.kind === "scene") return sel.sceneId;
-    if (sel?.kind === "shot") return sel.sceneId;
-    if (sel?.kind === "annotation") {
-      const ann = get().project.annotations.find((a) => a.id === sel.annotationId);
-      const shotId = ann && "shotId" in ann ? ann.shotId : undefined;
-      const scene = shotId
-        ? get().project.scenes.find((sc) => sc.shots.some((sh) => sh.id === shotId))
-        : undefined;
-      if (scene) return scene.id;
-    }
-    const sorted = getSortedScenes(get().project.scenes);
-    return sorted.length > 0 ? sorted[sorted.length - 1]?.id ?? null : null;
-  },
-
-  addScene: (slugline = "") =>
-    set((s) => {
-      const scenes = [...s.project.scenes, createScene(s.project.scenes.length, slugline)];
-      const next = applyScenes(s.project, scenes);
-      const newScene = next.scenes[next.scenes.length - 1];
-      return {
-        project: next,
-        selection: newScene ? { kind: "scene", sceneId: newScene.id } : s.selection,
-      };
-    }),
-
-  updateScene: (sceneId, patch) =>
-    set((s) => ({
-      project: syncLockedLinesFromShots(
-        applyScenes(
-          s.project,
-          s.project.scenes.map((sc) => (sc.id === sceneId ? applyScenePatch(sc, patch) : sc))
-        )
-      ),
-    })),
-
-  deleteScene: (sceneId) =>
-    set((s) => {
-      const scenes = s.project.scenes.filter((sc) => sc.id !== sceneId);
-      const sel =
-        s.selection?.kind === "scene" && s.selection.sceneId === sceneId
-          ? null
-          : s.selection?.kind === "shot" && s.selection.sceneId === sceneId
-            ? null
-            : s.selection;
-      const collapsedSceneIds = s.collapsedSceneIds[sceneId]
-        ? (() => {
-            const next = { ...s.collapsedSceneIds };
-            delete next[sceneId];
-            return next;
-          })()
-        : s.collapsedSceneIds;
-      return {
-        project: applyScenes(s.project, scenes),
-        selection: sel,
-        collapsedSceneIds,
-      };
-    }),
-
-  reorderScenes: (activeId, overId) =>
-    set((s) => {
-      const sorted = getSortedScenes(s.project.scenes);
-      const oldIndex = sorted.findIndex((sc) => sc.id === activeId);
-      const newIndex = sorted.findIndex((sc) => sc.id === overId);
-      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return s;
-      return { project: applyScenes(s.project, arrayMove(sorted, oldIndex, newIndex)) };
-    }),
-
-  addShot: (sceneId) =>
-    set((s) => {
-      const targetId = sceneId ?? get().getLastSelectedSceneId();
-      if (!targetId) return s;
-
-      const scenes = s.project.scenes.map((sc) => {
-        if (sc.id !== targetId) return sc;
-        const order = sc.shots.length;
-        return { ...sc, shots: [...sc.shots, createShot(s.project, order)] };
-      });
-      const next = applyScenes(s.project, scenes);
-      const scene = next.scenes.find((sc) => sc.id === targetId);
-      const shot = scene?.shots[scene.shots.length - 1];
-      const collapsedSceneIds = s.collapsedSceneIds[targetId]
-        ? (() => {
-            const ids = { ...s.collapsedSceneIds };
-            delete ids[targetId];
-            return ids;
-          })()
-        : s.collapsedSceneIds;
-      return {
-        project: next,
-        selection: shot ? { kind: "shot", sceneId: targetId, shotId: shot.id } : s.selection,
-        collapsedSceneIds,
-      };
-    }),
-
-  updateShot: (sceneId, shotId, patch) =>
-    set((s) => ({
-      project: syncLockedLinesFromShots(
-        applyScenes(
-          s.project,
-          s.project.scenes.map((sc) =>
-            sc.id !== sceneId
-              ? sc
-              : {
-                  ...sc,
-                  shots: sc.shots.map((sh) => (sh.id === shotId ? { ...sh, ...patch } : sh)),
-                }
-          )
-        )
-      ),
-    })),
-
-  deleteShot: (sceneId, shotId) =>
-    set((s) => {
-      const scenes = s.project.scenes.map((sc) =>
-        sc.id !== sceneId
-          ? sc
-          : { ...sc, shots: sc.shots.filter((sh) => sh.id !== shotId) }
-      );
-      const sel =
-        s.selection?.kind === "shot" && s.selection.shotId === shotId ? null : s.selection;
-      return { project: applyScenes(s.project, scenes), selection: sel };
-    }),
-
-  moveShotWithinScene: (sceneId, activeId, overId) =>
-    set((s) => {
-      const scenes = s.project.scenes.map((sc) => {
-        if (sc.id !== sceneId) return sc;
-        const sorted = getSortedShots(sc);
-        const oldIndex = sorted.findIndex((sh) => sh.id === activeId);
-        const newIndex = sorted.findIndex((sh) => sh.id === overId);
-        if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return sc;
-        return {
-          ...sc,
-          shots: assignShotOrders(arrayMove(sorted, oldIndex, newIndex)),
-        };
-      });
-      return { project: applyScenes(s.project, scenes) };
-    }),
-
-  reorderShots: (shotId, fromSceneId, toSceneId, overShotId) =>
-    set((s) => {
-      let moving: Shot | undefined;
-      let scenes = s.project.scenes.map((sc) => {
-        if (sc.id !== fromSceneId) return sc;
-        const found = sc.shots.find((sh) => sh.id === shotId);
-        moving = found;
-        return { ...sc, shots: sc.shots.filter((sh) => sh.id !== shotId) };
-      });
-      if (!moving) return s;
-
-      scenes = scenes.map((sc) => {
-        if (sc.id !== toSceneId) return sc;
-        const sorted = getSortedShots(sc);
-        let insertAt = sorted.length;
-        if (overShotId) {
-          const idx = sorted.findIndex((sh) => sh.id === overShotId);
-          if (idx >= 0) insertAt = idx;
+    },
+    {
+      limit: UNDO_LIMIT,
+      partialize: (state) => ({ project: state.project }),
+      equality: (past, current) => past.project === current.project,
+      // Record the state before the first change of a burst and skip the rest.
+      handleSet: (record) => (pastState, replace, currentState, deltaState) => {
+        const inGroup = groupTimer !== undefined;
+        clearTimeout(groupTimer);
+        groupTimer = setTimeout(() => (groupTimer = undefined), UNDO_GROUP_MS);
+        if (!inGroup) {
+          (record as (...args: unknown[]) => void)(pastState, replace, currentState, deltaState);
         }
-        const next = [...sorted];
-        next.splice(insertAt, 0, moving!);
-        return { ...sc, shots: assignShotOrders(next) };
-      });
-      return { project: applyScenes(s.project, scenes) };
-    }),
-
-  addLine: (line) =>
-    set((s) => ({
-      project: {
-        ...s.project,
-        annotations: [...s.project.annotations, line],
       },
-      selection: { kind: "annotation", annotationId: line.id },
-    })),
+    }
+  )
+);
 
-  applyMarginContinuationTrim: (lineId, pageHeightPt, hint = "drawEnd") =>
-    set((s) => {
-      const pt = pageHeightPt ?? s.scriptPageHeightPt;
-      const ann = s.project.annotations.find((a) => a.id === lineId && a.kind === "line");
-      if (!ann || ann.kind !== "line") return s;
-      const [a, b] = ann.points;
-      const { points, marginContinuation } = computeMarginContinuationTrim(a, b, pt, hint);
-      return {
-        project: {
-          ...s.project,
-          annotations: s.project.annotations.map((x) =>
-            x.id === lineId && x.kind === "line"
-              ? { ...x, points, marginContinuation }
-              : x
-          ),
-        },
-      };
-    }),
+const history = () => useProjectStore.temporal.getState();
 
-  addText: (text) =>
-    set((s) => ({
-      project: {
-        ...s.project,
-        annotations: [...s.project.annotations, text],
-      },
-      selection: { kind: "annotation", annotationId: text.id },
-    })),
+/** Replaces the whole project (New, Open). Clears undo history; the result counts as saved. */
+export function replaceProject(project: Project): void {
+  history().pause();
+  useProjectStore.setState({ project, savedProject: project });
+  history().resume();
+  history().clear();
+  breakUndoGroup();
+}
 
-  updateText: (id, patch) =>
-    set((s) => ({
-      project: {
-        ...s.project,
-        annotations: s.project.annotations.map((a) =>
-          a.id === id && a.kind === "text" ? { ...a, ...patch } : a
-        ),
-      },
-    })),
+/**
+ * Applies an edit that is not something to undo, such as recording which
+ * script PDF was imported. Clears undo history, since older steps would
+ * bring back the state before it.
+ */
+export function applyWithoutUndo(edit: Edit): void {
+  history().pause();
+  useProjectStore.getState().apply(edit);
+  history().resume();
+  history().clear();
+  breakUndoGroup();
+}
 
-  duplicateText: (id) => {
-    const text = get().project.annotations.find((a) => a.id === id && a.kind === "text");
-    if (!text || text.kind !== "text") return;
-    get().addText(cloneText(text));
-  },
+export function markProjectSaved(): void {
+  history().pause();
+  useProjectStore.setState((state) => ({ savedProject: state.project }));
+  history().resume();
+}
 
-  updateLine: (id, patch) =>
-    set((s) => ({
-      project: {
-        ...s.project,
-        annotations: s.project.annotations.map((a) =>
-          a.id === id && a.kind === "line" ? { ...a, ...patch } : a
-        ),
-      },
-    })),
+export function undoProject(): void {
+  breakUndoGroup();
+  history().undo();
+}
 
-  updateLineLocks: (id, locks) =>
-    set((s) => ({
-      project: {
-        ...s.project,
-        annotations: s.project.annotations.map((a) => {
-          if (a.id !== id || a.kind !== "line") return a;
-          return { ...a, locks: { ...a.locks, ...locks } };
-        }),
-      },
-    })),
+export function redoProject(): void {
+  breakUndoGroup();
+  history().redo();
+}
 
-  deleteAnnotation: (id) =>
-    set((s) => {
-      const annotations = s.project.annotations.filter((a) => a.id !== id);
-      return {
-        project: { ...s.project, annotations },
-        selection:
-          s.selection?.kind === "annotation" && s.selection.annotationId === id
-            ? null
-            : s.selection,
-      };
-    }),
+export function canUndo(): boolean {
+  return history().pastStates.length > 0;
+}
 
-  deleteLinesForShot: (shotId) =>
-    set((s) => ({
-      project: {
-        ...s.project,
-        annotations: s.project.annotations.filter(
-          (a) => !(a.kind === "line" && a.shotId === shotId)
-        ),
-      },
-    })),
+export function canRedo(): boolean {
+  return history().futureStates.length > 0;
+}
 
-  copySelectedLines: () => {
-    const line = get().getSelectedLine();
-    if (!line) return;
-    set({ lineClipboard: { kind: "line", lines: [line] } });
-  },
-
-  pasteLines: (page) => {
-    const clip = get().lineClipboard;
-    if (!clip?.lines.length) return;
-    const newLines = clip.lines.map((l) => cloneLine(l, page));
-    set((s) => ({
-      project: {
-        ...s.project,
-        annotations: [...s.project.annotations, ...newLines],
-      },
-      selection: {
-        kind: "annotation",
-        annotationId: newLines[newLines.length - 1]!.id,
-      },
-    }));
-  },
-
-  duplicateLine: (id) => {
-    const line = get().project.annotations.find((a) => a.id === id && a.kind === "line");
-    if (!line || line.kind !== "line") return;
-    const dup = cloneLine(line);
-    get().addLine(dup);
-    get().applyMarginContinuationTrim(dup.id, get().scriptPageHeightPt, "center");
-  },
-}));
+export function isProjectUnsaved(state: Pick<ProjectState, "project" | "savedProject">): boolean {
+  return state.project !== state.savedProject;
+}

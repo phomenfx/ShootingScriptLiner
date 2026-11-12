@@ -7,7 +7,7 @@ import {
   PDF_PAGE_GAP_PX,
 } from "../../lib/pdfViewport";
 import { PdfPageStack } from "./PdfPageStack";
-import { useProjectStore } from "../../stores/projectStore";
+import { useLegacyStore } from "../../legacy/legacyStore";
 
 type Props = {
   pdf: PDFDocumentProxy;
@@ -32,7 +32,7 @@ export function PdfScrollView({
 }: Props) {
   const slotRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [pageStridePx, setPageStridePx] = useState(0);
-  const maxMountedPdfPages = useProjectStore((s) => s.maxMountedPdfPages);
+  const maxMountedPdfPages = useLegacyStore((s) => s.maxMountedPdfPages);
   const { scale } = usePdfPageScale(wrapRef, pdf, zoomPercent);
 
   useEffect(() => {

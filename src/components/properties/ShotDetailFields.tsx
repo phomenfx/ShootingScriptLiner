@@ -5,7 +5,7 @@ import {
   lineLabelFieldEnabled,
   nextLineLabelInclude,
 } from "../../lib/lineCaption";
-import { useProjectStore } from "../../stores/projectStore";
+import { useLegacyStore } from "../../legacy/legacyStore";
 import type { LineLabelFieldId } from "../../types/lineLabelFields";
 import { SYNC_STATUSES, type Scene, type Shot } from "../../types/project";
 import { SluglineFields, SLUGLINE_PLACEHOLDERS } from "../SluglineFields";
@@ -84,8 +84,8 @@ export function ShotDetailFields({
   shot: Shot;
   title?: string;
 }) {
-  const project = useProjectStore((s) => s.project);
-  const updateShot = useProjectStore((s) => s.updateShot);
+  const project = useLegacyStore((s) => s.project);
+  const updateShot = useLegacyStore((s) => s.updateShot);
 
   const patch = (next: Parameters<typeof updateShot>[2]) => {
     updateShot(scene.id, shot.id, next);

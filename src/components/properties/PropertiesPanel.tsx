@@ -20,7 +20,7 @@ import {
 } from "../../lib/fonts";
 import { STROKE_OPTIONS } from "../../lib/lineStrokes";
 import { formatShotLabel, getSortedScenes, getSortedShots } from "../../lib/labelUtils";
-import { useProjectStore } from "../../stores/projectStore";
+import { useLegacyStore } from "../../legacy/legacyStore";
 import type { LineFieldLocks, LineStroke } from "../../types/annotations";
 import {
   DEFAULT_LINE_LOCKS,
@@ -54,21 +54,21 @@ function LockBtn({
 }
 
 export function PropertiesPanel() {
-  const project = useProjectStore((s) => s.project);
-  const selection = useProjectStore((s) => s.selection);
-  const updateLine = useProjectStore((s) => s.updateLine);
-  const updateLineLocks = useProjectStore((s) => s.updateLineLocks);
-  const updateShot = useProjectStore((s) => s.updateShot);
-  const updateScene = useProjectStore((s) => s.updateScene);
-  const updateText = useProjectStore((s) => s.updateText);
-  const duplicateLine = useProjectStore((s) => s.duplicateLine);
-  const duplicateText = useProjectStore((s) => s.duplicateText);
-  const deleteAnnotation = useProjectStore((s) => s.deleteAnnotation);
-  const deleteShot = useProjectStore((s) => s.deleteShot);
-  const deleteLinesForShot = useProjectStore((s) => s.deleteLinesForShot);
-  const setConfirm = useProjectStore((s) => s.setConfirm);
-  const selectShot = useProjectStore((s) => s.selectShot);
-  const toolKeybinds = useProjectStore((s) => s.toolKeybinds);
+  const project = useLegacyStore((s) => s.project);
+  const selection = useLegacyStore((s) => s.selection);
+  const updateLine = useLegacyStore((s) => s.updateLine);
+  const updateLineLocks = useLegacyStore((s) => s.updateLineLocks);
+  const updateShot = useLegacyStore((s) => s.updateShot);
+  const updateScene = useLegacyStore((s) => s.updateScene);
+  const updateText = useLegacyStore((s) => s.updateText);
+  const duplicateLine = useLegacyStore((s) => s.duplicateLine);
+  const duplicateText = useLegacyStore((s) => s.duplicateText);
+  const deleteAnnotation = useLegacyStore((s) => s.deleteAnnotation);
+  const deleteShot = useLegacyStore((s) => s.deleteShot);
+  const deleteLinesForShot = useLegacyStore((s) => s.deleteLinesForShot);
+  const setConfirm = useLegacyStore((s) => s.setConfirm);
+  const selectShot = useLegacyStore((s) => s.selectShot);
+  const toolKeybinds = useLegacyStore((s) => s.toolKeybinds);
 
   const [fontOptions, setFontOptions] = useState(getFontOptions());
   const [dropOver, setDropOver] = useState(false);

@@ -1,14 +1,14 @@
 import { useEffect } from "react";
 import { toolForKey } from "../lib/toolKeybinds";
-import { useProjectStore } from "../stores/projectStore";
+import { useLegacyStore } from "../legacy/legacyStore";
 
 export function useAnnotationKeyboard(pageNum: number) {
-  const selection = useProjectStore((s) => s.selection);
-  const toolKeybinds = useProjectStore((s) => s.toolKeybinds);
-  const deleteAnnotation = useProjectStore((s) => s.deleteAnnotation);
-  const copySelectedLines = useProjectStore((s) => s.copySelectedLines);
-  const pasteLines = useProjectStore((s) => s.pasteLines);
-  const setActiveTool = useProjectStore((s) => s.setActiveTool);
+  const selection = useLegacyStore((s) => s.selection);
+  const toolKeybinds = useLegacyStore((s) => s.toolKeybinds);
+  const deleteAnnotation = useLegacyStore((s) => s.deleteAnnotation);
+  const copySelectedLines = useLegacyStore((s) => s.copySelectedLines);
+  const pasteLines = useLegacyStore((s) => s.pasteLines);
+  const setActiveTool = useLegacyStore((s) => s.setActiveTool);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {

@@ -1,19 +1,22 @@
 import { useCallback, useRef } from "react";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { NoticeArea } from "./components/NoticeArea";
+import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { PropertiesPanel } from "./components/properties/PropertiesPanel";
 import { ScriptPane } from "./components/pdf/ScriptPane";
 import { SettingsModal } from "./components/SettingsModal";
 import { Toolbar } from "./components/Toolbar";
 import { SceneOutliner } from "./components/outliner/SceneOutliner";
-import { useProjectStore } from "./stores/projectStore";
+import { useLegacyStore } from "./legacy/legacyStore";
 
 function App() {
-  const confirm = useProjectStore((s) => s.confirm);
-  const setConfirm = useProjectStore((s) => s.setConfirm);
-  const sidebarWidthPx = useProjectStore((s) => s.sidebarWidthPx);
-  const setSidebarWidthPx = useProjectStore((s) => s.setSidebarWidthPx);
-  const propertiesHeightPx = useProjectStore((s) => s.propertiesHeightPx);
-  const setPropertiesHeightPx = useProjectStore((s) => s.setPropertiesHeightPx);
+  useGlobalShortcuts();
+  const confirm = useLegacyStore((s) => s.confirm);
+  const setConfirm = useLegacyStore((s) => s.setConfirm);
+  const sidebarWidthPx = useLegacyStore((s) => s.sidebarWidthPx);
+  const setSidebarWidthPx = useLegacyStore((s) => s.setSidebarWidthPx);
+  const propertiesHeightPx = useLegacyStore((s) => s.propertiesHeightPx);
+  const setPropertiesHeightPx = useLegacyStore((s) => s.setPropertiesHeightPx);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const propertiesDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -86,6 +89,7 @@ function App() {
   return (
     <div className="app">
       <Toolbar />
+      <NoticeArea />
       <main className="main-split">
         <section className="pane pane-pdf">
           <ScriptPane />

@@ -1,14 +1,14 @@
 import { formatToolKeyDisplay } from "../../lib/toolKeybinds";
-import { useProjectStore } from "../../stores/projectStore";
+import { useLegacyStore } from "../../legacy/legacyStore";
 import type { ScriptTool } from "../../types/annotations";
 import { TOOL_KEYBIND_LABELS } from "../../types/toolKeybinds";
 
 const TOOL_ORDER: ScriptTool[] = ["select", "line", "text"];
 
 export function ScriptToolbar() {
-  const activeTool = useProjectStore((s) => s.activeTool);
-  const toolKeybinds = useProjectStore((s) => s.toolKeybinds);
-  const setActiveTool = useProjectStore((s) => s.setActiveTool);
+  const activeTool = useLegacyStore((s) => s.activeTool);
+  const toolKeybinds = useLegacyStore((s) => s.toolKeybinds);
+  const setActiveTool = useLegacyStore((s) => s.setActiveTool);
 
   return (
     <div className="script-toolbar" role="toolbar" aria-label="Script tools">
