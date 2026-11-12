@@ -55,6 +55,8 @@ type PrefsValues = {
   panels: PanelPrefs;
   /** Groups folded in the Properties forms, by group name. */
   foldedGroups: Record<string, true>;
+  /** Shot list table columns turned off, by column id. */
+  hiddenTableColumns: string[];
 };
 
 type PrefsState = PrefsValues & {
@@ -75,6 +77,8 @@ type PrefsState = PrefsValues & {
   setPanelCollapsed: (panel: SidePanel, collapsed: boolean) => void;
   setSwapSides: (swap: boolean) => void;
   setGroupFolded: (group: string, folded: boolean) => void;
+  setTableColumnHidden: (column: string, hidden: boolean) => void;
+  showAllTableColumns: () => void;
 };
 
 const memory = new Map<string, string>();
@@ -154,6 +158,7 @@ export const usePrefsStore = create<PrefsState>()(
       showActionBar: true,
       panels: defaultPanelPrefs(),
       foldedGroups: {},
+      hiddenTableColumns: [],
       ...readOldKeys(),
 
       setColorTheme: (theme) => {
@@ -207,6 +212,11 @@ export const usePrefsStore = create<PrefsState>()(
           else delete foldedGroups[group];
           return { foldedGroups };
         }),
+      showAllTableColumns: () => set({ hiddenTableColumns: [] }),
+      setTableColumnHidden: (column, hidden) =>
+        set((s) => ({
+          hiddenTableColumns: hidden ? [...new Set([...s.hiddenTableColumns, column])] : s.hiddenTableColumns.filter((c) => c !== column),
+        })),
     }),
     {
       name: PREFS_STORAGE_KEY,
@@ -218,6 +228,9 @@ export const usePrefsStore = create<PrefsState>()(
         return {
           ...current,
           ...s,
+          // Tools added later (Shape) get their default key.
+          hiddenTableColumns: Array.isArray(s.hiddenTableColumns) ? s.hiddenTableColumns : [],
+          toolKeybinds: sanitizeToolKeybinds({ ...DEFAULT_TOOL_KEYBINDS, ...s.toolKeybinds }),
           panels: {
             widthPx: { ...d.widthPx, ...s.panels?.widthPx },
             collapsed: { ...d.collapsed, ...s.panels?.collapsed },
@@ -239,6 +252,7 @@ export const usePrefsStore = create<PrefsState>()(
         showActionBar,
         panels,
         foldedGroups,
+        hiddenTableColumns,
       }): PrefsValues => ({
         colorTheme,
         uiScale,
@@ -251,6 +265,7 @@ export const usePrefsStore = create<PrefsState>()(
         showActionBar,
         panels,
         foldedGroups,
+        hiddenTableColumns,
       }),
     }
   )

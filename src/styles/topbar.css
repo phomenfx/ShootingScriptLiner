@@ -347,3 +347,12 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Right-click menu */
+.context-menu {
+  min-width: 12rem;
+}
+
+.menu-item-danger {
+  color: var(--color-danger-text);
+}

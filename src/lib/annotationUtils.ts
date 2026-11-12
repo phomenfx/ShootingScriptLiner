@@ -136,6 +136,14 @@ export function textIsVisible(text: TextAnnotation): boolean {
   return text.showText !== false;
 }
 
+/** A note is drawn when it is shown and its shot and scene are not hidden. */
+export function isTextShown(project: Project, text: TextAnnotation): boolean {
+  if (!textIsVisible(text)) return false;
+  if (!text.shotId) return true;
+  const found = findShot(project, text.shotId);
+  return !found || (found.scene.visible && found.shot.visible);
+}
+
 /** Endpoint index used for bottom-margin secondary “(cont.)” label (prefer arrow end). */
 export function lineEndIndexForContLabel(line: LineAnnotation): 0 | 1 {
   if (line.style.end.cap !== "none") return 1;

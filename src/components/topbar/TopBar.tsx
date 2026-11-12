@@ -22,6 +22,7 @@ export function TopBar() {
   const canUndo = useStore(useProjectStore.temporal, (s) => s.pastStates.length > 0);
   const canRedo = useStore(useProjectStore.temporal, (s) => s.futureStates.length > 0);
   const hasSelection = useSessionStore((s) => s.selection !== null);
+  const scenesView = useSessionStore((s) => s.scenesView);
   const hasClipboard = useSessionStore((s) => !!s.clipboard?.length || !!s.outlineClipboard);
   const hasCopyable = useSessionStore((s) => !!s.selection?.ids.length);
   const openSettings = useSessionStore((s) => s.setSettingsOpen);
@@ -97,7 +98,16 @@ export function TopBar() {
       checked: prefs.showActionBar,
       onChange: prefs.setShowActionBar,
     },
-    { kind: "check", label: "Shot list table", checked: false, disabled: true, onChange: () => {} },
+    {
+      kind: "check",
+      label: "Shot list table",
+      checked: scenesView === "table",
+      onChange: (on) => {
+        // The table lives in the Scenes panel, so show the panel too.
+        if (on) prefs.setPanelCollapsed("scenes", false);
+        useSessionStore.getState().setScenesView(on ? "table" : "list");
+      },
+    },
     { kind: "check", label: "Swap side panels", checked: prefs.panels.swapSides, onChange: prefs.setSwapSides },
     SEPARATOR,
     { kind: "label", label: "Theme" },

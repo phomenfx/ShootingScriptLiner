@@ -7,11 +7,13 @@ type PanelProps = {
   side: "left" | "right";
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  /** Controls shown in the header beside the title. */
+  actions?: ReactNode;
   children: ReactNode;
 };
 
 /** A side panel card: header with title and collapse, body that scrolls on its own. */
-export function Panel({ title, side, collapsed, onToggleCollapsed, children }: PanelProps) {
+export function Panel({ title, side, collapsed, onToggleCollapsed, actions, children }: PanelProps) {
   const Fold = side === "left" ? ChevronsLeft : ChevronsRight;
   const Unfold = side === "left" ? ChevronsRight : ChevronsLeft;
 
@@ -39,6 +41,7 @@ export function Panel({ title, side, collapsed, onToggleCollapsed, children }: P
     <section className="panel" aria-label={title}>
       <header className="panel-header">
         <h2 className="panel-title">{title}</h2>
+        {actions}
         <button
           type="button"
           className="panel-icon-btn"

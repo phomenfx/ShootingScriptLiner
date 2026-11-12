@@ -263,6 +263,7 @@ export function ShotRow({
       role="row"
       tabIndex={0}
       aria-selected={selected}
+      data-shot-id={shot.id}
       className={[
         "shot-row",
         selected ? "selected" : "",
@@ -379,6 +380,7 @@ export function SceneBlock({
         tabIndex={0}
         aria-selected={selected}
         className={`scene-row ${selected ? "selected" : ""}`}
+        data-scene-id={scene.id}
         onClick={onSelect}
         onKeyDown={(e) => {
           if (e.target !== e.currentTarget) return;

@@ -3,6 +3,7 @@ import * as edits from "../../model/edits";
 import { useProjectStore } from "../../stores/projectStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { LineInspector, OtherMarkInspector, TextInspector } from "./MarkForms";
+import { ShapeInspector } from "./ShapeForm";
 import { SceneInspector, ShotInspector } from "./ShotSceneForms";
 
 const MARK_NAMES: Record<string, string> = { line: "Line", text: "Note", shape: "Shape", image: "Image" };
@@ -35,6 +36,8 @@ export function PropertiesPanel() {
           <LineInspector project={project} line={mark} />
         ) : mark.kind === "text" ? (
           <TextInspector project={project} note={mark} />
+        ) : mark.kind === "shape" ? (
+          <ShapeInspector project={project} shape={mark} />
         ) : (
           <OtherMarkInspector mark={mark} />
         );

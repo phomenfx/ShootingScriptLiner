@@ -13,6 +13,7 @@ import { projectFileStem } from "../io/writeProject";
 import { toLegacyProject } from "../legacy/legacyView";
 import { loadPdfFromCache, savePdfToCache } from "../lib/pdfCache";
 import { createProject } from "../model/defaults";
+import { updateScene, updateShot } from "../model/edits";
 import { CLONE_NUDGE_PT, addMarks, cloneMark, deleteMarks, deleteScene, deleteShot, findShot, setScript, unlinkMark, updateMark, updateSettings } from "../model/edits";
 import { insertOutline, outlineClipOf, type OutlineAnchor, type OutlineClip } from "../model/outlineClipboard";
 import type { Mark, Project, ScriptInfo } from "../model/types";
@@ -241,7 +242,8 @@ export async function exportLinedPdf(): Promise<void> {
     const bytes = await buildLinedPdfBytes(
       toLegacyProject(project()),
       await pdfFile.arrayBuffer(),
-      project().marks.filter((mark) => mark.kind === "line")
+      project().marks.filter((mark) => mark.kind === "line"),
+      project()
     );
     downloadBlob(new Blob([bytes], { type: "application/pdf" }), `${projectFileStem(project())}-lined.pdf`);
   } catch (error) {
@@ -435,6 +437,55 @@ async function removeOutline(outline: { kind: "shot" | "scene"; ids: string[] },
   for (const id of outline.ids) useProjectStore.getState().apply(outline.kind === "shot" ? deleteShot(id) : deleteScene(id));
   breakUndoGroup();
   session().clearSelection();
+}
+
+/** The shot behind the selection: a selected shot, or the shot a selected mark links to. */
+function selectedShotFound() {
+  const selection = session().selection;
+  const p = project();
+  if (selection?.kind === "shot") return findShot(p, selection.ids[0]);
+  if (selection?.kind === "mark") {
+    const mark = p.marks.find((m) => m.id === selection.ids[0]);
+    return mark && mark.kind !== "image" ? findShot(p, mark.shotId) : null;
+  }
+  return null;
+}
+
+/** Ctrl+H: hides the selected shot (or a selected mark's shot), like its eye in the Scenes list. */
+export function hideSelectedShot(): void {
+  const found = selectedShotFound();
+  if (!found) return;
+  breakUndoGroup();
+  useProjectStore.getState().apply(updateShot(found.shot.id, (shot) => ({ ...shot, visible: false })));
+  breakUndoGroup();
+  if (session().selection?.kind === "mark") session().clearSelection();
+}
+
+/** Ctrl+Shift+H: hides the scene of the selection (a scene, a shot, or a linked mark). */
+export function hideSelectedScene(): void {
+  const selection = session().selection;
+  const sceneId = selection?.kind === "scene" ? selection.ids[0] : selectedShotFound()?.scene.id;
+  if (!sceneId) return;
+  breakUndoGroup();
+  useProjectStore.getState().apply(updateScene(sceneId, (scene) => ({ ...scene, visible: false })));
+  breakUndoGroup();
+  if (session().selection?.kind === "mark") session().clearSelection();
+}
+
+/** Alt+H: shows every hidden shot and scene, and every row and column hidden in the table. */
+export function showAllHidden(): void {
+  const p = project();
+  const anyHidden = p.scenes.some((scene) => !scene.visible || scene.shots.some((shot) => !shot.visible));
+  if (anyHidden) {
+    breakUndoGroup();
+    useProjectStore.getState().apply((current) => ({
+      ...current,
+      scenes: current.scenes.map((scene) => ({ ...scene, visible: true, shots: scene.shots.map((shot) => (shot.visible ? shot : { ...shot, visible: true })) })),
+    }));
+    breakUndoGroup();
+  }
+  session().showAllTableRows();
+  usePrefsStore.getState().showAllTableColumns();
 }
 
 export function deselect(): void {

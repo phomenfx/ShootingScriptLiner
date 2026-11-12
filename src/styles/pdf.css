@@ -428,3 +428,23 @@
   padding: 2px 6px;
   border-radius: var(--radius-sm);
 }
+
+/* Shape tool with its menu of shapes */
+.script-tool-group {
+  display: inline-flex;
+  align-items: center;
+}
+
+.script-tool.script-tool-more {
+  width: 0.875rem;
+  margin-left: -0.125rem;
+}
+
+/* Highlights multiply with the page image underneath, like a highlighter pen. */
+.highlight-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}

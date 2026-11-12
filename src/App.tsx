@@ -1,6 +1,7 @@
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ContextMenuHost } from "./components/ContextMenu";
 import { NoticeArea } from "./components/NoticeArea";
-import { ScenePanel } from "./components/scenes/ScenePanel";
+import { ScenePanel, ScenesViewSwitch } from "./components/scenes/ScenePanel";
 import { ScriptPane } from "./components/pdf/ScriptPane";
 import { PropertiesPanel } from "./components/properties/PropertiesPanel";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
@@ -19,9 +20,11 @@ function App() {
         properties={<PropertiesPanel />}
         script={<ScriptPane />}
         scenes={<ScenePanel />}
+        scenesActions={<ScenesViewSwitch />}
       />
       <SettingsDialog />
       <ConfirmDialog />
+      <ContextMenuHost />
     </>
   );
 }

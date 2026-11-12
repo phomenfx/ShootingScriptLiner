@@ -8,9 +8,11 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { ChevronsDownUp, ChevronsUpDown, Plus, Search, X } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, List, Plus, Search, Table2, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import * as commands from "../../commands";
 import { confirm } from "../../commands";
+import { openContextMenu } from "../ContextMenu";
 import { outlinerCollisionDetection } from "../../lib/dndCollision";
 import { createScene, createShot } from "../../model/defaults";
 import * as edits from "../../model/edits";
@@ -20,6 +22,7 @@ import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
 import { usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { SceneBlock, ShotRow } from "./rows";
+import { ShotTable } from "./ShotTable";
 
 /** One deliberate action is one undo step, however quickly the next one follows. */
 function step(edit: edits.Edit) {
@@ -33,7 +36,24 @@ function plural(count: number, word: string): string {
 }
 
 /** The Scenes panel in list mode: scenes and their shots, editable in place. */
+/** List / Table switch in the Scenes panel header. */
+export function ScenesViewSwitch() {
+  const view = useSessionStore((s) => s.scenesView);
+  const setView = useSessionStore((s) => s.setScenesView);
+  return (
+    <div className="view-switch" role="tablist" aria-label="Scenes view">
+      {(["list", "table"] as const).map((v) => (
+        <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : undefined} onClick={() => setView(v)}>
+          {v === "list" ? <List size={15} strokeWidth={1.75} /> : <Table2 size={15} strokeWidth={1.75} />}
+          {v === "list" ? "List" : "Table"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function ScenePanel() {
+  const view = useSessionStore((s) => s.scenesView);
   const project = useProjectStore((s) => s.project);
   const selection = useSessionStore((s) => s.selection);
   const collapsed = useSessionStore((s) => s.collapsedSceneIds);
@@ -140,6 +160,41 @@ export function ScenePanel() {
 
   const allCollapsed = project.scenes.length > 0 && project.scenes.every((scene) => collapsed[scene.id]);
 
+  if (view === "table") return <ShotTable />;
+
+  /** Right-click on a scene or shot row: select it, then offer the clipboard actions. */
+  function rowMenu(e: React.MouseEvent) {
+    const target = e.target as Element;
+    const shotId = target.closest("[data-shot-id]")?.getAttribute("data-shot-id");
+    const sceneId = shotId ? null : target.closest("[data-scene-id]")?.getAttribute("data-scene-id");
+    if (!shotId && !sceneId) return;
+    if (shotId) session().select("shot", shotId);
+    else if (sceneId) session().select("scene", sceneId);
+    const what = shotId ? "shot" : "scene";
+    const hasClip = !!session().outlineClipboard;
+    const visible = shotId ? (edits.findShot(project, shotId)?.shot.visible ?? true) : (project.scenes.find((sc) => sc.id === sceneId)?.visible ?? true);
+    openContextMenu(e, [
+      { label: "Cut", shortcut: "Ctrl+X", onSelect: commands.cut },
+      { label: "Copy", shortcut: "Ctrl+C", onSelect: commands.copy },
+      { label: "Paste", shortcut: "Ctrl+V", disabled: !hasClip, onSelect: () => commands.paste() },
+      { label: `Duplicate ${what}`, shortcut: "Ctrl+D", onSelect: commands.duplicateSelection },
+      "separator",
+      ...(shotId ? [{ label: "Show on script", onSelect: () => void commands.jumpToShot(shotId) }] : []),
+      {
+        label: visible ? `Hide ${what} on the script` : `Show ${what} on the script`,
+        shortcut: visible ? (shotId ? "Ctrl+H" : "Ctrl+Shift+H") : undefined,
+        onSelect: () =>
+          step(
+            shotId
+              ? edits.updateShot(shotId, (shot) => ({ ...shot, visible: !shot.visible }))
+              : edits.updateScene(sceneId!, (scene) => ({ ...scene, visible: !scene.visible }))
+          ),
+      },
+      "separator",
+      { label: `Delete ${what}`, shortcut: "Del", danger: true, onSelect: commands.deleteSelection },
+    ]);
+  }
+
   return (
     <div className="scene-panel">
       <div className="scene-tools">
@@ -189,7 +244,7 @@ export function ScenePanel() {
         </button>
       </div>
 
-      <div className="scene-list" role="grid" aria-label="Scenes and shots">
+      <div className="scene-list" role="grid" aria-label="Scenes and shots" onContextMenu={rowMenu}>
         {project.scenes.length === 0 && (
           <p className="scene-list-empty">No scenes yet. Add a scene, then add its shots.</p>
         )}

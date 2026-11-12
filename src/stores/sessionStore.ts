@@ -29,6 +29,12 @@ type SessionState = {
   /** Scenes folded in the Scenes list. */
   collapsedSceneIds: Record<string, true>;
   activeTool: ScriptTool;
+  /** Which shape the Shape tool draws. */
+  shapeKind: string;
+  /** The Scenes panel as a list, or widened into the shot-list table. */
+  scenesView: "list" | "table";
+  /** Shots and scenes hidden from the table for now (Alt+H shows them). Not saved. */
+  hiddenTableRows: string[];
   /** Snap button. Shift still snaps while this is off. Not saved with the project. */
   snapEnabled: boolean;
   /** How far the action bar has been dragged from its automatic spot, in page pixels. */
@@ -58,6 +64,10 @@ type SessionState = {
   setSceneCollapsed: (sceneId: string, collapsed: boolean) => void;
   setCollapsedScenes: (sceneIds: string[]) => void;
   setActiveTool: (tool: ScriptTool) => void;
+  setShapeKind: (kind: string) => void;
+  setScenesView: (view: "list" | "table") => void;
+  hideTableRow: (id: string) => void;
+  showAllTableRows: () => void;
   setSnapEnabled: (on: boolean) => void;
   setActionBarOffset: (offset: { x: number; y: number }) => void;
   setClipboard: (marks: Mark[] | null) => void;
@@ -86,6 +96,9 @@ export const useSessionStore = create<SessionState>((set) => ({
   lineSegment: null,
   collapsedSceneIds: {},
   activeTool: "select",
+  shapeKind: "rectangle",
+  scenesView: "list",
+  hiddenTableRows: [],
   snapEnabled: true,
   actionBarOffset: { x: 0, y: 0 },
   clipboard: null,
@@ -121,6 +134,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   setCollapsedScenes: (sceneIds) =>
     set({ collapsedSceneIds: Object.fromEntries(sceneIds.map((id) => [id, true as const])) }),
   setActiveTool: (activeTool) => set({ activeTool }),
+  setShapeKind: (shapeKind) => set({ shapeKind, activeTool: "shape" }),
+  setScenesView: (scenesView) => set({ scenesView }),
+  hideTableRow: (id) => set((s) => ({ hiddenTableRows: [...new Set([...s.hiddenTableRows, id])] })),
+  showAllTableRows: () => set({ hiddenTableRows: [] }),
   setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
   setActionBarOffset: (actionBarOffset) => set({ actionBarOffset }),
   setClipboard: (clipboard) => set({ clipboard, outlineClipboard: null }),

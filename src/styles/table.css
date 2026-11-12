@@ -1,0 +1,259 @@
+/* Shot list table (Scenes panel in table mode) */
+.shot-table {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.shot-table-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.625rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.shot-table-bar .scene-search {
+  flex: 0 1 14rem;
+}
+
+.shot-table-spacer {
+  flex: 1;
+}
+
+.table-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 1.625rem;
+  padding: 0 0.25rem 0 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-tint);
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.table-chip button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.shot-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  outline: none;
+}
+
+.shot-table table {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.shot-table th,
+.shot-table td {
+  height: 1.875rem;
+  padding: 0 0.5rem;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shot-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-header);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* The Shot column stays put while the table scrolls sideways. */
+.shot-table .pin {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-panel, var(--color-bg));
+}
+
+.shot-table thead th.pin {
+  z-index: 3;
+  background: var(--color-header);
+}
+
+.table-scene th,
+.table-scene td {
+  background: var(--color-header);
+  font-weight: 600;
+  cursor: default;
+}
+
+.table-scene th.pin {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--color-header);
+}
+
+.table-fold {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.table-slug {
+  margin-right: 0.75rem;
+}
+
+.table-scene-meta {
+  color: var(--color-text-dim);
+  font-weight: 400;
+}
+
+.table-shot td {
+  cursor: default;
+}
+
+.table-shot:hover td {
+  background: var(--color-row-hover);
+}
+
+.table-shot.selected td {
+  background: var(--color-accent-tint);
+}
+
+.table-shot.is-cut td:not(.pin) {
+  color: var(--color-text-dim);
+  text-decoration: line-through;
+}
+
+.shot-table td.active {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.shot-table td.inherited {
+  color: var(--color-text-dim);
+  font-style: italic;
+}
+
+.shot-table td.readonly {
+  color: var(--color-text-muted);
+}
+
+.table-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.375rem;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.table-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+}
+
+.table-choice.status-planned svg,
+.table-choice.priority-nice svg {
+  opacity: 0.45;
+}
+
+.table-choice.priority-must svg {
+  color: #f5b301;
+  fill: #f5b301;
+}
+
+.table-chip-value {
+  display: inline-block;
+  margin-right: 0.25rem;
+  padding: 0 0.4375rem;
+  border-radius: 0.75rem;
+  background: var(--color-btn-hover);
+  line-height: 1.25rem;
+}
+
+.table-editor {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.shot-table-foot {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.375rem 0.625rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+  font-size: var(--font-size-sm);
+}
+
+/* List / Table switch in the panel header */
+.view-switch {
+  display: flex;
+  margin-left: auto;
+  margin-right: 0.375rem;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.view-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.75rem;
+  padding: 0 0.875rem;
+  font-weight: 500;
+  border: 0;
+  background: var(--color-input);
+  color: var(--color-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.view-switch button.on {
+  background: var(--color-accent-tint);
+  color: var(--color-text);
+}
+
+/* Pinned cells stay solid so scrolled cells never show through. */
+.table-shot:hover td.pin {
+  background: linear-gradient(var(--color-row-hover), var(--color-row-hover)), var(--color-panel);
+}
+
+.table-shot.selected td.pin {
+  background: linear-gradient(var(--color-accent-tint), var(--color-accent-tint)), var(--color-panel);
+}
+
+.table-foot-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  cursor: pointer;
+}

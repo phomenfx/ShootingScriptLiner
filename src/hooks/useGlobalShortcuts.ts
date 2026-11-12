@@ -29,6 +29,7 @@ const OUTSIDE_FIELDS: Record<string, (shift: boolean) => void> = {
   c: () => commands.copy(),
   v: (shift) => (shift ? commands.pasteInPlace() : commands.paste()),
   d: () => commands.duplicateSelection(),
+  h: (shift) => (shift ? commands.hideSelectedScene() : commands.hideSelectedShot()),
 };
 
 /** App-wide shortcuts, and the warning when leaving with unsaved work. */
@@ -37,6 +38,13 @@ export function useGlobalShortcuts() {
     const onKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       const typing = isTyping(e.target);
+
+      // Alt+H shows everything hidden: shots, scenes, and table rows and columns.
+      if (e.altKey && !e.ctrlKey && !e.metaKey && key === "h" && !typing) {
+        e.preventDefault();
+        commands.showAllHidden();
+        return;
+      }
 
       if (!(e.ctrlKey || e.metaKey)) {
         if (typing || e.altKey) return;

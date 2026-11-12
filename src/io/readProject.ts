@@ -414,6 +414,10 @@ function readShape(raw: Raw, ctx: MarkContext, notes: string[], what: string): S
   }
   const stamp = nonEmpty(raw.stamp);
   if (stamp) shape.stamp = stamp;
+  if (isRecord(raw.path) && Array.isArray(raw.path.points)) {
+    const points = raw.path.points.map(readPoint).filter((p): p is Point => !!p);
+    if (points.length >= 2) shape.path = { points, closed: raw.path.closed === true };
+  }
   if (isRecord(raw.stroke)) shape.stroke = readStroke(raw.stroke, { pattern: "straight", widthPt: 2 });
   if (isRecord(raw.fill)) {
     shape.fill = { opacityPct: num(raw.fill.opacityPct) ?? 100 };

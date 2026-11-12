@@ -10,7 +10,7 @@ import {
   getTextLabelBold,
   getTextDisplayText,
   resolveTextColor,
-  textIsVisible,
+  isTextShown,
   isAnnotationVisible,
   lineEndIndexForContLabel,
   resolveLineStyle,
@@ -29,6 +29,7 @@ import * as commands from "../../commands";
 import { legacyEnding, toLegacyProject } from "../../legacy/legacyView";
 import { addLine, addText, applyMarginContinuationTrim, replaceLine, selectMark, updateText } from "../../drawing/marks";
 import { useProjectStore } from "../../stores/projectStore";
+import { shotIdLabel } from "../../model/shotList";
 import { usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { LineAnnotation, NormalizedPoint, TextAlign, TextAnnotation } from "../../types/annotations";
@@ -47,6 +48,9 @@ import { segmentLook } from "../../model/segments";
 import { actionBarPosition } from "../../lib/actionBarLayout";
 import { lineAngleRad, renderLineCap } from "../../lib/lineCaps";
 import { labelDragPatch } from "../../gestures/labelDrag";
+import { useShapeGestures } from "./useShapeGestures";
+import * as edits from "../../model/edits";
+import { openContextMenu, type ContextMenuItem } from "../ContextMenu";
 import { clonedLinePoints, closestOnLine, dragLinePoints, drawPreviewEnd, finishDrawEnd, type LineHandle } from "../../gestures/lineDrag";
 import { noteMovePatch, noteResizePatch } from "../../gestures/noteDrag";
 import { pickSelectTarget } from "../../gestures/priority";
@@ -136,7 +140,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   const activeTool = useSessionStore((s) => s.activeTool);
   const selectedId = useSessionStore((s) => (s.selection?.kind === "mark" ? s.selection.ids[0] : undefined));
   const cursorClass =
-    activeTool === "line"
+    activeTool === "line" || activeTool === "shape" || activeTool === "pen" || activeTool === "polygon"
       ? "tool-draw"
       : activeTool === "text"
         ? "tool-text"
@@ -151,6 +155,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   const setActivePage = useSessionStore((s) => s.setActivePage);
   const linkedShotId = useSessionStore((s) => (s.selection?.kind === "shot" ? s.selection.ids[0] : undefined));
   const lineSegment = useSessionStore((s) => s.lineSegment);
+  const shapeGestures = useShapeGestures({ pageNum, width, selectedId, snapDegrees });
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -280,7 +285,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     return placed;
   });
 
-  const placedNotes: PlacedNote[] = texts.filter(textIsVisible).map((text) => {
+  const placedNotes: PlacedNote[] = texts.filter((text) => isTextShown(project, text)).map((text) => {
     const fontSizePx = (text.fontSize ?? project.defaultLine.fontSizePt) * labelScale;
     const fontFamily = text.fontFamily ?? project.defaultLine.fontFamily;
     const bold = getTextLabelBold(text, project);
@@ -351,6 +356,19 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     const pu = getPointUnclamped(e);
     const p = { x: clamp01(pu.x), y: clamp01(pu.y) };
 
+    if (activeTool === "shape") {
+      shapeGestures.startDraw(pu, e);
+      return;
+    }
+    if (activeTool === "pen") {
+      shapeGestures.startPen(pu, e);
+      return;
+    }
+    if (activeTool === "polygon") {
+      shapeGestures.polyClick(pu, e);
+      return;
+    }
+
     if (activeTool === "text") {
       addText({
         id: newId(),
@@ -370,6 +388,8 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     const isDrawTool = activeTool === "line";
 
     if (activeTool === "select") {
+      // The selected shape's handles come first; other shapes sit under lines and notes.
+      if (shapeGestures.grabHandle(pu, e)) return;
       const px = eventPx(e);
       const selectedLine = lines.find((line) => line.id === selectedId) ?? null;
       const selectedPx = selectedLine ? selectedLine.points.map((point) => normalizedToPx(point, width, height)) : [];
@@ -468,6 +488,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         selectMark(target.id);
         return;
       }
+      if (shapeGestures.grabShape(pu, e)) return;
       useSessionStore.getState().clearSelection();
       return;
     }
@@ -480,6 +501,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    if (shapeGestures.move(getPointUnclamped(e), e)) return;
     const current = dragRef.current;
     if (!current) return;
     const pu = getPointUnclamped(e);
@@ -559,7 +581,73 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     }
   };
 
+  /** Right-click: picks the mark under the pointer the way a click would, then offers its actions. */
+  const handleContextMenu = (e: React.MouseEvent) => {
+    setActivePage(pageNum);
+    const pu = getPointUnclamped(e);
+    const p = { x: clamp01(pu.x), y: clamp01(pu.y) };
+    const px = eventPx(e);
+    const hitId = (e.target as Element).closest?.("[data-hit-id]")?.getAttribute("data-hit-id") ?? null;
+    const note = [...placedNotes].reverse().find((n) => pointInFrame(px.x, px.y, n.frame));
+    const label = [...placedLabels].reverse().find((l) => pointInFrame(px.x, px.y, l.frame));
+    const segment = findSegmentAt(p);
+    const id = note?.text.id ?? label?.line.id ?? hitId ?? segment?.line.id ?? shapeGestures.shapeAt(pu)?.id ?? null;
+    const hasClip = !!useSessionStore.getState().clipboard?.length;
+    const pasteItems: ContextMenuItem[] = [
+      { label: "Paste", shortcut: "Ctrl+V", disabled: !hasClip, onSelect: () => commands.paste(pageNum) },
+      { label: "Paste in place", shortcut: "Ctrl+Shift+V", disabled: !hasClip, onSelect: () => commands.paste(pageNum, true) },
+    ];
+    if (!id) {
+      useSessionStore.getState().clearSelection();
+      openContextMenu(e, pasteItems);
+      return;
+    }
+    selectMark(id);
+    const mark = edits.findMark(v2Project, id);
+    const shotId = mark ? edits.markShotId(mark) : undefined;
+    const found = edits.findShot(v2Project, shotId);
+    const linkedShot = found
+      ? {
+          id: found.shot.id,
+          label: shotIdLabel(found.sceneIndex, found.shotIndex, v2Project.settings.general.shotIdStyle),
+          sceneNumber: found.sceneIndex + 1,
+        }
+      : null;
+    const isLine = mark?.kind === "line";
+    if (isLine && segment?.line.id === id && mark.points.length > 2) useSessionStore.getState().setLineSegment(id, segment.index);
+    openContextMenu(e, [
+      { label: "Cut", shortcut: "Ctrl+X", onSelect: commands.cut },
+      { label: "Copy", shortcut: "Ctrl+C", onSelect: commands.copy },
+      ...pasteItems,
+      { label: "Duplicate", shortcut: "Ctrl+D", onSelect: commands.duplicateSelection },
+      ...(isLine
+        ? [
+            "separator" as const,
+            { label: "Split here", onSelect: () => commands.splitSelection(segment?.line.id === id ? segment.index : undefined, segment?.line.id === id ? p : undefined) },
+            { label: "Rejoin", disabled: mark.points.length < 3, onSelect: commands.rejoinSelection },
+          ]
+        : []),
+      ...(linkedShot
+        ? [
+            "separator" as const,
+            { label: `Select shot ${linkedShot.label}`, onSelect: () => useSessionStore.getState().select("shot", linkedShot.id) },
+            // The same as the shot's eye in the Scenes list: all its lines, notes and shapes hide.
+            { label: `Hide shot ${linkedShot.label}`, shortcut: "Ctrl+H", onSelect: commands.hideSelectedShot },
+            { label: `Hide scene ${linkedShot.sceneNumber}`, shortcut: "Ctrl+Shift+H", onSelect: commands.hideSelectedScene },
+          ]
+        : []),
+      "separator",
+      { label: "Show everything hidden", shortcut: "Alt+H", onSelect: commands.showAllHidden },
+      { label: "Delete", shortcut: "Del", danger: true, onSelect: commands.deleteSelection },
+    ]);
+  };
+
   const handleDoubleClick = (e: React.MouseEvent) => {
+    // Polygon: a double-click finishes the shape, left open.
+    if (activeTool === "polygon") {
+      shapeGestures.finishPoly(false);
+      return;
+    }
     const px = eventPx(e);
     if (placedNotes.some((note) => pointInFrame(px.x, px.y, note.frame))) {
       useSessionStore.getState().setActiveTool("select");
@@ -581,6 +669,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
+    if (shapeGestures.up(getPointUnclamped(e), e)) return;
     const current = dragRef.current;
     if (!current) return;
 
@@ -653,6 +742,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
 
   return (
     <>
+    {shapeGestures.highlightLayer}
     <svg
       ref={svgRef}
       className={`annotation-layer ${cursorClass}`}
@@ -665,7 +755,9 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
     >
+      {shapeGestures.shapesLayer}
       {lines.map((line) => {
         const style = resolveLineStyle(line, project);
         const pts = line.points.map((point) => normalizedToPx(point, width, height));
@@ -812,6 +904,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
           pointerEvents="none"
         />
       )}
+      {shapeGestures.handlesLayer}
     </svg>
     {barPos && selectedId && (
       <ScriptActionBar

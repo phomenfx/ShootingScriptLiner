@@ -1,4 +1,5 @@
 import {
+  BlendMode,
   PDFDocument,
   concatTransformationMatrix,
   popGraphicsState,
@@ -8,7 +9,7 @@ import {
   type PDFPage,
 } from "pdf-lib";
 import type { Project } from "../types/project";
-import { isLineAnnotation, isTextAnnotation, type TextAlign } from "../types/annotations";
+import { isLineAnnotation, isTextAnnotation, type LineCap, type TextAlign } from "../types/annotations";
 import {
   getLineFontSizePt,
   getLineScriptLabels,
@@ -18,7 +19,8 @@ import {
   getTextDisplayText,
   resolveTextColor,
   lineEndIndexForContLabel,
-  textIsVisible,
+  isAnnotationVisible,
+  isTextShown,
   resolveLineStyle,
 } from "./annotationUtils";
 import {
@@ -34,7 +36,8 @@ import { endingGeometry, shaftEnds } from "./geometry";
 import { legacyEnding } from "../legacy/legacyView";
 import { segmentStrands, type StrokeStrand } from "./strokeGeometry";
 import { segmentLook } from "../model/segments";
-import type { LineMark } from "../model/types";
+import type { LineMark, Project as V2Project, ShapeMark } from "../model/types";
+import { isShapeShown, outlineEdges, shapeColor, shapeFill, shapeHasStroke, shapeOutline, stampScalePercent, stampTip } from "./shapeGeometry";
 import { drawPdfLineCap } from "./pdfLineCaps";
 import { resolvePdfExportFont, sanitizePdfExportText } from "./pdfExportFonts";
 import {
@@ -124,7 +127,9 @@ function drawWrappedPdfText(
 export async function buildLinedPdfBytes(
   project: Project,
   pdfBytes: ArrayBuffer,
-  sourceLines: LineMark[] = []
+  sourceLines: LineMark[] = [],
+  /** The saved project, for box shapes. */
+  source?: V2Project
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
 
@@ -147,11 +152,19 @@ export async function buildLinedPdfBytes(
     const ph = page.getHeight();
     const pageNum = i + 1;
 
+    // Shapes go under lines and notes, as on screen.
+    if (source) {
+      for (const mark of source.marks) {
+        if (mark.kind === "shape" && mark.page === pageNum && isShapeShown(source, mark)) drawShape(page, ph, source, mark);
+      }
+    }
+
+    // Hidden shots and scenes stay out of the PDF, as they are off the page on screen.
     const lines = project.annotations.filter(
-      (a) => isLineAnnotation(a) && a.page === pageNum
+      (a) => isLineAnnotation(a) && a.page === pageNum && isAnnotationVisible(project, a)
     );
     const texts = project.annotations.filter(
-      (a) => isTextAnnotation(a) && a.page === pageNum
+      (a) => isTextAnnotation(a) && a.page === pageNum && isTextShown(project, a)
     );
 
     for (const line of lines) {
@@ -267,7 +280,7 @@ export async function buildLinedPdfBytes(
     }
 
     for (const t of texts) {
-      if (!isTextAnnotation(t) || !textIsVisible(t)) continue;
+      if (!isTextAnnotation(t)) continue;
       const tp = normToPdf(t.x, t.y, pw, ph);
       const textFont = await getFont(
         t.fontFamily ?? project.defaultLine.fontFamily,
@@ -291,6 +304,42 @@ export async function buildLinedPdfBytes(
   }
 
   return doc.save();
+}
+
+/** One box shape. Points are built top-down like the page, then flipped for the PDF. */
+function drawShape(page: PDFPage, ph: number, source: V2Project, shape: ShapeMark): void {
+  const color = shapeColor(source, shape);
+  const ink = hexToRgb(color);
+  const flip = (point: { x: number; y: number }) => ({ x: point.x, y: ph - point.y });
+  const widthPt = shape.stroke?.widthPt ?? 2;
+  if (shape.shape === "stamp") {
+    const tip = flip(stampTip(shape));
+    const ending = { cap: (shape.stamp ?? "arrow") as LineCap, scalePercent: stampScalePercent(shape), filled: !!shape.fill };
+    drawPdfLineCap(page, tip.x, tip.y, (-shape.rotation * Math.PI) / 180, ending, color, widthPt, false);
+    return;
+  }
+  const outline = shapeOutline(shape);
+  if (!outline) return;
+  const fill = shapeFill(source, shape);
+  if (fill && outline.closed) {
+    // drawSvgPath reads y downward from the given origin, so the page points go in as they are.
+    const d = outline.points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ") + " Z";
+    page.drawSvgPath(d, {
+      x: 0,
+      y: ph,
+      color: hexToRgb(fill.color),
+      opacity: fill.opacity,
+      borderWidth: 0,
+      ...(shape.shape === "highlight" ? { blendMode: BlendMode.Multiply } : {}),
+    });
+  }
+  if (!shapeHasStroke(shape) || !shape.stroke) return;
+  const stroke = shape.stroke;
+  for (const [a, b] of outlineEdges(outline)) {
+    for (const strand of segmentStrands(a, b, stroke.pattern, stroke.widthPt, stroke)) {
+      if (strand.export) drawStrand(page, { ...strand, points: strand.points.map(flip) }, ink);
+    }
+  }
 }
 
 function drawStrand(page: PDFPage, strand: StrokeStrand, color: ReturnType<typeof hexToRgb>): void {

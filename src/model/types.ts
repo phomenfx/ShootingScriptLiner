@@ -263,6 +263,11 @@ export type ShapeMark = MarkBase & {
   innerDepthPct?: number;
   /** Ending stamps: which ending to draw. */
   stamp?: string;
+  /**
+   * Pen and polygon shapes: corners as fractions of the box (0–1, before
+   * rotation), so moving, resizing and rotating the box carries them along.
+   */
+  path?: { points: Point[]; closed: boolean };
   color?: string;
   stroke?: Stroke;
   fill?: { color?: string; opacityPct: number };
