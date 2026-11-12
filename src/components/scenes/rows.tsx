@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { fieldWithDivider } from "../../model/captions";
 import { choiceLabel } from "../../model/registry";
 import type { ListedScene, ListedShot } from "../../model/shotList";
 import type { Project, Scene, Shot } from "../../model/types";
@@ -237,7 +238,6 @@ export function ShotRow({
     }, 250);
   };
   const style = { transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition };
-  const parens = project.settings.general.additionalInfoStyle === "parens";
   const statusLabel = choiceLabel("status", shot.status, lists);
   const priorityLabel = choiceLabel("priority", shot.priority, lists);
 
@@ -249,7 +249,7 @@ export function ShotRow({
       editing={editing === index}
       startOn="doubleClick"
       className={`shot-${key}`}
-      format={key === "additionalInfo" ? (v) => (parens ? `(${v})` : `- ${v}`) : undefined}
+      format={key === "additionalInfo" ? (v) => fieldWithDivider(project, "additionalInfo", v) : undefined}
       onStart={() => setEditing(index)}
       onCommit={(value) => onPatch({ [key]: value || undefined })}
       onEnd={end}

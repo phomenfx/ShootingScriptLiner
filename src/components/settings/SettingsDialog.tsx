@@ -309,19 +309,6 @@ export function SettingsDialog() {
           ),
         },
         {
-          label: "Additional info style",
-          control: (
-            <Segmented
-              value={s.general.additionalInfoStyle}
-              options={[
-                { value: "parens", label: "Subject (Moving)" },
-                { value: "hyphen", label: "Subject - Moving" },
-              ]}
-              onChange={(additionalInfoStyle) => setGeneral({ additionalInfoStyle })}
-            />
-          ),
-        },
-        {
           label: "New shot color",
           control: (
             <span className="set-color">

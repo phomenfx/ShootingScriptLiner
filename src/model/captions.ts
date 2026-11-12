@@ -227,6 +227,12 @@ function customBody(text: string, pattern: string, first: boolean): string {
   return first ? rendered.replace(/^ /, "") : rendered;
 }
 
+/** How one field reads after the text before it, with its caption divider: " (Info)" becomes "(Info)". */
+export function fieldWithDivider(project: Project, fieldId: string, text: string): string {
+  const field = project.settings.captions.fields.find((f) => f.id === fieldId) ?? ({ id: fieldId, print: true } as CaptionField);
+  return appendField("", text, field).trim();
+}
+
 function appendField(previous: string, text: string, field: CaptionField): string {
   const kind = field.divider ?? defaultDivider(field.id);
   if (kind === "custom") return previous + customBody(text, field.dividerText ?? "", false);
