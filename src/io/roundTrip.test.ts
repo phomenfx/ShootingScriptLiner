@@ -45,6 +45,7 @@ function sample(): Project {
       segments: [null, { pattern: "wavy", widthPt: 5, lengthPct: 1800, amplitudePct: 60 }],
       own: { subject: "Only this line", cameras: [] },
     }),
+    line("mid", { mid: { type: "doubleArrow", sizePct: 150, filled: false }, end: { type: "bracket", sizePct: 100, filled: false } }),
     line("sided", { stroke: { pattern: "straightWavy", widthPt: 2, waveSide: "left", gapPct: 250 } }),
     line("hidden", { segments: [{ pattern: "hidden" }, null] }),
   ];

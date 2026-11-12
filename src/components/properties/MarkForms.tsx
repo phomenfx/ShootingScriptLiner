@@ -397,6 +397,20 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
         <Group name="line-endings" title="Endings">
           <EndingFields title="Start" value={line.start} onChange={(start) => update((l) => ({ ...l, start }))} />
           <EndingFields title="End" value={line.end} onChange={(end) => update((l) => ({ ...l, end }))} />
+          {/* Mid: one marker at every split point. Offered once the line has a split. */}
+          {line.points.length > 2 && (
+            <EndingFields
+              title="Mid"
+              value={line.mid ?? { type: "none", sizePct: 100, filled: true }}
+              onChange={(mid) =>
+                update((l) => {
+                  if (mid.type !== "none") return { ...l, mid };
+                  const { mid: _removed, ...rest } = l;
+                  return rest;
+                })
+              }
+            />
+          )}
         </Group>
 
         <p className="pf-summary">This line: {describeLength(lineLength(project, line)).replace(/^1 line · /, "")}</p>

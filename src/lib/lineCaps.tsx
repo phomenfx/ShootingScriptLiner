@@ -11,6 +11,9 @@ export const CAP_OPTIONS: { value: LineCap; label: string }[] = [
   { value: "butt", label: "Butt" },
   { value: "arrowReversed", label: "Arrow (reversed)" },
   { value: "slash", label: "Slash" },
+  { value: "bracket", label: "Bracket" },
+  { value: "doubleArrow", label: "Double arrow" },
+  { value: "dot", label: "Dot" },
 ];
 
 export function lineAngleRad(x1: number, y1: number, x2: number, y2: number): number {

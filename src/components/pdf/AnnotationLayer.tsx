@@ -26,7 +26,7 @@ import {
 } from "../../lib/coords";
 import { newId } from "../../lib/ids";
 import * as commands from "../../commands";
-import { toLegacyProject } from "../../legacy/legacyView";
+import { legacyEnding, toLegacyProject } from "../../legacy/legacyView";
 import { addLine, addText, applyMarginContinuationTrim, replaceLine, selectMark, updateText } from "../../drawing/marks";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePrefsStore } from "../../stores/prefsStore";
@@ -679,6 +679,16 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         const endAng = lineAngleRad(pts[last - 1]!.x, pts[last - 1]!.y, pts[last]!.x, pts[last]!.y);
         const startCap = renderLineCap(style.start, style.color, strokePx, startAng, true, labelScale);
         const endCap = renderLineCap(style.end, style.color, strokePx, endAng, false, labelScale);
+        // Mid markers sit on each split point, pointing along the segment that arrives there.
+        const midSource = v2Project.marks.find((mark) => mark.id === line.id);
+        const midEnding = midSource?.kind === "line" && midSource.mid ? legacyEnding(midSource.mid) : null;
+        const midCaps = midEnding
+          ? pts.slice(1, -1).map((point, index) => {
+              const before = pts[index]!;
+              const cap = renderLineCap(midEnding, style.color, strokePx, lineAngleRad(before.x, before.y, point.x, point.y), false, labelScale);
+              return cap && <g key={`mid-${index}`} transform={`translate(${point.x}, ${point.y})`}>{cap.elements}</g>;
+            })
+          : null;
 
         return (
           <g key={line.id} className={isSel ? "line-selected" : undefined}>
@@ -735,6 +745,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
             })}
             {startCap && <g transform={`translate(${pts[0]!.x}, ${pts[0]!.y})`}>{startCap.elements}</g>}
             {endCap && <g transform={`translate(${pts[last]!.x}, ${pts[last]!.y})`}>{endCap.elements}</g>}
+            {midCaps}
           </g>
         );
       })}

@@ -31,6 +31,7 @@ import {
   secondaryLayoutForLine,
 } from "./labelLayout";
 import { endingGeometry, shaftEnds } from "./geometry";
+import { legacyEnding } from "../legacy/legacyView";
 import { segmentStrands, type StrokeStrand } from "./strokeGeometry";
 import { segmentLook } from "../model/segments";
 import type { LineMark } from "../model/types";
@@ -188,6 +189,14 @@ export async function buildLinedPdfBytes(
       const endAngle = Math.atan2(p1.y - pts[last - 1]!.y, p1.x - pts[last - 1]!.x);
       drawPdfLineCap(page, p0.x, p0.y, startAngle, style.start, style.color, style.widthPt, true);
       drawPdfLineCap(page, p1.x, p1.y, endAngle, style.end, style.color, style.widthPt, false);
+      if (source?.mid) {
+        const mid = legacyEnding(source.mid);
+        for (let index = 1; index < last; index += 1) {
+          const at = pts[index]!;
+          const before = pts[index - 1]!;
+          drawPdfLineCap(page, at.x, at.y, Math.atan2(at.y - before.y, at.x - before.x), mid, style.color, style.widthPt, false);
+        }
+      }
 
       if (line.showLabel) {
         const { primary, secondary } = getLineScriptLabels(line, project);

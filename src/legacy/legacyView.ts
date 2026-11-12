@@ -34,7 +34,8 @@ import type { LineDefaults } from "../types/lineDefaults";
 import type { LineLabelField, LineLabelFieldId } from "../types/lineLabelFields";
 import type { Annotation, Project, Scene, Shot } from "../types/project";
 
-const V1_CAPS = ["none", "square", "circle", "diamond", "arrow", "arrowReversed", "butt", "slash"];
+/** Endings the page and PDF drawing understand. */
+const V1_CAPS = ["none", "square", "circle", "diamond", "arrow", "arrowReversed", "butt", "slash", "bracket", "doubleArrow", "dot"];
 const V2_CAPTION_FIELD_IDS: Record<string, string> = Object.fromEntries(
   Object.entries(V1_CAPTION_FIELD_IDS).map(([v1, v2]) => [v2, v1])
 );
@@ -46,7 +47,7 @@ function legacyStroke(pattern: string): LineStroke {
   return patternFromV1(pattern) === pattern ? (pattern as LineStroke) : "solid";
 }
 
-function legacyEnding(ending: V2.Ending): LineEnding {
+export function legacyEnding(ending: V2.Ending): LineEnding {
   return {
     cap: (V1_CAPS.includes(ending.type) ? ending.type : "none") as LineCap,
     scalePercent: ending.sizePct,
@@ -371,6 +372,7 @@ export function lineToV2(line: LineAnnotation, project: V2.Project, base?: V2.Li
   mark.start.type = keepUnlessChanged(base.start.type, (k) => legacyEnding({ ...base.start, type: k }).cap, line.style.start.cap, mark.start.type);
   mark.end.type = keepUnlessChanged(base.end.type, (k) => legacyEnding({ ...base.end, type: k }).cap, line.style.end.cap, mark.end.type);
   if (base.segments && base.segments.length === mark.points.length - 1) mark.segments = base.segments;
+  if (base.mid) mark.mid = structuredClone(base.mid);
   if (base.outline) mark.outline = base.outline;
   if (base.caption.outline) mark.caption.outline = base.caption.outline;
   if (base.own) mark.own = structuredClone(base.own);

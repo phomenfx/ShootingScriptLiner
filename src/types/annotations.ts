@@ -10,7 +10,10 @@ export type LineCap =
   | "arrow"
   | "arrowReversed"
   | "butt"
-  | "slash";
+  | "slash"
+  | "bracket"
+  | "doubleArrow"
+  | "dot";
 
 export type LineStroke =
   | "solid"
@@ -177,6 +180,7 @@ export function capSupportsFill(cap: LineCap): boolean {
     cap === "circle" ||
     cap === "diamond" ||
     cap === "arrow" ||
-    cap === "arrowReversed"
+    cap === "arrowReversed" ||
+    cap === "doubleArrow"
   );
 }

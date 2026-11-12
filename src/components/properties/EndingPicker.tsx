@@ -7,9 +7,9 @@ import type { Ending } from "../../model/types";
 import type { LineCap } from "../../types/annotations";
 
 /** Endings the page and the PDF can draw today. */
-export const DRAWABLE_ENDINGS = ["none", "square", "circle", "diamond", "arrow", "arrowReversed", "butt", "slash"];
+export const DRAWABLE_ENDINGS = ["none", "square", "circle", "diamond", "arrow", "arrowReversed", "doubleArrow", "bracket", "dot", "butt", "slash"];
 /** Endings with an inside that can be filled. */
-export const FILLABLE_ENDINGS = ["square", "circle", "diamond", "arrow", "arrowReversed"];
+export const FILLABLE_ENDINGS = ["square", "circle", "diamond", "arrow", "arrowReversed", "doubleArrow"];
 
 /** A short line ending in the given shape, pointing right. */
 export function EndingSwatch({ type, filled }: { type: string; filled: boolean }) {

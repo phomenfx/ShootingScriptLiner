@@ -217,6 +217,8 @@ export type LineMark = MarkBase & {
   segments?: (SegmentStyle | null)[];
   start: Ending;
   end: Ending;
+  /** Drawn at every split point, pointing the way the line runs. Missing means none. */
+  mid?: Ending;
   outline?: Outline;
   caption: Caption;
   contCaption?: ContCaption;

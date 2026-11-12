@@ -327,6 +327,10 @@ function readLine(raw: Raw, ctx: MarkContext, notes: string[], what: string): Li
     end: readEnding(raw.end, defaults.end),
     caption: readCaption(raw.caption, defaults.caption),
   };
+  if (isRecord(raw.mid)) {
+    const mid = readEnding(raw.mid, { type: "none", sizePct: 100, filled: true });
+    if (mid.type !== "none") line.mid = mid;
+  }
   const shotId = readShotLink(raw, ctx, notes, what);
   const color = nonEmpty(raw.color);
   if (shotId) {

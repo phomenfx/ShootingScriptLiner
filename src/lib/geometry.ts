@@ -33,7 +33,7 @@ export function endingGeometry(ending: LineEnding, widthPt: number): EndingGeome
   const s = endingSizePt(ending.scalePercent);
   const strokePt = Math.max(0.75, Math.max(0, widthPt) * 0.8);
   const filled = ending.filled && capSupportsFill(ending.cap);
-  const shaftInsetPt = ending.cap === "arrow" ? s : 0;
+  const shaftInsetPt = ending.cap === "arrow" ? s : ending.cap === "doubleArrow" ? (filled ? s * 1.6 : s * 0.6) : 0;
 
   switch (ending.cap) {
     case "arrow":
@@ -81,9 +81,41 @@ export function endingGeometry(ending: LineEnding, widthPt: number): EndingGeome
           segments: [[{ x: -s * 0.35, y: -s * 0.5 }, { x: s * 0.35, y: s * 0.5 }]],
         },
       };
+    case "doubleArrow":
+      return {
+        shaftInsetPt,
+        strokePt,
+        primitive: { kind: "path", filled, d: `${chevron(-1, s, filled)} ${chevronAt(-s * 0.6, s, filled)}` },
+      };
+    case "bracket": {
+      // A bar across the line with short arms pointing back along it.
+      const h = s * 0.6;
+      const arm = s * 0.4;
+      return {
+        shaftInsetPt,
+        strokePt,
+        primitive: {
+          kind: "segments",
+          segments: [
+            [{ x: 0, y: -h }, { x: 0, y: h }],
+            [{ x: 0, y: -h }, { x: -arm, y: -h }],
+            [{ x: 0, y: h }, { x: -arm, y: h }],
+          ],
+        },
+      };
+    }
+    case "dot":
+      // Always solid; the fill toggle does not apply.
+      return { shaftInsetPt, strokePt, primitive: { kind: "circle", r: s * 0.28, filled: true } };
     default:
       return null;
   }
+}
+
+/** A backward-opening chevron whose tip sits at `tipX`. */
+function chevronAt(tipX: number, s: number, filled: boolean): string {
+  const y = s * 0.55;
+  return `M ${tipX - s} ${-y} L ${tipX} 0 L ${tipX - s} ${y}${filled ? " Z" : ""}`;
 }
 
 function chevron(direction: 1 | -1, s: number, filled: boolean): string {
