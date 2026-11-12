@@ -1,6 +1,6 @@
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { NoticeArea } from "./components/NoticeArea";
-import { SceneOutliner } from "./components/outliner/SceneOutliner";
+import { ScenePanel } from "./components/scenes/ScenePanel";
 import { ScriptPane } from "./components/pdf/ScriptPane";
 import { PropertiesPanel } from "./components/properties/PropertiesPanel";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
@@ -18,7 +18,7 @@ function App() {
         notices={<NoticeArea />}
         properties={<PropertiesPanel />}
         script={<ScriptPane />}
-        scenes={<SceneOutliner />}
+        scenes={<ScenePanel />}
       />
       <SettingsDialog />
       <ConfirmDialog />

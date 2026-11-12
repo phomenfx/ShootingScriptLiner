@@ -37,6 +37,10 @@
   --color-unsaved: #e0a030;
   --color-danger: #c0504d;
   --color-on-accent-strong: #10202c;
+  --color-row-hover: rgba(255, 255, 255, 0.04);
+  --color-status-shot: #5fb878;
+  --color-status-pickup: #e0a030;
+  --color-priority-must: #e0b040;
   --color-scrollbar: #3a3a3a;
   --color-scrollbar-hover: #4a4a4a;
 
@@ -94,6 +98,10 @@
   --color-unsaved: #c77d00;
   --color-danger: #b42318;
   --color-on-accent-strong: #ffffff;
+  --color-row-hover: rgba(0, 0, 0, 0.04);
+  --color-status-shot: #2e8b4e;
+  --color-status-pickup: #b26f00;
+  --color-priority-must: #c08a00;
   --color-scrollbar: #c4c4ca;
   --color-scrollbar-hover: #a9a9b1;
 }

@@ -171,10 +171,6 @@ body.panel-resizing iframe {
   display: none;
 }
 
-.panel .outliner {
-  overflow: visible;
-}
-
 /* Thin scrollbars everywhere. */
 * {
   scrollbar-width: thin;

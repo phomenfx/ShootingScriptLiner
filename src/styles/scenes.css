@@ -1,0 +1,388 @@
+/* Scenes panel, list mode. Sizes are in rem so they follow the UI scale. */
+.scene-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.scene-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex: none;
+  padding: 0.5rem 0.625rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.scene-search {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex: 1;
+  min-width: 4rem;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  background: var(--color-input);
+  color: var(--color-text-dim);
+}
+
+.scene-search:focus-within {
+  border-color: var(--color-accent);
+}
+
+.scene-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.scene-search button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  background: var(--color-btn);
+  color: var(--color-text);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tool-btn.icon {
+  width: 1.75rem;
+  justify-content: center;
+  padding: 0;
+  border-color: transparent;
+  background: none;
+  color: var(--color-text-muted);
+}
+
+.tool-btn:hover:not(:disabled) {
+  background: var(--color-btn-hover);
+  color: var(--color-text);
+}
+
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tool-btn:focus-visible,
+.row-btn:focus-visible,
+.scene-row:focus-visible,
+.shot-row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+/* Only the list scrolls. */
+.scene-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 2rem;
+}
+
+.scene-list-empty,
+.scene-empty {
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  color: var(--color-text-dim);
+}
+
+.scene-empty {
+  padding: 0.375rem 0.875rem 0.375rem 2.75rem;
+  font-size: var(--font-size-sm);
+}
+
+.scene-block {
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-card);
+}
+
+.scene-block.is-dragging,
+.shot-row.is-dragging {
+  opacity: 0.4;
+}
+
+.scene-row,
+.shot-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2rem;
+  padding: 0 0.375rem 0 0.25rem;
+  border-left: 2px solid transparent;
+  cursor: default;
+}
+
+.scene-row {
+  font-weight: 600;
+}
+
+.shot-row {
+  padding-left: 1.375rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.scene-row:hover,
+.shot-row:hover {
+  background: var(--color-row-hover);
+}
+
+.scene-row.selected,
+.shot-row.selected {
+  border-left-color: var(--color-accent);
+  background: var(--color-accent-tint);
+}
+
+.scene-shots.is-over {
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+.drag-handle {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1rem;
+  height: 1.5rem;
+  color: var(--color-text-dim);
+  cursor: grab;
+  touch-action: none;
+}
+
+.drag-handle:hover {
+  color: var(--color-text);
+}
+
+.scene-number,
+.shot-id {
+  flex: none;
+  min-width: 1.5rem;
+  color: var(--color-text-muted);
+}
+
+.scene-number {
+  min-width: 1.125rem;
+  color: var(--color-text);
+}
+
+.scene-heading,
+.shot-fields {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.scene-dash {
+  color: var(--color-text-dim);
+}
+
+.scene-count {
+  flex: none;
+  padding: 0 0.375rem;
+  border-radius: 0.625rem;
+  background: var(--color-btn-hover);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+}
+
+.shot-dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin: 0 0.25rem 0 0.125rem;
+  border-radius: 50%;
+}
+
+/* A value that turns into an input */
+.inline-value {
+  padding: 0.125rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scene-heading .inline-value {
+  cursor: text;
+}
+
+.scene-heading .inline-value:hover {
+  border-color: var(--color-border-input);
+}
+
+/* When a row is too narrow, the additional info gives way first, then the subject or location. */
+.scene-indicator,
+.scene-time,
+.shot-type {
+  flex: none;
+}
+
+.scene-location,
+.shot-subject {
+  flex: 0 1 auto;
+  min-width: 1.5rem;
+}
+
+.shot-additionalInfo {
+  flex: 0 20 auto;
+  min-width: 0;
+}
+
+.inline-empty {
+  color: var(--color-text-dim);
+  font-weight: 400;
+  font-style: italic;
+  opacity: 0.55;
+}
+
+/* Empty shot fields stay out of the way until the row is hovered or selected. */
+.shot-row .inline-empty {
+  display: none;
+}
+
+.shot-row:hover .inline-empty,
+.shot-row.selected .inline-empty,
+.shot-row:focus-within .inline-empty {
+  display: inline;
+}
+
+.shot-additionalInfo {
+  color: var(--color-text-muted);
+}
+
+.inline-input {
+  min-width: 2.5rem;
+  max-width: 100%;
+  padding: 0.125rem 0.25rem;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  outline: 0;
+  background: var(--color-input);
+  color: var(--color-text);
+  font: inherit;
+}
+
+/* Row buttons: fold, status, priority, eye, delete */
+.row-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.row-btn:hover {
+  background: var(--color-btn-hover);
+  color: var(--color-text);
+}
+
+.row-btn.eye {
+  color: var(--color-text-dim);
+}
+
+.row-btn.eye-off {
+  color: var(--color-text-dim);
+  opacity: 0.6;
+}
+
+/* An empty slot shows a faint outline only when the row is hovered. */
+.row-btn.slot-empty {
+  color: var(--color-text-dim);
+  opacity: 0;
+}
+
+.shot-row:hover .slot-empty,
+.row-btn.slot-empty:focus-visible {
+  opacity: 0.45;
+}
+
+.row-btn.on-hover {
+  opacity: 0;
+}
+
+.scene-row:hover .on-hover,
+.row-btn.on-hover:focus-visible {
+  opacity: 1;
+}
+
+.row-btn.danger:hover {
+  color: var(--color-danger);
+}
+
+.status-shot {
+  color: var(--color-status-shot);
+}
+
+.status-pickup {
+  color: var(--color-status-pickup);
+}
+
+.priority-must {
+  color: var(--color-priority-must);
+}
+
+.slot-text {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* A cut shot is dimmed and struck through. */
+.shot-row.is-cut .shot-id,
+.shot-row.is-cut .shot-fields {
+  text-decoration: line-through;
+  opacity: 0.45;
+}
+
+.shot-row.is-cut .shot-dot {
+  background: var(--color-text-dim) !important;
+}
+
+.shot-row.is-hidden .shot-fields,
+.scene-block.is-hidden .scene-heading {
+  opacity: 0.5;
+}
+
+.drag-chip {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  font-size: var(--font-size);
+}
