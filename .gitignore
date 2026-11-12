@@ -14,3 +14,9 @@ portable/Start-Windows.bat
 portable/Start-macOS.command
 portable/start-linux.sh
 portable/README.md
+# Private local saves used by tests on the author's machine. Never publish.
+local-fixtures/
+
+# Scripts and project saves are private. Never commit a PDF or ZIP.
+*.pdf
+*.zip

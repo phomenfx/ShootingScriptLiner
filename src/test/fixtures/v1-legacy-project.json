@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "name": "Fixture Film",
+  "labelMode": "letter",
+  "defaultShotColor": "#FF0000",
+  "snapLineAngles": false,
+  "labelBold": false,
+  "labelOffsetXPt": 3,
+  "labelOffsetYPt": 4,
+  "labelSecondaryGapPt": 4,
+  "defaultLine": {
+    "stroke": "solid",
+    "widthPt": 2,
+    "fontFamily": "\"Arial\", sans-serif",
+    "fontSizePt": 11,
+    "startCap": "none",
+    "endCap": "arrow"
+  },
+  "scriptFileName": "fixture-script.pdf",
+  "scenes": [
+    {
+      "id": "scene-garage",
+      "slugline": "EXT. GARAGE - NIGHT",
+      "order": 1,
+      "visible": true,
+      "shots": [
+        {
+          "id": "shot-garage-master",
+          "order": 0,
+          "color": "#00AA55",
+          "visible": true,
+          "shotType": "WS",
+          "subject": "Master",
+          "slug": "",
+          "lens": "24mm",
+          "sync": "MOS"
+        }
+      ]
+    },
+    {
+      "id": "scene-kitchen",
+      "slugline": "INT. KITCHEN - DAY",
+      "order": 0,
+      "visible": true,
+      "cameraSupport": "Tripod",
+      "lens": "35mm",
+      "audioSource": "Boom",
+      "camera": "A",
+      "fps": "24",
+      "sync": "SYNC",
+      "scheduledDate": "2026-03-14",
+      "shots": [
+        {
+          "id": "shot-kitchen-cu",
+          "order": 1,
+          "color": "#3366FF",
+          "visible": true,
+          "shotType": "CU",
+          "subject": "Robin",
+          "slug": "Pouring tea",
+          "lens": "85mm",
+          "notes": "Rack focus to the cup"
+        },
+        {
+          "id": "shot-kitchen-ws",
+          "order": 0,
+          "color": "#FF0000",
+          "visible": true,
+          "shotType": "WS",
+          "subject": "Kitchen",
+          "slug": ""
+        }
+      ]
+    },
+    {
+      "id": "scene-empty",
+      "slugline": "",
+      "order": 2,
+      "visible": false,
+      "shots": []
+    }
+  ],
+  "annotations": [
+    {
+      "id": "line-linked",
+      "kind": "line",
+      "page": 1,
+      "points": [
+        { "x": 0.1, "y": 0.2 },
+        { "x": 0.1, "y": 0.6 }
+      ],
+      "style": {
+        "stroke": "solid",
+        "widthPt": 2,
+        "color": "#FF0000",
+        "start": { "cap": "none", "scalePercent": 100, "filled": true },
+        "end": { "cap": "arrow", "scalePercent": 100, "filled": true }
+      },
+      "fontFamily": "\"Arial\", sans-serif",
+      "fontSizePt": 11,
+      "labelBold": true,
+      "shotId": "shot-kitchen-ws",
+      "showLabel": true,
+      "locks": { "shotId": true, "shotType": true, "label": true, "color": true }
+    },
+    {
+      "id": "line-custom-caption",
+      "kind": "line",
+      "page": 1,
+      "points": [
+        { "x": 0.7, "y": 0.15 },
+        { "x": 0.7, "y": 0.45 }
+      ],
+      "style": {
+        "stroke": "dashed_4_3_2_3",
+        "widthPt": 3,
+        "color": "#8800CC",
+        "start": { "cap": "circle", "scalePercent": 150, "filled": false },
+        "end": { "cap": "slash", "scalePercent": 100, "filled": true }
+      },
+      "fontFamily": "\"Consolas\", monospace",
+      "fontSizePt": 9,
+      "labelBold": false,
+      "shotId": "shot-kitchen-cu",
+      "label": "Robin's hands only",
+      "showLabel": true,
+      "locks": { "shotId": true, "shotType": true, "label": false, "color": false }
+    },
+    {
+      "id": "line-unlinked-legacy-style",
+      "kind": "line",
+      "page": 2,
+      "points": [
+        { "x": 0.5, "y": 0.05 },
+        { "x": 0.6, "y": 0.3 }
+      ],
+      "style": {
+        "stroke": "dotted",
+        "width": 3,
+        "color": "#111111",
+        "startCap": "none",
+        "endCap": "diamond"
+      },
+      "showLabel": false
+    },
+    {
+      "id": "line-continues",
+      "kind": "line",
+      "page": 2,
+      "points": [
+        { "x": 0.2, "y": 0.5 },
+        { "x": 0.2, "y": 0.97 }
+      ],
+      "style": {
+        "stroke": "solid",
+        "widthPt": 2,
+        "color": "#00AA55",
+        "start": { "cap": "none", "scalePercent": 100, "filled": true },
+        "end": { "cap": "arrow", "scalePercent": 100, "filled": true }
+      },
+      "fontFamily": "\"Arial\", sans-serif",
+      "fontSizePt": 11,
+      "shotId": "shot-garage-master",
+      "showLabel": true,
+      "continuesToNextPage": true
+    },
+    {
+      "id": "line-continuation-segment",
+      "kind": "line",
+      "page": 3,
+      "points": [
+        { "x": 0.2, "y": 0.03 },
+        { "x": 0.2, "y": 0.4 }
+      ],
+      "style": {
+        "stroke": "solid",
+        "widthPt": 2,
+        "color": "#00AA55",
+        "start": { "cap": "none", "scalePercent": 100, "filled": true },
+        "end": { "cap": "arrow", "scalePercent": 100, "filled": true }
+      },
+      "shotId": "shot-garage-master",
+      "showLabel": true,
+      "continuedFromLineId": "line-continues",
+      "continuedFromPrevPage": true
+    },
+    {
+      "id": "note-plain",
+      "kind": "text",
+      "page": 1,
+      "x": 0.4,
+      "y": 0.3,
+      "text": "Check props",
+      "color": "#111111",
+      "fontSize": 14,
+      "fontFamily": "\"Courier New\", monospace",
+      "bold": true
+    },
+    {
+      "id": "note-follows-shot",
+      "kind": "text",
+      "page": 2,
+      "x": 0.3,
+      "y": 0.7,
+      "text": "stale copy",
+      "color": "#3366FF",
+      "shotId": "shot-kitchen-cu",
+      "followShot": true,
+      "locks": { "shotId": true, "color": true }
+    }
+  ]
+}
