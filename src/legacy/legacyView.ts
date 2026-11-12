@@ -364,6 +364,10 @@ export function lineToV2(line: LineAnnotation, project: V2.Project, base?: V2.Li
 
   mark.stroke.pattern = keepUnlessChanged(base.stroke.pattern, legacyStroke, line.style.stroke, mark.stroke.pattern);
   if (base.stroke.patternSizePct !== undefined) mark.stroke.patternSizePct = base.stroke.patternSizePct;
+  if (base.stroke.lengthPct !== undefined) mark.stroke.lengthPct = base.stroke.lengthPct;
+  if (base.stroke.gapPct !== undefined) mark.stroke.gapPct = base.stroke.gapPct;
+  if (base.stroke.amplitudePct !== undefined) mark.stroke.amplitudePct = base.stroke.amplitudePct;
+  if (base.stroke.waveSide !== undefined) mark.stroke.waveSide = base.stroke.waveSide;
   mark.start.type = keepUnlessChanged(base.start.type, (k) => legacyEnding({ ...base.start, type: k }).cap, line.style.start.cap, mark.start.type);
   mark.end.type = keepUnlessChanged(base.end.type, (k) => legacyEnding({ ...base.end, type: k }).cap, line.style.end.cap, mark.end.type);
   if (base.segments && base.segments.length === mark.points.length - 1) mark.segments = base.segments;

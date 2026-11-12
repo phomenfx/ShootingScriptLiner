@@ -132,12 +132,38 @@ export type Ending = {
   filled: boolean;
 };
 
-export type Stroke = {
+/** Which side the wavy strand sits on, looking along the segment. Right is the usual side. */
+export type WaveSide = "left" | "right";
+
+/**
+ * Optional pattern adjustments. 100, or a missing value, is the normal size.
+ * A segment stores one only when that segment differs from the line.
+ */
+export type PatternTune = {
+  /**
+   * Older overall scale. A dash, gap, wavelength, or amplitude uses this
+   * only when that pattern has no value of its own.
+   */
+  patternSizePct?: number;
+  /** Dash or dot length, or the wavelength of a wave or zigzag. */
+  lengthPct?: number;
+  /** Space between dashes, dots, parallel strands, or hash ticks. */
+  gapPct?: number;
+  /** Height of a wave or zigzag. */
+  amplitudePct?: number;
+  waveSide?: WaveSide;
+};
+
+export type Stroke = PatternTune & {
   /** Registry key: straight, dotted, wavy, … */
   pattern: string;
   widthPt: number;
-  /** 100 = normal. Missing means 100. */
-  patternSizePct?: number;
+};
+
+/** What one segment overrides. Anything missing follows the line's stroke. */
+export type SegmentStyle = PatternTune & {
+  pattern?: string;
+  widthPt?: number;
 };
 
 export type TextStyle = {
@@ -188,7 +214,7 @@ export type LineMark = MarkBase & {
   color?: string;
   stroke: Stroke;
   /** One entry per segment between points. Missing or null follows `stroke`. */
-  segments?: ({ pattern?: string } | null)[];
+  segments?: (SegmentStyle | null)[];
   start: Ending;
   end: Ending;
   outline?: Outline;

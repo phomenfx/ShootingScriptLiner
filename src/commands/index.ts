@@ -237,7 +237,11 @@ export async function exportLinedPdf(): Promise<void> {
       return;
     }
     const { buildLinedPdfBytes } = await import("../lib/pdfExport");
-    const bytes = await buildLinedPdfBytes(toLegacyProject(project()), await pdfFile.arrayBuffer());
+    const bytes = await buildLinedPdfBytes(
+      toLegacyProject(project()),
+      await pdfFile.arrayBuffer(),
+      project().marks.filter((mark) => mark.kind === "line")
+    );
     downloadBlob(new Blob([bytes], { type: "application/pdf" }), `${projectFileStem(project())}-lined.pdf`);
   } catch (error) {
     notify(

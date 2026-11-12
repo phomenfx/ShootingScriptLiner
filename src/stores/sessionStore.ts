@@ -23,6 +23,8 @@ type SessionState = {
   selection: Selection;
   /** Which tab a linked mark shows in Properties: its own form or its shot's. */
   markTab: "own" | "shot";
+  /** One segment of the selected line. Cleared with the selection. Not saved. */
+  lineSegment: { lineId: string; index: number } | null;
   /** Scenes folded in the Scenes list. */
   collapsedSceneIds: Record<string, true>;
   activeTool: ScriptTool;
@@ -47,6 +49,8 @@ type SessionState = {
 
   select: (kind: "scene" | "shot" | "mark", id: string) => void;
   clearSelection: () => void;
+  setLineSegment: (lineId: string, index: number) => void;
+  clearLineSegment: () => void;
   setMarkTab: (tab: "own" | "shot") => void;
   setSceneCollapsed: (sceneId: string, collapsed: boolean) => void;
   setCollapsedScenes: (sceneIds: string[]) => void;
@@ -75,6 +79,7 @@ function clampPage(page: number, pageCount: number): number {
 export const useSessionStore = create<SessionState>((set) => ({
   selection: null,
   markTab: "own",
+  lineSegment: null,
   collapsedSceneIds: {},
   activeTool: "select",
   snapEnabled: true,
@@ -92,10 +97,13 @@ export const useSessionStore = create<SessionState>((set) => ({
   select: (kind, id) =>
     set({
       selection: { kind, ids: [id] },
+      lineSegment: null,
       // A line or note opens its own form. A shot opens the shot, with no mark tabs.
       ...(kind === "mark" ? { markTab: "own" as const } : {}),
     }),
-  clearSelection: () => set({ selection: null }),
+  clearSelection: () => set({ selection: null, lineSegment: null }),
+  setLineSegment: (lineId, index) => set({ lineSegment: { lineId, index } }),
+  clearLineSegment: () => set({ lineSegment: null }),
   setMarkTab: (markTab) => set({ markTab }),
   setSceneCollapsed: (sceneId, collapsed) =>
     set((s) => {
@@ -138,6 +146,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   reset: () =>
     set({
       selection: null,
+      lineSegment: null,
       collapsedSceneIds: {},
       activeTool: "select",
       snapEnabled: true,

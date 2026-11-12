@@ -1,4 +1,4 @@
-import { AlignCenter, AlignLeft, AlignRight, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, ChevronDown, ChevronUp, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import * as commands from "../../commands";
 import { getFontOptions, loadBundledFonts } from "../../lib/fonts";
@@ -7,12 +7,15 @@ import * as edits from "../../model/edits";
 import { describeLength, lineLength } from "../../model/pageLength";
 import { choiceEntries } from "../../model/registry";
 import { listScenes } from "../../model/shotList";
-import type { Ending, LineMark, Mark, Project, TextAlign, TextMark, TextStyle } from "../../model/types";
+import type { Ending, LineMark, Mark, PatternTune, Project, TextAlign, TextMark, TextStyle } from "../../model/types";
+import { patternFields, tuneLabel, type TuneField } from "../../lib/strokeGeometry";
+import { segmentLook, editSegmentTune, editStrokeTune, setSegmentPattern, setSegmentWidth, tunePercent } from "../../model/segments";
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
-import { ColorField, Field, Footer, FooterButton, Group, NumberInput, Segmented, Select, TextInput, Toggles } from "./parts";
+import { useSessionStore } from "../../stores/sessionStore";
+import { PatternPicker } from "./PatternPicker";
+import { ColorField, Field, Footer, FooterButton, Group, Lockable, NumberInput, Segmented, Select, TextInput, Toggles } from "./parts";
 
-/* Patterns and endings the script can draw today. The newer ones join as they are built. */
-const DRAWABLE_PATTERNS = ["straight", "dashed_2_2", "dashed_3_3", "dashed_4_4", "dashed_4_3_2_3", "dashed_4_3_16_3", "dashed_8_4_4_4", "dotted"];
+/* Endings the script can draw today. The newer ones join with the next step. */
 const DRAWABLE_ENDINGS = ["none", "square", "circle", "diamond", "arrow", "arrowReversed", "butt", "slash"];
 const FILLABLE_ENDINGS = ["square", "circle", "diamond", "arrow", "arrowReversed"];
 
@@ -21,6 +24,11 @@ function step(edit: edits.Edit) {
   breakUndoGroup();
   apply(edit);
   breakUndoGroup();
+}
+
+function tuneNumber(look: PatternTune, field: TuneField): number {
+  if (field === "side") return 100;
+  return tunePercent(look, field);
 }
 
 function useFonts() {
@@ -161,7 +169,7 @@ function EndingFields({ title, value, onChange }: { title: string; value: Ending
         Filled
       </label>
       <Field label="Size">
-        <NumberInput label={`${title} ending size`} value={value.sizePct} min={50} max={350} step={10} unit="%" onChange={(sizePct) => sizePct && onChange({ ...value, sizePct })} />
+        <NumberInput label={`${title} ending size`} value={value.sizePct} min={50} step={10} unit="%" onChange={(sizePct) => sizePct && onChange({ ...value, sizePct })} />
       </Field>
     </>
   );
@@ -188,12 +196,20 @@ function MarkFooter({ onUseAsDefault }: { onUseAsDefault?: () => void }) {
 export function LineInspector({ project, line }: { project: Project; line: LineMark }) {
   const fonts = useFonts();
   const linked = edits.findShot(project, line.shotId);
+  const segmentIndex = useSessionStore((s) => (s.lineSegment?.lineId === line.id ? s.lineSegment.index : null));
+  // A line with one segment has nothing to pick between, so it edits the whole stroke.
+  const segment =
+    line.points.length > 2 && segmentIndex !== null && segmentIndex >= 0 && segmentIndex < line.points.length - 1 ? segmentIndex : null;
+  const look = segment === null ? line.stroke : segmentLook(line, segment);
+  // Arrows walk the segments in order. With none picked, down starts at the first and up at the last.
+  const stepSegment = (by: 1 | -1) => {
+    const count = line.points.length - 1;
+    const next = segment === null ? (by === 1 ? 0 : count - 1) : Math.min(count - 1, Math.max(0, segment + by));
+    useSessionStore.getState().setLineSegment(line.id, next);
+  };
   const update = (recipe: (line: LineMark) => LineMark) =>
     apply(edits.updateMark(line.id, (m) => (m.kind === "line" ? recipe(m) : m)));
   const caption = (patch: Partial<LineMark["caption"]>) => update((l) => ({ ...l, caption: { ...l.caption, ...patch } }));
-  const patterns = choiceEntries("pattern", undefined)
-    .filter((e) => DRAWABLE_PATTERNS.includes(e.key))
-    .map((e) => ({ value: e.key, label: e.label }));
 
   const useAsDefault = () =>
     step(
@@ -250,7 +266,7 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
           )}
         </Group>
 
-        <Group name="line-stroke" title="Stroke">
+        <Group name="line-stroke" title={segment === null ? "Stroke" : `Segment ${segment + 1} of ${line.points.length - 1}`}>
           <Field label="Color">
             <ColorField
               label="Line color"
@@ -266,17 +282,126 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
               }
             />
           </Field>
-          <Field label="Width">
-            <NumberInput label="Line width" value={line.stroke.widthPt} min={0.25} max={24} step={0.25} unit="pt" onChange={(widthPt) => widthPt && update((l) => ({ ...l, stroke: { ...l.stroke, widthPt } }))} />
+          <Field label="Thickness">
+            {segment === null ? (
+              <NumberInput
+                label="Line thickness"
+                value={line.stroke.widthPt}
+                min={0.25}
+                max={24}
+                step={0.25}
+                unit="pt"
+                onChange={(widthPt) => {
+                  if (!widthPt) return;
+                  update((l) => ({ ...l, stroke: { ...l.stroke, widthPt } }));
+                }}
+              />
+            ) : (
+              // Locked: the field is the whole line's thickness. Unlocked: this segment's own.
+              <Lockable
+                locked={line.segments?.[segment]?.widthPt === undefined}
+                what="the whole line"
+                onToggle={() =>
+                  update((l) => {
+                    const own = l.segments?.[segment]?.widthPt;
+                    return setSegmentWidth(l, segment, own === undefined ? l.stroke.widthPt : undefined);
+                  })
+                }
+              >
+                <NumberInput
+                  label={line.segments?.[segment]?.widthPt === undefined ? "Line thickness" : "Segment thickness"}
+                  value={line.segments?.[segment]?.widthPt ?? line.stroke.widthPt}
+                  min={0.25}
+                  max={24}
+                  step={0.25}
+                  unit="pt"
+                  onChange={(widthPt) => {
+                    if (!widthPt) return;
+                    update((l) =>
+                      l.segments?.[segment]?.widthPt === undefined
+                        ? { ...l, stroke: { ...l.stroke, widthPt } }
+                        : setSegmentWidth(l, segment, widthPt)
+                    );
+                  }}
+                />
+              </Lockable>
+            )}
           </Field>
           <Field label="Pattern" wide>
-            <Select label="Pattern" value={line.stroke.pattern} options={patterns} onChange={(pattern) => update((l) => ({ ...l, stroke: { ...l.stroke, pattern } }))} />
+            <PatternPicker
+              value={look.pattern}
+              onChange={(pattern) =>
+                update((l) => (segment === null ? { ...l, stroke: { ...l.stroke, pattern } } : setSegmentPattern(l, segment, pattern)))
+              }
+            />
           </Field>
+          {patternFields(look.pattern).map((field) =>
+            field === "side" ? (
+              <Field key={field} label={tuneLabel(look.pattern, field)}>
+                <Segmented
+                  label="Wavy side"
+                  value={look.waveSide ?? "right"}
+                  options={[
+                    { value: "left", label: "Left", title: "Left of the direction the segment runs" },
+                    { value: "right", label: "Right", title: "Right of the direction the segment runs" },
+                  ]}
+                  onChange={(waveSide) =>
+                    update((l) =>
+                      segment === null
+                        ? { ...l, stroke: editStrokeTune(l.stroke, "side", waveSide) }
+                        : editSegmentTune(l, segment, "side", waveSide)
+                    )
+                  }
+                />
+              </Field>
+            ) : (
+              <Field key={field} label={tuneLabel(look.pattern, field)}>
+                <NumberInput
+                  label={tuneLabel(look.pattern, field)}
+                  value={tuneNumber(look, field)}
+                  min={25}
+                  step={5}
+                  unit="%"
+                  onChange={(value) =>
+                    update((l) =>
+                      segment === null
+                        ? { ...l, stroke: editStrokeTune(l.stroke, field, value) }
+                        : editSegmentTune(l, segment, field, value)
+                    )
+                  }
+                />
+              </Field>
+            )
+          )}
           <div className="pf-wide pf-link">
             <FooterButton onClick={() => commands.splitSelection()}>Split</FooterButton>
             <FooterButton onClick={() => commands.rejoinSelection()} disabled={line.points.length < 3}>
               Rejoin
             </FooterButton>
+            {line.points.length > 2 && (
+              <>
+                <button
+                  type="button"
+                  className="pf-icon-btn"
+                  title="Previous segment"
+                  aria-label="Previous segment"
+                  disabled={segment === 0}
+                  onClick={() => stepSegment(-1)}
+                >
+                  <ChevronUp size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="pf-icon-btn"
+                  title="Next segment"
+                  aria-label="Next segment"
+                  disabled={segment === line.points.length - 2}
+                  onClick={() => stepSegment(1)}
+                >
+                  <ChevronDown size={16} />
+                </button>
+              </>
+            )}
           </div>
         </Group>
 

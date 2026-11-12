@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildShotListRows, rowsToCsv, SHOT_LIST_COLUMNS } from "../io/shotListCsv";
-import { effectiveShot, printsField, shotCaption, withPrintField } from "./captions";
+import { cameraRowPrints, effectiveShot, printsField, shotCaption, withCameraRowPrint, withPrintField } from "./captions";
 import { createProject, createScene } from "./defaults";
 import { findShot } from "./edits";
 import { describeLength, formatEighths, shotLength } from "./pageLength";
@@ -95,6 +95,25 @@ describe("shot captions", () => {
     const info = project.settings.captions.fields.find((field) => field.id === "additionalInfo");
     if (info) info.divider = "spacedHyphen";
     expect(shotCaption(project, found(project, "b"))).toBe("1.2-CU Alice - Moving");
+  });
+
+  it("prints each camera row's name and lenses by its own checkbox", () => {
+    const project = sample();
+    const b = () => found(project, "b");
+    const setShot = (next: Shot) => (project.scenes[0]!.shots[1] = next);
+    // Camera and lens are off by default, so nothing prints until a row is ticked.
+    expect(shotCaption(project, b())).not.toContain("135mm");
+    setShot(withCameraRowPrint(project, b().shot, "lens", 0, true));
+    setShot(withCameraRowPrint(project, b().shot, "camera", 1, true));
+    expect(cameraRowPrints(project, b().shot, "lens", 0)).toBe(true);
+    expect(cameraRowPrints(project, b().shot, "lens", 1)).toBe(false);
+    const caption = shotCaption(project, b());
+    expect(caption).toContain("85mm, 135mm");
+    expect(caption).not.toContain("50mm");
+    expect(caption).toContain("B");
+    // Unticking a row back to the field's setting stores nothing.
+    setShot(withCameraRowPrint(project, b().shot, "lens", 0, false));
+    expect(b().shot.print).toEqual({ "camera:1": true });
   });
 
   it("lets a divider sit between fields or surround one", () => {

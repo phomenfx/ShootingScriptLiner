@@ -44,6 +44,30 @@ export function printsField(project: Project, shot: Shot, fieldId: string): bool
   return field?.print ?? CAPTION_FIELDS.find((f) => f.id === fieldId)?.print ?? false;
 }
 
+/**
+ * Whether one camera row prints its camera name or its lenses. Each row has its
+ * own checkbox, stored on the shot as "camera:0", "lens:0" and so on. A row with
+ * no checkbox of its own follows the field's setting.
+ */
+export function cameraRowPrints(project: Project, shot: Shot, part: "camera" | "lens", index: number): boolean {
+  const own = shot.print?.[`${part}:${index}`];
+  return typeof own === "boolean" ? own : printsField(project, shot, part);
+}
+
+/** The shot after one camera row's checkbox changes. A value equal to the field's setting is not kept. */
+export function withCameraRowPrint(project: Project, shot: Shot, part: "camera" | "lens", index: number, print: boolean): Shot {
+  const key = `${part}:${index}`;
+  const next = { ...shot.print };
+  delete next[key];
+  const follows = printsField(project, { ...shot, print: next }, part);
+  if (print !== follows) next[key] = print;
+  if (Object.keys(next).length === 0) {
+    const { print: _removed, ...rest } = shot;
+    return rest;
+  }
+  return { ...shot, print: next };
+}
+
 /** The shot's print checkboxes after one is changed. A value equal to the project setting is not kept. */
 export function withPrintField(project: Project, shot: Shot, fieldId: string, print: boolean): Shot {
   const projectDefault =
@@ -85,9 +109,10 @@ export function captionFieldText(project: Project, found: FoundShot, fieldId: st
     case "movement":
       return list(own?.movement ?? e.movement);
     case "lens":
-      return list(cameraLenses(own?.cameras ?? e.cameras));
-    case "camera":
-      return list(cameraNames(own?.cameras ?? e.cameras));
+    case "camera": {
+      const rows = (own?.cameras ?? e.cameras).filter((_, index) => cameraRowPrints(project, shot, fieldId, index));
+      return list(fieldId === "lens" ? cameraLenses(rows) : cameraNames(rows));
+    }
     case "audio":
       return list(own?.audio ?? e.audio);
     case "indicator":
@@ -233,7 +258,9 @@ export function shotCaption(project: Project, found: FoundShot, own?: MarkOwn): 
   let caption = "";
   let started = false;
   for (const field of project.settings.captions.fields) {
-    if (!printsField(project, found.shot, field.id)) continue;
+    // Camera and lens print row by row, so their rows decide.
+    const byRow = field.id === "camera" || field.id === "lens";
+    if (!byRow && !printsField(project, found.shot, field.id)) continue;
     const text = captionFieldText(project, found, field.id, own);
     if (!text) continue;
     if (!started) {

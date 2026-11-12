@@ -31,7 +31,9 @@ import {
   secondaryLayoutForLine,
 } from "./labelLayout";
 import { endingGeometry, shaftEnds } from "./geometry";
-import { strokeDashPatternPdf } from "./lineStrokes";
+import { segmentStrands, type StrokeStrand } from "./strokeGeometry";
+import { segmentLook } from "../model/segments";
+import type { LineMark } from "../model/types";
 import { drawPdfLineCap } from "./pdfLineCaps";
 import { resolvePdfExportFont, sanitizePdfExportText } from "./pdfExportFonts";
 import {
@@ -120,11 +122,13 @@ function drawWrappedPdfText(
 /** Draws coverage lines and text onto a copy of the script PDF. */
 export async function buildLinedPdfBytes(
   project: Project,
-  pdfBytes: ArrayBuffer
+  pdfBytes: ArrayBuffer,
+  sourceLines: LineMark[] = []
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
 
   const fontCache = new Map<string, Awaited<ReturnType<typeof resolvePdfExportFont>>>();
+  const sourceById = new Map(sourceLines.map((line) => [line.id, line]));
   const getFont = async (fontFamily: string, bold: boolean, sampleText?: string) => {
     const key = `${fontFamily}\0${bold}`;
     let font = fontCache.get(key);
@@ -152,30 +156,30 @@ export async function buildLinedPdfBytes(
     for (const line of lines) {
       if (!isLineAnnotation(line)) continue;
       const style = resolveLineStyle(line, project);
-      const dash = strokeDashPatternPdf(style.stroke, style.widthPt);
+      const source = sourceById.get(line.id);
       const startNorm = line.points[0];
       const endNorm = line.points[line.points.length - 1];
       if (!startNorm || !endNorm || line.points.length < 2) continue;
-      const pts = line.points.map((point) => normToPdf(point.x, point.y, pw, ph));
+      const pts = source
+        ? source.points.map((point) => ({ x: point.x, y: ph - point.y }))
+        : line.points.map((point) => normToPdf(point.x, point.y, pw, ph));
       const last = pts.length - 1;
+      if (last < 1) continue;
+      const ink = hexToRgb(style.color);
       const startInset = endingGeometry(style.start, style.widthPt)?.shaftInsetPt ?? 0;
       const endInset = endingGeometry(style.end, style.widthPt)?.shaftInsetPt ?? 0;
       for (let index = 0; index < last; index += 1) {
         const start = pts[index]!;
         const end = pts[index + 1]!;
-        const [shaftStart, shaftEnd] = shaftEnds(
-          start,
-          end,
-          index === 0 ? startInset : 0,
-          index === last - 1 ? endInset : 0
-        );
-        page.drawLine({
-          start: shaftStart,
-          end: shaftEnd,
-          thickness: Math.max(0.5, style.widthPt),
-          color: hexToRgb(style.color),
-          dashArray: dash,
-        });
+        const look = source
+          ? segmentLook(source, index)
+          : { pattern: style.stroke === "solid" ? "straight" : style.stroke, widthPt: style.widthPt };
+        const [shaftStart, shaftEnd] = shaftEnds(start, end, index === 0 ? startInset : 0, index === last - 1 ? endInset : 0);
+        // Build strands with y pointing down, as on screen, so sided patterns land on the same side; then flip for the PDF.
+        const flip = (point: { x: number; y: number }) => ({ x: point.x, y: ph - point.y });
+        for (const strand of segmentStrands(flip(shaftStart), flip(shaftEnd), look.pattern, look.widthPt, look)) {
+          if (strand.export) drawStrand(page, { ...strand, points: strand.points.map(flip) }, ink);
+        }
       }
 
       const p0 = pts[0]!;
@@ -278,4 +282,26 @@ export async function buildLinedPdfBytes(
   }
 
   return doc.save();
+}
+
+function drawStrand(page: PDFPage, strand: StrokeStrand, color: ReturnType<typeof hexToRgb>): void {
+  const points = strand.points;
+  if (points.length < 2) return;
+  const paint = (start: StrokeStrand["points"][number], end: StrokeStrand["points"][number], dash?: number[]) => {
+    page.drawLine({
+      start,
+      end,
+      thickness: Math.max(0.25, strand.widthPt),
+      color,
+      opacity: strand.opacity,
+      ...(dash ? { dashArray: dash } : {}),
+    });
+  };
+  if (points.length === 2) {
+    paint(points[0]!, points[1]!, strand.dash);
+    return;
+  }
+  for (let index = 0; index < points.length - 1; index += 1) {
+    paint(points[index]!, points[index + 1]!);
+  }
 }

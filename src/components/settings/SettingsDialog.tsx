@@ -21,7 +21,9 @@ import { CAPTION_DIVIDERS, customDividerSeed, isCaptionDivider } from "../../mod
 import { defaultSettings } from "../../model/defaults";
 import { setName, updateSettings } from "../../model/edits";
 import { CAPTION_FIELDS, choiceEntries, isCaptionFieldId } from "../../model/registry";
-import type { CaptionDivider, Ending, LineDefaults, ProjectSettings } from "../../model/types";
+import type { CaptionDivider, Ending, LineDefaults, ProjectSettings, WaveSide } from "../../model/types";
+import { patternFields, tuneLabel, type TuneField } from "../../lib/strokeGeometry";
+import { editStrokeTune, tunePercent } from "../../model/segments";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -34,19 +36,10 @@ import {
   type ColorTheme,
   type UiScale,
 } from "../../types/appPreferences";
+import { PatternPicker } from "../properties/PatternPicker";
 import { ToolKeybindSettings } from "../ToolKeybindSettings";
 
-/* Patterns and endings the script can draw today. The newer ones join as they are built. */
-const DRAWABLE_PATTERNS = [
-  "straight",
-  "dashed_2_2",
-  "dashed_3_3",
-  "dashed_4_4",
-  "dashed_4_3_2_3",
-  "dashed_4_3_16_3",
-  "dashed_8_4_4_4",
-  "dotted",
-];
+/* Endings the script can draw today. The newer ones join with the next step. */
 const DRAWABLE_ENDINGS = ["none", "square", "circle", "diamond", "arrow", "arrowReversed", "butt", "slash"];
 const FILLABLE_ENDINGS = ["square", "circle", "diamond", "arrow", "arrowReversed"];
 
@@ -105,6 +98,45 @@ function Segmented<T extends string | number>({
   );
 }
 
+function strokeTuneRow(stroke: LineDefaults["stroke"], field: TuneField, onChange: (stroke: LineDefaults["stroke"]) => void): Row {
+  const label = tuneLabel(stroke.pattern, field);
+  if (field === "side") {
+    return {
+      label,
+      hint: "Which side the wavy strand sits on, looking along the line.",
+      control: (
+        <Segmented
+          value={stroke.waveSide ?? "right"}
+          options={[
+            { value: "left", label: "Left" },
+            { value: "right", label: "Right" },
+          ]}
+          onChange={(waveSide: WaveSide) => onChange(editStrokeTune(stroke, "side", waveSide))}
+        />
+      ),
+    };
+  }
+  return {
+    label,
+    hint: tuneHint(field),
+    control: (
+      <NumberField
+        value={tunePercent(stroke, field)}
+        min={25}
+        step={5}
+        unit="%"
+        onChange={(next) => onChange(editStrokeTune(stroke, field, next))}
+      />
+    ),
+  };
+}
+
+function tuneHint(field: TuneField): string {
+  if (field === "length") return "Dash or dot size, or the distance from one crest to the next.";
+  if (field === "gap") return "Space between the marks or the strands.";
+  return "How far the wave or zigzag swings.";
+}
+
 function NumberField({
   value,
   min,
@@ -115,7 +147,8 @@ function NumberField({
 }: {
   value: number;
   min: number;
-  max: number;
+  /** Leave out for no upper limit. */
+  max?: number;
   step?: number;
   unit?: string;
   onChange: (value: number) => void;
@@ -130,7 +163,7 @@ function NumberField({
         step={step}
         onChange={(e) => {
           const n = Number(e.target.value);
-          if (e.target.value !== "" && Number.isFinite(n)) onChange(Math.max(min, Math.min(max, n)));
+          if (e.target.value !== "" && Number.isFinite(n)) onChange(Math.max(min, max === undefined ? n : Math.min(max, n)));
         }}
       />
       {unit && <span className="set-unit">{unit}</span>}
@@ -150,7 +183,7 @@ function EndingField({ value, onChange }: { value: Ending; onChange: (value: End
           </option>
         ))}
       </select>
-      <NumberField value={value.sizePct} min={50} max={350} step={10} unit="%" onChange={(sizePct) => onChange({ ...value, sizePct })} />
+      <NumberField value={value.sizePct} min={50} step={10} unit="%" onChange={(sizePct) => onChange({ ...value, sizePct })} />
       <label className="set-check">
         <input
           type="checkbox"
@@ -266,7 +299,6 @@ export function SettingsDialog() {
 
   const line = s.markDefaults.line;
   const fonts = getFontOptions();
-  const patterns = choiceEntries("pattern", undefined).filter((e) => DRAWABLE_PATTERNS.includes(e.key));
   const icon = { size: 15, strokeWidth: 1.75 } as const;
 
   const sections: Section[] = [
@@ -299,8 +331,8 @@ export function SettingsDialog() {
             <Segmented
               value={s.general.additionalInfoStyle}
               options={[
-                { value: "parens", label: "Alice (Moving)" },
-                { value: "hyphen", label: "Alice - Moving" },
+                { value: "parens", label: "Subject (Moving)" },
+                { value: "hyphen", label: "Subject - Moving" },
               ]}
               onChange={(additionalInfoStyle) => setGeneral({ additionalInfoStyle })}
             />
@@ -460,20 +492,17 @@ export function SettingsDialog() {
         {
           label: "Line pattern",
           control: (
-            <select value={line.stroke.pattern} onChange={(e) => setLine({ stroke: { ...line.stroke, pattern: e.target.value } })}>
-              {!DRAWABLE_PATTERNS.includes(line.stroke.pattern) && <option value={line.stroke.pattern}>{line.stroke.pattern}</option>}
-              {patterns.map((entry) => (
-                <option key={entry.key} value={entry.key}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
+            <PatternPicker
+              value={line.stroke.pattern}
+              onChange={(pattern) => setLine({ stroke: { ...line.stroke, pattern } })}
+            />
           ),
         },
         {
-          label: "Line width",
+          label: "Line thickness",
           control: <NumberField value={line.stroke.widthPt} min={0.25} max={24} step={0.25} unit="pt" onChange={(widthPt) => setLine({ stroke: { ...line.stroke, widthPt } })} />,
         },
+        ...patternFields(line.stroke.pattern).map((field) => strokeTuneRow(line.stroke, field, (stroke) => setLine({ stroke }))),
         { label: "Line start", control: <EndingField value={line.start} onChange={(start) => setLine({ start })} /> },
         { label: "Line end", control: <EndingField value={line.end} onChange={(end) => setLine({ end })} /> },
         {

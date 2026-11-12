@@ -42,9 +42,10 @@ import {
   viewerScalePxPerPt,
 } from "../../lib/labelLayout";
 import { endingGeometry, shaftEnds } from "../../lib/geometry";
+import { segmentStrands } from "../../lib/strokeGeometry";
+import { segmentLook } from "../../model/segments";
 import { actionBarPosition } from "../../lib/actionBarLayout";
 import { lineAngleRad, renderLineCap } from "../../lib/lineCaps";
-import { strokeDashArray } from "../../lib/lineStrokes";
 import { labelDragPatch } from "../../gestures/labelDrag";
 import { clonedLinePoints, closestOnLine, dragLinePoints, drawPreviewEnd, finishDrawEnd, type LineHandle } from "../../gestures/lineDrag";
 import { noteMovePatch, noteResizePatch } from "../../gestures/noteDrag";
@@ -149,6 +150,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   const showActionBar = usePrefsStore((s) => s.showActionBar);
   const setActivePage = useSessionStore((s) => s.setActivePage);
   const linkedShotId = useSessionStore((s) => (s.selection?.kind === "shot" ? s.selection.ids[0] : undefined));
+  const lineSegment = useSessionStore((s) => s.lineSegment);
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -307,17 +309,19 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     };
   });
 
-  const findLineAt = (p: NormalizedPoint): LineAnnotation | null => {
+  const findSegmentAt = (p: NormalizedPoint): { line: LineAnnotation; index: number } | null => {
     const threshold = lineHitTolerancePx / Math.max(width, height);
     for (const line of [...lines].reverse()) {
       for (let index = 0; index < line.points.length - 1; index += 1) {
         const a = line.points[index];
         const b = line.points[index + 1];
-        if (a && b && pointToSegmentDistance(p, a, b) < threshold) return line;
+        if (a && b && pointToSegmentDistance(p, a, b) < threshold) return { line, index };
       }
     }
     return null;
   };
+
+  const findLineAt = (p: NormalizedPoint): LineAnnotation | null => findSegmentAt(p)?.line ?? null;
 
   const selectLine = (line: LineAnnotation) => selectMark(line.id);
 
@@ -407,6 +411,8 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         return;
       }
       if (target.type === "handle") {
+        if (target.handle.kind === "vertex") useSessionStore.getState().clearLineSegment();
+        else useSessionStore.getState().setLineSegment(target.line.id, target.handle.index);
         setDrag({ type: "handle", lineId: target.line.id, handle: target.handle, origin: target.line });
         capture(e);
         return;
@@ -454,6 +460,8 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       }
       if (target.type === "select-line") {
         selectLine(target.line);
+        const spot = findSegmentAt(p);
+        if (spot && spot.line.id === target.line.id) useSessionStore.getState().setLineSegment(target.line.id, spot.index);
         return;
       }
       if (target.type === "select-id") {
@@ -676,23 +684,53 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
           <g key={line.id} className={isSel ? "line-selected" : undefined}>
             {pts.slice(0, -1).map((start, index) => {
               const end = pts[index + 1]!;
+              const source = v2Project.marks.find((mark) => mark.id === line.id);
+              const owned = source?.kind === "line" ? source : undefined;
+              const look = owned
+                ? segmentLook(owned, index)
+                : { pattern: style.stroke === "solid" ? "straight" : style.stroke, widthPt: style.widthPt };
               const [shaftStart, shaftEnd] = shaftEnds(
                 start,
                 end,
                 index === 0 ? startInset : 0,
                 index === last - 1 ? endInset : 0
               );
+              const strands = segmentStrands(
+                { x: shaftStart.x / labelScale, y: shaftStart.y / labelScale },
+                { x: shaftEnd.x / labelScale, y: shaftEnd.y / labelScale },
+                look.pattern,
+                look.widthPt,
+                look
+              );
+              const segmentOn = last > 1 && lineSegment?.lineId === line.id && lineSegment.index === index;
               return (
-                <line
-                  key={index}
-                  x1={shaftStart.x}
-                  y1={shaftStart.y}
-                  x2={shaftEnd.x}
-                  y2={shaftEnd.y}
-                  stroke={style.color}
-                  strokeWidth={strokePx}
-                  strokeDasharray={strokeDashArray(style.stroke, strokePx)}
-                />
+                <g key={index}>
+                  {segmentOn && (
+                    <line
+                      x1={shaftStart.x}
+                      y1={shaftStart.y}
+                      x2={shaftEnd.x}
+                      y2={shaftEnd.y}
+                      stroke="#4a9eff"
+                      strokeWidth={look.widthPt * labelScale + 6}
+                      strokeOpacity={0.45}
+                      strokeLinecap="round"
+                    />
+                  )}
+                  {strands.map((strand, strandIndex) => (
+                    <polyline
+                      key={strandIndex}
+                      points={strand.points.map((point) => `${point.x * labelScale},${point.y * labelScale}`).join(" ")}
+                      fill="none"
+                      stroke={style.color}
+                      strokeWidth={strand.widthPt * labelScale}
+                      strokeDasharray={strand.dash?.map((part) => part * labelScale).join(" ")}
+                      strokeOpacity={strand.opacity}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+                  ))}
+                </g>
               );
             })}
             {startCap && <g transform={`translate(${pts[0]!.x}, ${pts[0]!.y})`}>{startCap.elements}</g>}

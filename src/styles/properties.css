@@ -492,3 +492,53 @@ textarea.pf-input {
   flex: none;
   height: 1.5rem;
 }
+
+.pf-patterns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.pf-pattern {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 1.75rem;
+  padding: 0.125rem 0.375rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pf-pattern:hover {
+  background: var(--color-row-hover);
+}
+
+.pf-pattern[aria-selected="true"] {
+  background: var(--color-accent-tint);
+  color: var(--color-accent);
+}
+
+.pf-pattern-swatch {
+  width: 3.5rem;
+  height: 1rem;
+  flex: none;
+}
+
+.pf-icon-btn:disabled {
+  opacity: 0.35;
+  background: none;
+  cursor: default;
+}
+
+/* Print checkbox at the start of a camera name and of its lenses */
+.pf input[type="checkbox"].pf-camera-tick {
+  margin-top: 0.4375rem;
+}

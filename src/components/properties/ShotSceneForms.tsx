@@ -1,7 +1,7 @@
 import { Plus, X } from "lucide-react";
 import type { ReactNode } from "react";
 import * as commands from "../../commands";
-import { captionFieldText, printsField, shotCaption, withPrintField } from "../../model/captions";
+import { cameraRowPrints, captionFieldText, printsField, shotCaption, withCameraRowPrint, withPrintField } from "../../model/captions";
 import { createShot } from "../../model/defaults";
 import * as edits from "../../model/edits";
 import { describeLength, formatEighths, formatPageRange, sceneLength, shotLength } from "../../model/pageLength";
@@ -26,13 +26,42 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
 
 /* ---------- camera rows ---------- */
 
-export function CameraRows({ cameras, disabled, onChange }: { cameras: CameraRow[]; disabled?: boolean; onChange: (cameras: CameraRow[]) => void }) {
+/** Print checkboxes for each camera row: one for its name, one for its lenses. */
+type RowPrint = {
+  prints: (part: "camera" | "lens", index: number) => boolean;
+  set: (part: "camera" | "lens", index: number, on: boolean) => void;
+  removed: (index: number) => void;
+};
+
+export function CameraRows({
+  cameras,
+  disabled,
+  print,
+  onChange,
+}: {
+  cameras: CameraRow[];
+  disabled?: boolean;
+  print?: RowPrint;
+  onChange: (cameras: CameraRow[]) => void;
+}) {
   const setRow = (index: number, patch: Partial<CameraRow>) =>
     onChange(cameras.map((camera, i) => (i === index ? { ...camera, ...patch } : camera)));
+  const tick = (part: "camera" | "lens", index: number, name: string) =>
+    print && (
+      <input
+        type="checkbox"
+        className="pf-camera-tick"
+        checked={print.prints(part, index)}
+        aria-label={`Print ${part === "camera" ? "camera" : "lenses of"} ${name} in the caption`}
+        title={`Print ${part === "camera" ? "this camera" : "these lenses"} in the caption`}
+        onChange={(e) => print.set(part, index, e.target.checked)}
+      />
+    );
   return (
     <div className="pf-cameras">
       {cameras.map((camera, index) => (
         <div className="pf-camera" key={index}>
+          {tick("camera", index, camera.name || `camera ${index + 1}`)}
           <input
             className="pf-input pf-camera-name"
             aria-label={`Camera ${index + 1} name`}
@@ -41,6 +70,7 @@ export function CameraRows({ cameras, disabled, onChange }: { cameras: CameraRow
             disabled={disabled}
             onChange={(e) => setRow(index, { name: e.target.value })}
           />
+          {tick("lens", index, camera.name || `camera ${index + 1}`)}
           <Chips
             values={camera.lenses}
             label={`Lenses of camera ${camera.name || index + 1}`}
@@ -49,7 +79,10 @@ export function CameraRows({ cameras, disabled, onChange }: { cameras: CameraRow
             onChange={(lenses) => setRow(index, { lenses })}
           />
           {!disabled && (
-            <button type="button" className="pf-icon-btn" title="Remove camera" aria-label={`Remove camera ${camera.name || index + 1}`} onClick={() => onChange(cameras.filter((_, i) => i !== index))}>
+            <button type="button" className="pf-icon-btn" title="Remove camera" aria-label={`Remove camera ${camera.name || index + 1}`} onClick={() => {
+                print?.removed(index);
+                onChange(cameras.filter((_, i) => i !== index));
+              }}>
               <X size={13} strokeWidth={1.75} />
             </button>
           )}
@@ -83,7 +116,7 @@ type ShotInspectorProps = {
   mark?: LineMark | TextMark;
 };
 
-type MarkField = "type" | "angle" | "subject" | "cast" | "tags" | "additionalInfo";
+type MarkField = "type" | "angle" | "subject" | "cast" | "tags" | "additionalInfo" | "setup" | "notes";
 
 export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProps) {
   const { scene, shot, sceneIndex } = found;
@@ -106,7 +139,7 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
   /* On a mark's Shot tab, each Shot field is either the shot's (locked) or that mark's own (unlocked). */
   const markOwn = mark?.own ?? {};
   const isOwn = (key: MarkField) => !!mark && markOwn[key] !== undefined;
-  const setMarkOwn = <K extends MarkField>(key: K, value: MarkOwn[K] | undefined) => {
+  const setMarkOwn = <K extends keyof MarkOwn>(key: K, value: MarkOwn[K] | undefined) => {
     if (!mark) return;
     apply(
       edits.updateMark(mark.id, (m) => {
@@ -157,36 +190,69 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
   });
   const setOwn = <K extends keyof ShotOwn>(field: K, value: ShotOwn[K] | undefined) => apply(edits.setShotOwn(shot.id, field, value));
 
-  /** Lock state and toggle for one inheritable field. Unlocking starts from the scene's value. */
-  const lock = <K extends keyof ShotOwn>(field: K, sceneValue: NonNullable<ShotOwn[K]> | undefined, empty: NonNullable<ShotOwn[K]>) => {
+  /* Fields a shot takes from its scene. Locked fields stay editable and edit what they follow. */
+  const sceneValue = <K extends keyof ShotOwn>(field: K): ShotOwn[K] =>
+    (field === "indicator" || field === "location" || field === "time"
+      ? scene.heading[field as "indicator" | "location" | "time"]
+      : scene.defaults[field as keyof typeof scene.defaults]) as ShotOwn[K];
+  const setScene = <K extends keyof ShotOwn>(field: K, value: NonNullable<ShotOwn[K]>) =>
+    apply(
+      edits.updateScene(scene.id, (s) =>
+        field === "indicator" || field === "location" || field === "time"
+          ? { ...s, heading: { ...s.heading, [field]: value } }
+          : { ...s, defaults: { ...s.defaults, [field]: value } }
+      )
+    );
+  const shotValue = <K extends keyof ShotOwn>(field: K): ShotOwn[K] => own[field] ?? sceneValue(field);
+  /** Edits the shot's value: its own when unlocked, else the scene's. */
+  const writeShot = <K extends keyof ShotOwn>(field: K, value: NonNullable<ShotOwn[K]>) =>
+    own[field] !== undefined ? setOwn(field, value) : setScene(field, value);
+
+  /**
+   * One inherited field. On a shot the lock is shot vs scene. On a mark's Shot tab
+   * the lock is mark vs shot, the same as the Shot group above.
+   */
+  const inherit = <K extends keyof ShotOwn>(field: K, empty: NonNullable<ShotOwn[K]>) => {
+    const toggle = (run: () => void) => () => {
+      breakUndoGroup();
+      run();
+      breakUndoGroup();
+    };
+    if (mark) {
+      const locked = markOwn[field] === undefined;
+      return {
+        locked,
+        what: `shot ${id}`,
+        value: (locked ? shotValue(field) : markOwn[field]) as ShotOwn[K],
+        set: (value: NonNullable<ShotOwn[K]>) => (locked ? writeShot(field, value) : setMarkOwn(field, value as MarkOwn[K])),
+        onToggle: toggle(() => setMarkOwn(field, (locked ? structuredClone(shotValue(field) ?? empty) : undefined) as MarkOwn[K])),
+      };
+    }
     const locked = own[field] === undefined;
     return {
       locked,
       what: `scene ${sceneIndex + 1}`,
-      onToggle: () => {
-        breakUndoGroup();
-        setOwn(field, locked ? structuredClone(sceneValue ?? empty) : undefined);
-        breakUndoGroup();
-      },
+      value: shotValue(field),
+      set: (value: NonNullable<ShotOwn[K]>) => writeShot(field, value),
+      onToggle: toggle(() => setOwn(field, locked ? structuredClone(sceneValue(field) ?? empty) : undefined)),
     };
   };
-  /** A text field left empty goes back to following the scene. */
-  const relockIfEmpty = (field: "indicator" | "location" | "time" | "fps" | "date") => (value: string) => {
-    if (value.trim() === "" && own[field] !== undefined) setOwn(field, undefined);
-  };
+  const lockOf = (l: { locked: boolean; what: string; onToggle: () => void }) => ({ locked: l.locked, what: l.what, onToggle: l.onToggle });
 
-  const lockedText = (field: "indicator" | "location" | "time" | "fps", label: string, sceneValue: string, suggestions?: string[]) => {
-    const l = lock(field, sceneValue, "");
+  const inheritText = (field: "indicator" | "location" | "time" | "fps" | "date", label: string, suggestions?: string[], type?: "date") => {
+    const l = inherit(field, "");
     return (
-      <Lockable {...l}>
+      <Lockable {...lockOf(l)}>
         <TextInput
+          type={type}
           label={label}
-          value={l.locked ? sceneValue : (own[field] ?? "")}
-          placeholder={sceneValue}
-          disabled={l.locked}
+          value={l.value ?? ""}
           suggestions={suggestions}
-          onChange={(value) => setOwn(field, value)}
-          onBlur={relockIfEmpty(field)}
+          onChange={(value) => l.set(value)}
+          // An unlocked field left empty goes back to following.
+          onBlur={(value) => {
+            if (value.trim() === "" && !l.locked) l.onToggle();
+          }}
         />
       </Lockable>
     );
@@ -228,11 +294,30 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
     step(edits.deleteLinesForShot(shot.id));
   };
 
-  const movement = lock("movement", scene.defaults.movement, []);
-  const cameras = lock("cameras", scene.defaults.cameras, []);
-  const audio = lock("audio", scene.defaults.audio, []);
-  const sync = lock("sync", scene.defaults.sync, "");
-  const date = lock("date", scene.defaults.date, "");
+  const movement = inherit("movement", []);
+  const cameras = inherit("cameras", []);
+  const audio = inherit("audio", []);
+  const sync = inherit("sync", "");
+  const rowPrint = {
+    prints: (part: "camera" | "lens", index: number) => cameraRowPrints(project, shot, part, index),
+    set: (part: "camera" | "lens", index: number, on: boolean) =>
+      apply(edits.updateShot(shot.id, (current) => withCameraRowPrint(project, current, part, index, on))),
+    // Rows after a removed one move up, so their checkboxes move with them.
+    removed: (index: number) =>
+      apply(
+        edits.updateShot(shot.id, (current) => {
+          if (!current.print) return current;
+          const next: Record<string, boolean> = {};
+          for (const [key, value] of Object.entries(current.print)) {
+            const m = /^(camera|lens):(\d+)$/.exec(key);
+            if (!m) next[key] = value;
+            else if (Number(m[2]) < index) next[key] = value;
+            else if (Number(m[2]) > index) next[`${m[1]}:${Number(m[2]) - 1}`] = value;
+          }
+          return { ...current, print: next };
+        })
+      ),
+  };
 
   return (
     <>
@@ -295,46 +380,43 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
         <Group name="shot-scene" title="Scene" note={`from scene ${sceneIndex + 1}`}>
           <div className="pf-three pf-wide">
             <Field label="Indicator" {...print("indicator")}>
-              {lockedText("indicator", "Indicator", scene.heading.indicator, INDICATORS)}
+              {inheritText("indicator", "Indicator", INDICATORS)}
             </Field>
             <Field label="Location" {...print("location")}>
-              {lockedText("location", "Location", scene.heading.location)}
+              {inheritText("location", "Location")}
             </Field>
             <Field label="Time" {...print("time")}>
-              {lockedText("time", "Time", scene.heading.time, TIMES)}
+              {inheritText("time", "Time", TIMES)}
             </Field>
           </div>
         </Group>
 
         <Group name="shot-camera" title="Camera & Sound">
           <Field label="System/Movement" wide {...print("movement")}>
-            <Lockable {...movement}>
-              <Chips values={own.movement ?? scene.defaults.movement} label="Add system or movement" disabled={movement.locked} onChange={(v) => setOwn("movement", v)} />
+            <Lockable {...lockOf(movement)}>
+              <Chips values={movement.value ?? []} label="Add system or movement" onChange={movement.set} />
             </Lockable>
           </Field>
           <div className="pf-field pf-wide">
             <span className="pf-label">
-              <input type="checkbox" checked={print("camera").print} aria-label="Print camera in the caption" title="Print camera in the caption" onChange={(e) => print("camera").onPrintChange(e.target.checked)} />
-              Camera
-              <input type="checkbox" className="pf-second-check" checked={print("lens").print} aria-label="Print lens in the caption" title="Print lens in the caption" onChange={(e) => print("lens").onPrintChange(e.target.checked)} />
-              Lens
+              Camera and lens
               <span className="pf-label-end">
-                <LockButton {...cameras} />
+                <LockButton {...lockOf(cameras)} />
               </span>
             </span>
-            <CameraRows cameras={own.cameras ?? scene.defaults.cameras} disabled={cameras.locked} onChange={(v) => setOwn("cameras", v)} />
+            <CameraRows cameras={cameras.value ?? []} print={rowPrint} onChange={cameras.set} />
           </div>
           <Field label="Audio" wide {...print("audio")}>
-            <Lockable {...audio}>
-              <Chips values={own.audio ?? scene.defaults.audio} label="Add audio" disabled={audio.locked} onChange={(v) => setOwn("audio", v)} />
+            <Lockable {...lockOf(audio)}>
+              <Chips values={audio.value ?? []} label="Add audio" onChange={audio.set} />
             </Lockable>
           </Field>
           <Field label="FPS" {...print("fps")}>
-            {lockedText("fps", "FPS", scene.defaults.fps ?? "")}
+            {inheritText("fps", "FPS")}
           </Field>
           <Field label="Sync" {...print("sync")}>
-            <Lockable {...sync}>
-              <Select label="Sync" value={own.sync ?? scene.defaults.sync ?? ""} options={syncOptions(project)} disabled={sync.locked} onChange={(v) => setOwn("sync", v)} />
+            <Lockable {...lockOf(sync)}>
+              <Select label="Sync" value={sync.value ?? ""} options={syncOptions(project)} onChange={sync.set} />
             </Lockable>
           </Field>
         </Group>
@@ -347,18 +429,16 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
             <Select label="Priority" value={shot.priority} options={choiceEntries("priority", lists).map((e) => ({ value: e.key, label: e.label }))} onChange={(priority) => patch({ priority })} />
           </Field>
           <Field label="Setup" {...print("setup")}>
-            <TextInput label="Setup" value={shot.setup ?? ""} onChange={(setup) => patch({ setup })} />
+            {withMarkLock("setup", <TextInput label="Setup" value={shown("setup") ?? ""} onChange={(setup) => write("setup", setup)} onBlur={relockMarkIfEmpty("setup")} />)}
           </Field>
           <Field label="Est. time">
             <NumberInput label="Estimated time in minutes" value={shot.estimatedMinutes} min={0} max={9999} unit="min" allowEmpty onChange={(estimatedMinutes) => patch({ estimatedMinutes })} />
           </Field>
           <Field label="Scheduled date" wide {...print("date")}>
-            <Lockable {...date}>
-              <TextInput type="date" label="Scheduled date" value={own.date ?? scene.defaults.date ?? ""} disabled={date.locked} onChange={(v) => setOwn("date", v)} onBlur={relockIfEmpty("date")} />
-            </Lockable>
+            {inheritText("date", "Scheduled date", undefined, "date")}
           </Field>
           <Field label="Notes" wide {...print("notes")}>
-            <TextInput multiline label="Notes" value={shot.notes ?? ""} onChange={(notes) => patch({ notes })} />
+            {withMarkLock("notes", <TextInput multiline label="Notes" value={shown("notes") ?? ""} onChange={(notes) => write("notes", notes)} onBlur={relockMarkIfEmpty("notes")} />)}
           </Field>
         </Group>
 

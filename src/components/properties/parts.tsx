@@ -148,7 +148,8 @@ type NumberInputProps = {
   value: number | undefined;
   label: string;
   min: number;
-  max: number;
+  /** Leave out for no upper limit. */
+  max?: number;
   step?: number;
   unit?: string;
   disabled?: boolean;
@@ -179,7 +180,7 @@ export function NumberInput({ value, label, min, max, step = 1, unit, disabled, 
             return;
           }
           const n = Number(e.target.value);
-          if (Number.isFinite(n) && n >= min && n <= max) onChange(n);
+          if (Number.isFinite(n) && n >= min && (max === undefined || n <= max)) onChange(n);
         }}
         onBlur={() => setDraft(value === undefined ? "" : String(value))}
       />

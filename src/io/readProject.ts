@@ -23,6 +23,7 @@ import type {
   Mark,
   MarkOwn,
   Outline,
+  PatternTune,
   Point,
   Project,
   ProjectSettings,
@@ -111,13 +112,21 @@ function readEnding(raw: unknown, fallback: Ending): Ending {
 
 function readStroke(raw: unknown, fallback: Stroke): Stroke {
   if (!isRecord(raw)) return { ...fallback };
-  const stroke: Stroke = {
+  return {
     pattern: nonEmpty(raw.pattern) ?? fallback.pattern,
     widthPt: num(raw.widthPt) ?? fallback.widthPt,
+    ...readTune(raw),
   };
-  const size = num(raw.patternSizePct);
-  if (size !== undefined) stroke.patternSizePct = size;
-  return stroke;
+}
+
+function readTune(raw: Raw): PatternTune {
+  const tune: PatternTune = {};
+  for (const key of ["patternSizePct", "lengthPct", "gapPct", "amplitudePct"] as const) {
+    const value = num(raw[key]);
+    if (value !== undefined) tune[key] = value;
+  }
+  if (raw.waveSide === "left" || raw.waveSide === "right") tune.waveSide = raw.waveSide;
+  return tune;
 }
 
 function readTextStyle(raw: unknown, fallback: TextStyle): TextStyle {
@@ -329,8 +338,11 @@ function readLine(raw: Raw, ctx: MarkContext, notes: string[], what: string): Li
   else if (!shotId) line.color = ctx.settings.general.newShotColor;
   if (Array.isArray(raw.segments)) {
     line.segments = raw.segments.slice(0, line.points.length - 1).map((segment) => {
-      const pattern = isRecord(segment) ? nonEmpty(segment.pattern) : undefined;
-      return pattern ? { pattern } : null;
+      if (!isRecord(segment)) return null;
+      const pattern = nonEmpty(segment.pattern);
+      const widthPt = num(segment.widthPt);
+      const style = { ...readTune(segment), ...(pattern ? { pattern } : {}), ...(widthPt !== undefined ? { widthPt } : {}) };
+      return Object.keys(style).length > 0 ? style : null;
     });
   }
   const outline = readOutline(raw.outline);

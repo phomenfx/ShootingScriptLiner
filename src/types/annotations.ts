@@ -24,7 +24,7 @@ export type LineStroke =
 
 export type LineEnding = {
   cap: LineCap;
-  /** 50–350, 100 = normal */
+  /** 50 and up, 100 = normal */
   scalePercent: number;
   /** Filled shape uses stroke color as fill; open caps ignore fill */
   filled: boolean;
