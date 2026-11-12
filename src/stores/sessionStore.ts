@@ -2,6 +2,7 @@
  * What is going on in this window right now: selection, tool, page, open
  * dialogs, clipboard, the loaded script PDF. None of it is saved.
  */
+import type { OutlineClip } from "../model/outlineClipboard";
 import { create } from "zustand";
 import type { Mark } from "../model/types";
 import type { ScriptTool } from "../types/annotations";
@@ -34,6 +35,8 @@ type SessionState = {
   actionBarOffset: { x: number; y: number };
   /** In-app clipboard for marks. */
   clipboard: Mark[] | null;
+  /** Copied shots or scenes from the Scenes list. Only one of the two clipboards is filled. */
+  outlineClipboard: OutlineClip | null;
   settingsOpen: boolean;
   confirm: ConfirmRequest | null;
   /** Messages shown in the page: skipped records, script warnings, errors. */
@@ -58,6 +61,7 @@ type SessionState = {
   setSnapEnabled: (on: boolean) => void;
   setActionBarOffset: (offset: { x: number; y: number }) => void;
   setClipboard: (marks: Mark[] | null) => void;
+  setOutlineClipboard: (clip: OutlineClip | null) => void;
   setSettingsOpen: (open: boolean) => void;
   setConfirm: (confirm: ConfirmRequest | null) => void;
   addNotices: (notices: string[]) => void;
@@ -85,6 +89,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   snapEnabled: true,
   actionBarOffset: { x: 0, y: 0 },
   clipboard: null,
+  outlineClipboard: null,
   settingsOpen: false,
   confirm: null,
   notices: [],
@@ -118,7 +123,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   setActiveTool: (activeTool) => set({ activeTool }),
   setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
   setActionBarOffset: (actionBarOffset) => set({ actionBarOffset }),
-  setClipboard: (clipboard) => set({ clipboard }),
+  setClipboard: (clipboard) => set({ clipboard, outlineClipboard: null }),
+  setOutlineClipboard: (outlineClipboard) => set({ outlineClipboard, clipboard: null }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setConfirm: (confirm) => set({ confirm }),
   addNotices: (notices) =>
@@ -152,6 +158,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       snapEnabled: true,
       actionBarOffset: { x: 0, y: 0 },
       clipboard: null,
+      outlineClipboard: null,
       notices: [],
       viewerPage: 1,
       activePage: 1,

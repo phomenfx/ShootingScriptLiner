@@ -5,19 +5,17 @@ import { getFontOptions, loadBundledFonts } from "../../lib/fonts";
 import { shotCaption, shotName } from "../../model/captions";
 import * as edits from "../../model/edits";
 import { describeLength, lineLength } from "../../model/pageLength";
-import { choiceEntries } from "../../model/registry";
 import { listScenes } from "../../model/shotList";
 import type { Ending, LineMark, Mark, PatternTune, Project, TextAlign, TextMark, TextStyle } from "../../model/types";
 import { patternFields, tuneLabel, type TuneField } from "../../lib/strokeGeometry";
 import { segmentLook, editSegmentTune, editStrokeTune, setSegmentPattern, setSegmentWidth, tunePercent } from "../../model/segments";
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
 import { useSessionStore } from "../../stores/sessionStore";
+import { EndingPicker, FillToggle } from "./EndingPicker";
 import { PatternPicker } from "./PatternPicker";
 import { ColorField, Field, Footer, FooterButton, Group, Lockable, NumberInput, Segmented, Select, TextInput, Toggles } from "./parts";
 
 /* Endings the script can draw today. The newer ones join with the next step. */
-const DRAWABLE_ENDINGS = ["none", "square", "circle", "diamond", "arrow", "arrowReversed", "butt", "slash"];
-const FILLABLE_ENDINGS = ["square", "circle", "diamond", "arrow", "arrowReversed"];
 
 const apply = (edit: edits.Edit) => useProjectStore.getState().apply(edit);
 function step(edit: edits.Edit) {
@@ -154,24 +152,15 @@ function LinkedOrCustom({
   );
 }
 
+/** One ending on one row: shape (with previews), size, and fill. */
 function EndingFields({ title, value, onChange }: { title: string; value: Ending; onChange: (value: Ending) => void }) {
-  const options = choiceEntries("ending", undefined)
-    .filter((e) => DRAWABLE_ENDINGS.includes(e.key))
-    .map((e) => ({ value: e.key, label: e.label }));
-  const fillable = FILLABLE_ENDINGS.includes(value.type);
   return (
-    <>
-      <Field label={title} wide>
-        <Select label={`${title} ending`} value={value.type} options={options} onChange={(type) => onChange({ ...value, type })} />
-      </Field>
-      <label className="pf-check">
-        <input type="checkbox" checked={fillable && value.filled} disabled={!fillable} onChange={(e) => onChange({ ...value, filled: e.target.checked })} />
-        Filled
-      </label>
-      <Field label="Size">
-        <NumberInput label={`${title} ending size`} value={value.sizePct} min={50} step={10} unit="%" onChange={(sizePct) => sizePct && onChange({ ...value, sizePct })} />
-      </Field>
-    </>
+    <div className="pf-wide pf-ending">
+      <span className="pf-label">{title}</span>
+      <EndingPicker label={`${title} ending`} value={value} onChange={(type) => onChange({ ...value, type })} />
+      <NumberInput label={`${title} ending size`} value={value.sizePct} min={50} step={10} unit="%" onChange={(sizePct) => sizePct && onChange({ ...value, sizePct })} />
+      <FillToggle label={`Fill the ${title.toLowerCase()} ending`} value={value} onChange={(filled) => onChange({ ...value, filled })} />
+    </div>
   );
 }
 

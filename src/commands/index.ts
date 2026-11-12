@@ -13,7 +13,8 @@ import { projectFileStem } from "../io/writeProject";
 import { toLegacyProject } from "../legacy/legacyView";
 import { loadPdfFromCache, savePdfToCache } from "../lib/pdfCache";
 import { createProject } from "../model/defaults";
-import { CLONE_NUDGE_PT, addMarks, cloneMark, deleteMarks, findShot, setScript, unlinkMark, updateMark, updateSettings } from "../model/edits";
+import { CLONE_NUDGE_PT, addMarks, cloneMark, deleteMarks, deleteScene, deleteShot, findShot, setScript, unlinkMark, updateMark, updateSettings } from "../model/edits";
+import { insertOutline, outlineClipOf, type OutlineAnchor, type OutlineClip } from "../model/outlineClipboard";
 import type { Mark, Project, ScriptInfo } from "../model/types";
 import {
   applyWithoutUndo,
@@ -284,6 +285,11 @@ export function jumpToShot(shotId: string): boolean {
 }
 
 export function deleteSelection(): void {
+  const outline = selectedOutline();
+  if (outline) {
+    void removeOutline(outline, "Delete");
+    return;
+  }
   const marks = selectedMarks();
   if (marks.length === 0) return;
   breakUndoGroup();
@@ -292,6 +298,12 @@ export function deleteSelection(): void {
 }
 
 export function duplicateSelection(): void {
+  const outline = selectedOutline();
+  if (outline) {
+    const clip = outlineClipOf(project(), outline.kind, outline.ids);
+    if (clip) pasteOutline(clip, { kind: outline.kind, id: outline.ids[outline.ids.length - 1]! });
+    return;
+  }
   addAndSelect(selectedMarks().map((mark) => cloneMark(mark, { nudgePt: CLONE_NUDGE_PT })));
 }
 
@@ -327,7 +339,35 @@ export function linkMarkToShot(markId: string, shotId: string): void {
   );
 }
 
+/** The selected shots or scenes in the Scenes list, if that is what is selected. */
+function selectedOutline(): { kind: "shot" | "scene"; ids: string[] } | null {
+  const selection = session().selection;
+  if (selection?.kind !== "shot" && selection?.kind !== "scene") return null;
+  return selection.ids.length > 0 ? { kind: selection.kind, ids: selection.ids } : null;
+}
+
+/** Puts copies of shots or scenes after the anchor and selects the last copy. */
+function pasteOutline(clip: OutlineClip, anchor: OutlineAnchor): void {
+  let ids: string[] = [];
+  breakUndoGroup();
+  useProjectStore.getState().apply((p) => {
+    const result = insertOutline(p, clip, anchor);
+    ids = result.ids;
+    return result.project;
+  });
+  breakUndoGroup();
+  const last = ids[ids.length - 1];
+  if (last) session().select(clip.kind === "shots" ? "shot" : "scene", last);
+  else notify("Add a scene first, then paste the shots into it.");
+}
+
 export function copy(): void {
+  const outline = selectedOutline();
+  if (outline) {
+    const clip = outlineClipOf(project(), outline.kind, outline.ids);
+    if (clip) session().setOutlineClipboard(clip);
+    return;
+  }
   const marks = selectedMarks();
   if (marks.length > 0) session().setClipboard(structuredClone(marks));
 }
@@ -338,6 +378,12 @@ export function copy(): void {
  * while the shot still exists.
  */
 export function paste(page: number = session().activePage, inPlace = false): void {
+  const outlineClip = session().outlineClipboard;
+  if (outlineClip) {
+    const outline = selectedOutline();
+    pasteOutline(outlineClip, outline ? { kind: outline.kind, id: outline.ids[outline.ids.length - 1]! } : null);
+    return;
+  }
   const clipboard = session().clipboard;
   if (!clipboard?.length) return;
   const p = project();
@@ -361,9 +407,34 @@ export function pasteInPlace(): void {
 }
 
 export function cut(): void {
+  const outline = selectedOutline();
+  if (outline) {
+    void removeOutline(outline, "Cut");
+    return;
+  }
   if (selectedMarks().length === 0) return;
   copy();
   deleteSelection();
+}
+
+/** Deletes shots or scenes, copying them first for Cut. Their lines stay on the script, unlinked. */
+async function removeOutline(outline: { kind: "shot" | "scene"; ids: string[] }, verb: "Cut" | "Delete"): Promise<void> {
+  const p = project();
+  const shotIds =
+    outline.kind === "shot"
+      ? outline.ids
+      : p.scenes.filter((scene) => outline.ids.includes(scene.id)).flatMap((scene) => scene.shots.map((shot) => shot.id));
+  const lineCount = p.marks.filter((mark) => mark.kind !== "image" && mark.shotId && shotIds.includes(mark.shotId)).length;
+  if (lineCount > 0 && usePrefsStore.getState().confirmDeletes) {
+    const what = outline.kind === "shot" ? (outline.ids.length === 1 ? "this shot" : "these shots") : outline.ids.length === 1 ? "this scene" : "these scenes";
+    const message = `${verb} ${what}? ${lineCount} ${lineCount === 1 ? "line" : "lines"} will stay on the script, unlinked.`;
+    if (!(await confirm(message, verb, true))) return;
+  }
+  if (verb === "Cut") copy();
+  breakUndoGroup();
+  for (const id of outline.ids) useProjectStore.getState().apply(outline.kind === "shot" ? deleteShot(id) : deleteScene(id));
+  breakUndoGroup();
+  session().clearSelection();
 }
 
 export function deselect(): void {
@@ -372,6 +443,11 @@ export function deselect(): void {
 
 export function hasMarkSelection(): boolean {
   return selectedMarks().length > 0;
+}
+
+/** Whether Delete has something to act on: marks, shots or scenes. */
+export function hasDeletableSelection(): boolean {
+  return selectedOutline() !== null || selectedMarks().length > 0;
 }
 
 /* ---------- view ---------- */

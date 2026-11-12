@@ -21,9 +21,9 @@ const THEMES: { value: ColorTheme; label: string; Icon: typeof Moon }[] = [
 export function TopBar() {
   const canUndo = useStore(useProjectStore.temporal, (s) => s.pastStates.length > 0);
   const canRedo = useStore(useProjectStore.temporal, (s) => s.futureStates.length > 0);
-  const hasMarkSelected = useSessionStore((s) => s.selection?.kind === "mark");
   const hasSelection = useSessionStore((s) => s.selection !== null);
-  const hasClipboard = useSessionStore((s) => !!s.clipboard?.length);
+  const hasClipboard = useSessionStore((s) => !!s.clipboard?.length || !!s.outlineClipboard);
+  const hasCopyable = useSessionStore((s) => !!s.selection?.ids.length);
   const openSettings = useSessionStore((s) => s.setSettingsOpen);
   const prefs = usePrefsStore();
   const firstPageAlone = useProjectStore((s) => s.project.settings.drawing.firstPageAlone);
@@ -52,12 +52,12 @@ export function TopBar() {
     { label: "Undo", shortcut: "Ctrl+Z", disabled: !canUndo, onSelect: commands.undo },
     { label: "Redo", shortcut: "Ctrl+Shift+Z", disabled: !canRedo, onSelect: commands.redo },
     SEPARATOR,
-    { label: "Cut", shortcut: "Ctrl+X", disabled: !hasMarkSelected, onSelect: commands.cut },
-    { label: "Copy", shortcut: "Ctrl+C", disabled: !hasMarkSelected, onSelect: commands.copy },
+    { label: "Cut", shortcut: "Ctrl+X", disabled: !hasCopyable, onSelect: commands.cut },
+    { label: "Copy", shortcut: "Ctrl+C", disabled: !hasCopyable, onSelect: commands.copy },
     { label: "Paste", shortcut: "Ctrl+V", disabled: !hasClipboard, onSelect: () => commands.paste() },
     { label: "Paste in place", shortcut: "Ctrl+Shift+V", disabled: !hasClipboard, onSelect: commands.pasteInPlace },
-    { label: "Duplicate", shortcut: "Ctrl+D", disabled: !hasMarkSelected, onSelect: commands.duplicateSelection },
-    { label: "Delete", shortcut: "Del", disabled: !hasMarkSelected, onSelect: commands.deleteSelection },
+    { label: "Duplicate", shortcut: "Ctrl+D", disabled: !hasCopyable, onSelect: commands.duplicateSelection },
+    { label: "Delete", shortcut: "Del", disabled: !hasCopyable, onSelect: commands.deleteSelection },
     SEPARATOR,
     { label: "Select all on page", shortcut: "Ctrl+A", disabled: true, hint: NOT_YET, onSelect: () => {} },
     { label: "Deselect", shortcut: "Esc", disabled: !hasSelection, onSelect: commands.deselect },

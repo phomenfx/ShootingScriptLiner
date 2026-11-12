@@ -452,6 +452,7 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
             {length.lineCount === 0 ? "Not on script" : "Show on script"}
           </FooterButton>
         )}
+        {!asTab && <FooterButton onClick={() => commands.duplicateSelection()}>Duplicate</FooterButton>}
         <FooterButton danger onClick={() => void deleteShot()}>
           Delete shot
         </FooterButton>
@@ -548,6 +549,7 @@ export function SceneInspector({ project, scene }: { project: Project; scene: Sc
         <FooterButton onClick={addShot}>
           <Plus size={12} strokeWidth={2} /> Shot
         </FooterButton>
+        <FooterButton onClick={() => commands.duplicateSelection()}>Duplicate</FooterButton>
         <FooterButton danger onClick={() => void deleteScene()}>
           Delete scene
         </FooterButton>

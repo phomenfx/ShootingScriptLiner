@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { EndingPicker, FillToggle } from "../properties/EndingPicker";
 import {
   ArrowDown,
   ArrowUp,
@@ -40,8 +41,6 @@ import { PatternPicker } from "../properties/PatternPicker";
 import { ToolKeybindSettings } from "../ToolKeybindSettings";
 
 /* Endings the script can draw today. The newer ones join with the next step. */
-const DRAWABLE_ENDINGS = ["none", "square", "circle", "diamond", "arrow", "arrowReversed", "butt", "slash"];
-const FILLABLE_ENDINGS = ["square", "circle", "diamond", "arrow", "arrowReversed"];
 
 const DATE_CODES =
   "m 1–12 · mm 01–12 · mmm Jan · mmmm January\nd 1–31 · dd 01–31 · ddd Sun · dddd Sunday\nyy 00–99 · yyyy 1900–9999";
@@ -172,27 +171,11 @@ function NumberField({
 }
 
 function EndingField({ value, onChange }: { value: Ending; onChange: (value: Ending) => void }) {
-  const entries = choiceEntries("ending", undefined).filter((e) => DRAWABLE_ENDINGS.includes(e.key));
-  const fillable = FILLABLE_ENDINGS.includes(value.type);
   return (
-    <span className="set-inline">
-      <select value={value.type} onChange={(e) => onChange({ ...value, type: e.target.value })}>
-        {entries.map((entry) => (
-          <option key={entry.key} value={entry.key}>
-            {entry.label}
-          </option>
-        ))}
-      </select>
+    <span className="set-inline set-ending">
+      <EndingPicker label="Ending shape" value={value} onChange={(type) => onChange({ ...value, type })} />
       <NumberField value={value.sizePct} min={50} step={10} unit="%" onChange={(sizePct) => onChange({ ...value, sizePct })} />
-      <label className="set-check">
-        <input
-          type="checkbox"
-          checked={fillable && value.filled}
-          disabled={!fillable}
-          onChange={(e) => onChange({ ...value, filled: e.target.checked })}
-        />
-        Filled
-      </label>
+      <FillToggle label="Fill the ending" value={value} onChange={(filled) => onChange({ ...value, filled })} />
     </span>
   );
 }

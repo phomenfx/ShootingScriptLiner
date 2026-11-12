@@ -41,7 +41,7 @@ export function useGlobalShortcuts() {
       if (!(e.ctrlKey || e.metaKey)) {
         if (typing || e.altKey) return;
         if (key === "delete" || key === "backspace") {
-          if (commands.hasMarkSelection()) {
+          if (commands.hasDeletableSelection()) {
             e.preventDefault();
             commands.deleteSelection();
           }
