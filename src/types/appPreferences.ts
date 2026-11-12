@@ -1,5 +1,5 @@
-/** App chrome theme. Does not affect PDF pixels, annotations, or exports. */
-export const COLOR_THEMES = ["dark", "light"] as const;
+/** App chrome theme. `system` follows the device setting. Does not affect PDF pixels, annotations, or exports. */
+export const COLOR_THEMES = ["dark", "system", "light"] as const;
 
 export type ColorTheme = (typeof COLOR_THEMES)[number];
 
@@ -24,3 +24,10 @@ export const MIN_VIEWER_ZOOM_PERCENT = 25;
 export const MAX_VIEWER_ZOOM_PERCENT = 400;
 
 export const VIEWER_ZOOM_STEP_PERCENT = 10;
+
+/** Size of the app chrome as a percent. The script page has its own zoom. */
+export const UI_SCALES = [90, 100, 110, 125] as const;
+
+export type UiScale = (typeof UI_SCALES)[number];
+
+export const DEFAULT_UI_SCALE: UiScale = 100;

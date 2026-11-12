@@ -22,7 +22,9 @@ import {
   undoProject,
   useProjectStore,
 } from "../stores/projectStore";
+import { usePrefsStore } from "../stores/prefsStore";
 import { useSessionStore } from "../stores/sessionStore";
+import type { ViewerLayoutMode } from "../types/viewerLayout";
 
 const project = () => useProjectStore.getState().project;
 const session = () => useSessionStore.getState();
@@ -48,8 +50,11 @@ async function cacheScript(p: Project, file: File): Promise<void> {
   }
 }
 
-/** Asks before doing something that cannot be taken back. Resolves false when declined. */
-function confirm(message: string): Promise<boolean> {
+/**
+ * Asks before doing something that cannot be taken back. The button names the
+ * action. Resolves false when declined or dismissed.
+ */
+export function confirm(message: string, confirmLabel: string, danger = false): Promise<boolean> {
   return new Promise((resolve) => {
     const unsubscribe = useSessionStore.subscribe((s) => {
       if (s.confirm === null) {
@@ -59,6 +64,8 @@ function confirm(message: string): Promise<boolean> {
     });
     session().setConfirm({
       message,
+      confirmLabel,
+      danger,
       onYes: () => {
         unsubscribe();
         resolve(true);
@@ -67,11 +74,59 @@ function confirm(message: string): Promise<boolean> {
   });
 }
 
+/** Opens the system file picker. Resolves null when nothing was chosen. */
+function pickFile(accept: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
+function hasUnsavedWork(): boolean {
+  const state = useProjectStore.getState();
+  return state.project !== state.savedProject;
+}
+
 /* ---------- project files ---------- */
 
 export function newProject(): void {
   session().reset();
   replaceProject(createProject());
+}
+
+/** New project from the menu: asks first when there is unsaved work. */
+export async function requestNewProject(): Promise<void> {
+  if (hasUnsavedWork() && !(await confirm("Start a new project? Unsaved changes will be lost.", "New project", true))) {
+    return;
+  }
+  newProject();
+}
+
+/** Open from the menu: picks a file, and asks first when there is unsaved work. */
+export async function requestOpenProject(): Promise<void> {
+  const file = await pickFile(".zip,.json,application/zip,application/json");
+  if (!file) return;
+  if (
+    hasUnsavedWork() &&
+    !(await confirm(`Open "${file.name}"? Unsaved changes to this project will be lost.`, "Replace project", true))
+  ) {
+    return;
+  }
+  await openProject(file);
+}
+
+export async function requestImportPdf(): Promise<void> {
+  const file = await pickFile(".pdf,application/pdf");
+  if (file) await importPdf(file);
+}
+
+export async function exportBoth(): Promise<void> {
+  await exportLinedPdf();
+  await exportShotListCsv();
 }
 
 export async function openProject(file: File): Promise<void> {
@@ -89,7 +144,7 @@ export async function openProject(file: File): Promise<void> {
     let opened = loaded;
     if (script) {
       const warning = scriptMismatchMessage(compareScript(loaded.script, script), loaded.script, script);
-      if (warning && !(await confirm(`${warning} Open anyway?`))) return;
+      if (warning && !(await confirm(warning, "Open anyway"))) return;
       opened = setScript({ ...script, fileName: loaded.script?.fileName ?? script.fileName })(loaded);
       const placed = placeUnplacedV1Marks(opened);
       opened = placed.project;
@@ -140,7 +195,7 @@ export async function importPdf(file: File): Promise<void> {
     const current = project();
     if (current.marks.length > 0) {
       const warning = scriptMismatchMessage(compareScript(current.script, script), current.script, script);
-      if (warning && !(await confirm(`${warning} Use this script anyway?`))) return;
+      if (warning && !(await confirm(warning, "Use this script"))) return;
     }
     await adoptScript(file, script);
   } catch (error) {
@@ -237,13 +292,14 @@ export function copy(): void {
  * nudged when the original is on that page. Pasted marks keep their shot link
  * while the shot still exists.
  */
-export function paste(page: number = session().activePage): void {
+export function paste(page: number = session().activePage, inPlace = false): void {
   const clipboard = session().clipboard;
   if (!clipboard?.length) return;
   const p = project();
   addAndSelect(
     clipboard.map((mark) => {
-      const copyOf = cloneMark(mark, { page, nudgePt: mark.page === page ? CLONE_NUDGE_PT : 0 });
+      const nudgePt = !inPlace && mark.page === page ? CLONE_NUDGE_PT : 0;
+      const copyOf = cloneMark(mark, { page, nudgePt });
       if (copyOf.kind !== "image" && copyOf.shotId && !findShot(p, copyOf.shotId)) {
         delete copyOf.shotId;
         if (copyOf.color === undefined) copyOf.color = p.settings.general.newShotColor;
@@ -252,6 +308,49 @@ export function paste(page: number = session().activePage): void {
       return copyOf;
     })
   );
+}
+
+/** Paste at exactly the original position on the current page. */
+export function pasteInPlace(): void {
+  paste(session().activePage, true);
+}
+
+export function cut(): void {
+  if (selectedMarks().length === 0) return;
+  copy();
+  deleteSelection();
+}
+
+export function deselect(): void {
+  session().clearSelection();
+}
+
+export function hasMarkSelection(): boolean {
+  return selectedMarks().length > 0;
+}
+
+/* ---------- view ---------- */
+
+const ZOOM_STEP_PERCENT = 10;
+
+export function zoomIn(): void {
+  const prefs = usePrefsStore.getState();
+  prefs.setViewerZoomPercent(prefs.viewerZoomPercent + ZOOM_STEP_PERCENT);
+}
+
+export function zoomOut(): void {
+  const prefs = usePrefsStore.getState();
+  prefs.setViewerZoomPercent(prefs.viewerZoomPercent - ZOOM_STEP_PERCENT);
+}
+
+/** 100% fits the page to the script area. */
+export function zoomToFit(): void {
+  usePrefsStore.getState().setViewerZoomPercent(100);
+}
+
+export function setViewMode(mode: ViewerLayoutMode): void {
+  usePrefsStore.getState().setViewerLayoutMode(mode);
+  if (mode === "single") session().setActivePage(session().viewerPage);
 }
 
 /* ---------- undo ---------- */

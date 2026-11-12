@@ -186,6 +186,8 @@ export function SceneOutliner() {
                 onDeleteScene={() =>
                   setConfirm({
                     message: `Delete Scene ${scenes.findIndex((s) => s.id === scene.id) + 1} and all its shots?`,
+                    confirmLabel: "Delete",
+                    danger: true,
                     onYes: () => deleteScene(scene.id),
                   })
                 }

@@ -704,6 +704,8 @@ export function PropertiesPanel() {
               onClick={() =>
                 setConfirm({
                   message: "Delete this shot? Lines on the script will become unlinked.",
+                  confirmLabel: "Delete",
+                  danger: true,
                   onYes: () => deleteShot(shotOnly.scene.id, shotOnly.shot.id),
                 })
               }
@@ -715,6 +717,8 @@ export function PropertiesPanel() {
               onClick={() =>
                 setConfirm({
                   message: "Delete all lines linked to this shot?",
+                  confirmLabel: "Delete",
+                  danger: true,
                   onYes: () => deleteLinesForShot(shotOnly.shot.id),
                 })
               }

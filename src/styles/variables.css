@@ -33,6 +33,10 @@
   --color-card: #242424;
   --color-input: #1e1e1e;
   --color-accent-tint: rgba(111, 163, 199, 0.18);
+  --color-menu: #2a2a2a;
+  --color-unsaved: #e0a030;
+  --color-danger: #c0504d;
+  --color-on-accent-strong: #10202c;
   --color-scrollbar: #3a3a3a;
   --color-scrollbar-hover: #4a4a4a;
 
@@ -45,9 +49,9 @@
   --radius-lg: 6px;
   --radius-dialog: 8px;
 
-  --font-size: 13px;
-  --font-size-sm: 12px;
-  --font-size-lg: 22px;
+  --font-size: 0.8125rem;
+  --font-size-sm: 0.75rem;
+  --font-size-lg: 1.375rem;
 
   --drag-transition: transform 200ms ease;
 }
@@ -86,6 +90,10 @@
   --color-card: #ffffff;
   --color-input: #ffffff;
   --color-accent-tint: rgba(47, 111, 163, 0.14);
+  --color-menu: #ffffff;
+  --color-unsaved: #c77d00;
+  --color-danger: #b42318;
+  --color-on-accent-strong: #ffffff;
   --color-scrollbar: #c4c4ca;
   --color-scrollbar-hover: #a9a9b1;
 }

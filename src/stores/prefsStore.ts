@@ -6,10 +6,12 @@ import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import {
   applyColorTheme,
+  applyUiScale,
   clampLineHitTolerancePx,
   clampMaxMountedPdfPages,
   clampViewerZoomPercent,
   normalizeColorTheme,
+  normalizeUiScale,
 } from "../lib/appPreferences";
 import {
   clampPanelWidthPx,
@@ -24,8 +26,10 @@ import {
   DEFAULT_COLOR_THEME,
   DEFAULT_LINE_HIT_TOLERANCE_PX,
   DEFAULT_MAX_MOUNTED_PDF_PAGES,
+  DEFAULT_UI_SCALE,
   DEFAULT_VIEWER_ZOOM_PERCENT,
   type ColorTheme,
+  type UiScale,
 } from "../types/appPreferences";
 import { DEFAULT_TOOL_KEYBINDS, type ToolKeybinds } from "../types/toolKeybinds";
 import { VIEWER_LAYOUT_MODES, type ViewerLayoutMode } from "../types/viewerLayout";
@@ -34,6 +38,9 @@ export const PREFS_STORAGE_KEY = "shooting-script-liner-prefs";
 
 type PrefsValues = {
   colorTheme: ColorTheme;
+  uiScale: UiScale;
+  /** Ask before deleting a scene or shot that has lines. */
+  confirmDeletes: boolean;
   viewerLayoutMode: ViewerLayoutMode;
   toolKeybinds: ToolKeybinds;
   /** Perpendicular click slop for selecting lines (px). */
@@ -48,6 +55,9 @@ type PrefsValues = {
 
 type PrefsState = PrefsValues & {
   setColorTheme: (theme: ColorTheme) => void;
+  setUiScale: (scale: UiScale) => void;
+  setConfirmDeletes: (ask: boolean) => void;
+  resetPanelWidths: () => void;
   setViewerLayoutMode: (mode: ViewerLayoutMode) => void;
   /** Returns an error message, or null when the key was set. */
   setToolKeybind: (tool: ScriptTool, key: string) => string | null;
@@ -128,6 +138,8 @@ export const usePrefsStore = create<PrefsState>()(
   persist(
     (set, get) => ({
       colorTheme: DEFAULT_COLOR_THEME,
+      uiScale: DEFAULT_UI_SCALE,
+      confirmDeletes: true,
       viewerLayoutMode: "single",
       toolKeybinds: { ...DEFAULT_TOOL_KEYBINDS },
       lineHitTolerancePx: DEFAULT_LINE_HIT_TOLERANCE_PX,
@@ -141,6 +153,14 @@ export const usePrefsStore = create<PrefsState>()(
         applyColorTheme(colorTheme);
         set({ colorTheme });
       },
+      setUiScale: (scale) => {
+        const uiScale = normalizeUiScale(scale);
+        applyUiScale(uiScale);
+        set({ uiScale });
+      },
+      setConfirmDeletes: (confirmDeletes) => set({ confirmDeletes }),
+      resetPanelWidths: () =>
+        set((s) => ({ panels: { ...s.panels, widthPx: { ...DEFAULT_PANEL_WIDTH_PX } } })),
       setViewerLayoutMode: (viewerLayoutMode) => set({ viewerLayoutMode }),
       setToolKeybind: (tool, key) => {
         const result = validateToolKeybindChange(get().toolKeybinds, tool, key);
@@ -193,6 +213,8 @@ export const usePrefsStore = create<PrefsState>()(
       storage: createJSONStorage(storage),
       partialize: ({
         colorTheme,
+        uiScale,
+        confirmDeletes,
         viewerLayoutMode,
         toolKeybinds,
         lineHitTolerancePx,
@@ -201,6 +223,8 @@ export const usePrefsStore = create<PrefsState>()(
         panels,
       }): PrefsValues => ({
         colorTheme,
+        uiScale,
+        confirmDeletes,
         viewerLayoutMode,
         toolKeybinds,
         lineHitTolerancePx,

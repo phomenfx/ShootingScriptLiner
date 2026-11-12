@@ -7,6 +7,7 @@ import type { LineLabelFieldId } from "../types/lineLabelFields";
 import type { AdditionalInfoStyle, LabelMode, Project, Scene, Shot } from "../types/project";
 import type { ToolKeybinds } from "../types/toolKeybinds";
 import type { ViewerLayoutMode } from "../types/viewerLayout";
+import type { ConfirmRequest } from "../stores/sessionStore";
 
 export type Selection =
   | { kind: "scene"; sceneId: string }
@@ -14,10 +15,7 @@ export type Selection =
   | { kind: "annotation"; annotationId: string }
   | null;
 
-export type ConfirmRequest = {
-  message: string;
-  onYes: () => void;
-};
+export type { ConfirmRequest } from "../stores/sessionStore";
 
 export type LineClipboard = { kind: "line"; lines: LineAnnotation[] };
 

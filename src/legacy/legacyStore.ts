@@ -173,7 +173,11 @@ const actions: Omit<
   setDefaultLine: (patch) => settings((s) => applyLegacyDefaultLinePatch(s, patch)),
 
   setSettingsOpen: (open) => session().setSettingsOpen(open),
-  setConfirm: (confirm) => session().setConfirm(confirm),
+  setConfirm: (confirm) => {
+    // With "Delete asks first" off, deletes go straight through. Undo brings them back.
+    if (confirm?.confirmLabel === "Delete" && !prefs().confirmDeletes) confirm.onYes();
+    else session().setConfirm(confirm);
+  },
   setActiveTool: (tool) => session().setActiveTool(tool),
   setToolKeybind: (tool, key) => prefs().setToolKeybind(tool, key),
   resetToolKeybinds: () => prefs().resetToolKeybinds(),

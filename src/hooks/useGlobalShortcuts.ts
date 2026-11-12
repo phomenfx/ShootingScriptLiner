@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import * as commands from "../commands";
+import { isProjectUnsaved, useProjectStore } from "../stores/projectStore";
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -9,22 +10,70 @@ function isTyping(target: EventTarget | null): boolean {
   );
 }
 
-/** App-wide shortcuts. While typing in a field, the field's own undo applies. */
+/** Ctrl (or Cmd) shortcuts that work everywhere, even while typing. */
+const ALWAYS: Record<string, () => void> = {
+  s: () => void commands.saveZip(),
+  o: () => void commands.requestOpenProject(),
+  e: () => void commands.exportLinedPdf(),
+  "=": commands.zoomIn,
+  "+": commands.zoomIn,
+  "-": commands.zoomOut,
+  "0": commands.zoomToFit,
+};
+
+/** Ctrl (or Cmd) shortcuts that yield to a text field's own editing. */
+const OUTSIDE_FIELDS: Record<string, (shift: boolean) => void> = {
+  z: (shift) => (shift ? commands.redo() : commands.undo()),
+  y: () => commands.redo(),
+  x: () => commands.cut(),
+  c: () => commands.copy(),
+  v: (shift) => (shift ? commands.pasteInPlace() : commands.paste()),
+  d: () => commands.duplicateSelection(),
+};
+
+/** App-wide shortcuts, and the warning when leaving with unsaved work. */
 export function useGlobalShortcuts() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || isTyping(e.target)) return;
       const key = e.key.toLowerCase();
-      if (key === "z") {
+      const typing = isTyping(e.target);
+
+      if (!(e.ctrlKey || e.metaKey)) {
+        if (typing || e.altKey) return;
+        if (key === "delete" || key === "backspace") {
+          if (commands.hasMarkSelection()) {
+            e.preventDefault();
+            commands.deleteSelection();
+          }
+        } else if (key === "escape" && !document.querySelector('[role="dialog"], [role="menu"]')) {
+          commands.deselect();
+        }
+        return;
+      }
+      if (e.altKey) return;
+
+      const always = ALWAYS[key];
+      if (always) {
         e.preventDefault();
-        if (e.shiftKey) commands.redo();
-        else commands.undo();
-      } else if (key === "y") {
+        always();
+        return;
+      }
+      const outside = OUTSIDE_FIELDS[key];
+      if (outside && !typing) {
         e.preventDefault();
-        commands.redo();
+        outside(e.shiftKey);
       }
     };
+
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isProjectUnsaved(useProjectStore.getState())) e.preventDefault();
+    };
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
   }, []);
 }

@@ -2,12 +2,8 @@ import { useEffect } from "react";
 import { toolForKey } from "../lib/toolKeybinds";
 import { useLegacyStore } from "../legacy/legacyStore";
 
-export function useAnnotationKeyboard(pageNum: number) {
-  const selection = useLegacyStore((s) => s.selection);
+export function useAnnotationKeyboard(_pageNum: number) {
   const toolKeybinds = useLegacyStore((s) => s.toolKeybinds);
-  const deleteAnnotation = useLegacyStore((s) => s.deleteAnnotation);
-  const copySelectedLines = useLegacyStore((s) => s.copySelectedLines);
-  const pasteLines = useLegacyStore((s) => s.pasteLines);
   const setActiveTool = useLegacyStore((s) => s.setActiveTool);
 
   useEffect(() => {
@@ -23,41 +19,12 @@ export function useAnnotationKeyboard(pageNum: number) {
       }
 
       const tool = toolForKey(e.key, toolKeybinds);
-      if (tool) {
-        setActiveTool(tool);
-        return;
-      }
-
-      if (e.key === "Delete" || e.key === "Backspace") {
-        if (selection?.kind === "annotation") {
-          e.preventDefault();
-          deleteAnnotation(selection.annotationId);
-        }
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
-        if (selection?.kind === "annotation") {
-          e.preventDefault();
-          copySelectedLines();
-        }
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
-        e.preventDefault();
-        pasteLines(pageNum);
-      }
+      if (tool && !e.ctrlKey && !e.metaKey && !e.altKey) setActiveTool(tool);
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
-    selection,
-    pageNum,
-    deleteAnnotation,
-    copySelectedLines,
-    pasteLines,
     toolKeybinds,
     setActiveTool,
   ]);

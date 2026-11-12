@@ -10,7 +10,14 @@ import { usePrefsStore } from "./prefsStore";
 /** One or more things of one kind. A single ID until multi-select exists. */
 export type Selection = { kind: "scene" | "shot" | "mark"; ids: string[] } | null;
 
-export type ConfirmRequest = { message: string; onYes: () => void };
+export type ConfirmRequest = {
+  message: string;
+  onYes: () => void;
+  /** Names the action on the confirm button, such as "Delete" or "Replace project". */
+  confirmLabel?: string;
+  /** The action destroys something. */
+  danger?: boolean;
+};
 
 type SessionState = {
   selection: Selection;
