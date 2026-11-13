@@ -1,3 +1,4 @@
+import { defaultsFromProject, SUGGESTION_FIELDS, suggestionsFor } from "../../model/suggestions";
 import { fromPoints, lengthStep, toPoints, type LengthUnit } from "../../lib/units";
 import { clearRevisionTags, REVISION_COLORS, revisionColor } from "../../model/revisions";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -11,6 +12,7 @@ import {
   Gauge,
   Keyboard,
   List,
+  ListPlus,
   MousePointer2,
   Palette,
   PenLine,
@@ -298,6 +300,43 @@ function TagsField({
   );
 }
 
+/** A list of plain values (a field's dropdown): remove with ×, add by typing and Enter. */
+function ValueListField({ values, label, onChange }: { values: string[]; label: string; onChange: (values: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const parts = draft.split(";").map((p) => p.trim()).filter(Boolean);
+    setDraft("");
+    const next = [...values];
+    for (const part of parts) if (!next.some((v) => v.toLowerCase() === part.toLowerCase())) next.push(part);
+    if (next.length !== values.length) onChange(next);
+  };
+  return (
+    <div className="set-tags">
+      {values.map((value) => (
+        <span className="set-tag" key={value}>
+          {value}
+          <button type="button" aria-label={`Remove ${value}`} onClick={() => onChange(values.filter((v) => v !== value))}>
+            ×
+          </button>
+        </span>
+      ))}
+      <input
+        placeholder="Add…"
+        aria-label={`Add to ${label}`}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={add}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            add();
+          }
+        }}
+      />
+    </div>
+  );
+}
+
 export function SettingsDialog() {
   const open = useSessionStore((s) => s.settingsOpen);
   const setOpen = useSessionStore((s) => s.setSettingsOpen);
@@ -514,6 +553,59 @@ export function SettingsDialog() {
         {
           label: "Shot tags",
           control: <TagsField tags={s.lists.tags ?? []} onChange={(tags) => set((p) => ({ ...p, lists: { ...p.lists, tags } }))} />,
+        },
+      ],
+    },
+    {
+      id: "suggestions",
+      group: "Project",
+      title: "Suggestions",
+      icon: <ListPlus {...icon} />,
+      rows: [
+        ...SUGGESTION_FIELDS.map((f) => ({
+          label: f.label,
+          hint:
+            f.id === "cast"
+              ? "This project's cast. It stays with the project and is never saved as your default."
+              : f.single
+                ? "Offered in the field's dropdown; you can still type anything."
+                : "Offered when you click the field. Values you type there are added here.",
+          stacked: true,
+          control: (
+            <ValueListField
+              label={f.label}
+              values={suggestionsFor(project, f.id, prefs.suggestionDefaults)}
+              onChange={(values) => set((p) => ({ ...p, suggestions: { ...p.suggestions, [f.id]: values } }))}
+            />
+          ),
+        })),
+        {
+          label: "My defaults",
+          hint: "New projects start with your default lists. Cast is never included.",
+          control: (
+            <span className="set-inline">
+              <button
+                type="button"
+                className="dialog-btn"
+                onClick={() => {
+                  prefs.setSuggestionDefaults(defaultsFromProject(project, prefs.suggestionDefaults));
+                  useSessionStore.getState().addNotices(["Saved these lists (all but Cast) as your defaults."]);
+                }}
+              >
+                Save as my defaults
+              </button>
+              <button
+                type="button"
+                className="dialog-btn"
+                title="Replace this project's lists (all but Cast) with your defaults"
+                onClick={() =>
+                  set((p) => ({ ...p, suggestions: p.suggestions?.cast ? { cast: p.suggestions.cast } : undefined }))
+                }
+              >
+                Use my defaults
+              </button>
+            </span>
+          ),
         },
       ],
     },

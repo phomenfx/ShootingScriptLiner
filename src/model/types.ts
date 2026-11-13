@@ -415,6 +415,8 @@ export type ProjectSettings = {
   importMapping?: Record<string, string>;
   /** Script revision tracking (off unless turned on). */
   revisions?: { enabled: boolean; current: string };
+  /** Suggestion lists for shot fields (shot type, cast, movement…). Missing ones use my defaults. */
+  suggestions?: Partial<Record<string, string[]>>;
   /** Export choices saved with the project (lined PDF and shot list PDF dialogs). */
   exportChoices?: { linedPdf?: PdfExportOptions; shotListPdf?: ShotListPdfOptions };
 };

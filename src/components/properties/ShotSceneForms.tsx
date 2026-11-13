@@ -1,3 +1,5 @@
+import { suggestionsFor, type SuggestionField } from "../../model/suggestions";
+import { TagPicker } from "./TagPicker";
 import { revisionColor, revisionLabel } from "../../model/revisions";
 import { sceneNumber, shotSuffixes } from "../../model/numbering";
 import { Plus, X } from "lucide-react";
@@ -73,7 +75,8 @@ export function CameraRows({
             onChange={(e) => setRow(index, { name: e.target.value })}
           />
           {tick("lens", index, camera.name || `camera ${index + 1}`)}
-          <Chips
+          <TagPicker
+            field="lenses"
             values={camera.lenses}
             label={`Lenses of camera ${camera.name || index + 1}`}
             placeholder="Lens…"
@@ -124,6 +127,9 @@ type MarkField = "type" | "angle" | "subject" | "cast" | "tags" | "additionalInf
 
 export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspectorProps) {
   const { scene, shot, sceneIndex, shotIndex } = found;
+  const myDefaults = usePrefsStore((s) => s.suggestionDefaults);
+  /** The dropdown list for a field: the project's, else my defaults. */
+  const suggestions = (field: SuggestionField) => suggestionsFor(project, field, myDefaults);
   const style = project.settings.general.shotIdStyle;
   const sceneNo = sceneNumber(project, sceneIndex);
   const shotNo = shotSuffixes(scene, style)[shotIndex] ?? "";
@@ -282,6 +288,7 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
     );
   };
 
+
   const tagLabel = (key: string) => choiceLabel("tags", key, lists);
   const setTags = (labels: string[]) => {
     // Chips hand back keys for existing tags and typed text for new ones.
@@ -386,7 +393,14 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
           <Field label="Shot type" {...print("type")}>
             {withMarkLock(
               "type",
-              <TextInput label="Shot type" value={shown("type") ?? ""} placeholder="WS, MS, CU…" onChange={(type) => write("type", type)} onBlur={relockMarkIfEmpty("type")} />
+              <TextInput
+                label="Shot type"
+                value={shown("type") ?? ""}
+                placeholder="WS, MS, CU…"
+                suggestions={suggestions("type")}
+                onChange={(type) => write("type", type)}
+                onBlur={relockMarkIfEmpty("type")}
+              />
             )}
           </Field>
           <Field label="Angle" {...print("angle")}>
@@ -395,7 +409,7 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
               <TextInput
                 label="Angle"
                 value={choiceLabel("angle", shown("angle"), lists)}
-                suggestions={choiceEntries("angle", lists).map((e) => e.label)}
+                suggestions={suggestions("angle")}
                 onChange={(text) => write("angle", keyForText("angle", text, lists))}
                 onBlur={relockMarkIfEmpty("angle")}
               />
@@ -408,7 +422,7 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
             )}
           </Field>
           <Field label="Cast" wide {...print("cast")}>
-            {withMarkLock("cast", <Chips values={shown("cast") ?? []} label="Add cast" onChange={(cast) => write("cast", cast)} />)}
+            {withMarkLock("cast", <TagPicker field="cast" values={shown("cast") ?? []} label="Add cast" onChange={(cast) => write("cast", cast)} />)}
           </Field>
           <Field label="Tags" wide {...print("tags")}>
             {withMarkLock(
@@ -446,12 +460,12 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
         <Group name="shot-camera" title="Camera & Sound">
           <Field label="Movement" wide {...print("movement")}>
             <Lockable {...lockOf(movement)}>
-              <Chips values={movement.value ?? []} label="Add movement" onChange={movement.set} />
+              <TagPicker field="movement" values={movement.value ?? []} label="Add movement" onChange={movement.set} />
             </Lockable>
           </Field>
           <Field label="System" wide {...print("system")}>
             <Lockable {...lockOf(system)}>
-              <Chips values={system.value ?? []} label="Add system" onChange={system.set} />
+              <TagPicker field="system" values={system.value ?? []} label="Add system" onChange={system.set} />
             </Lockable>
           </Field>
           <div className="pf-field pf-wide">
@@ -465,11 +479,11 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
           </div>
           <Field label="Audio" wide {...print("audio")}>
             <Lockable {...lockOf(audio)}>
-              <Chips values={audio.value ?? []} label="Add audio" onChange={audio.set} />
+              <TagPicker field="audio" values={audio.value ?? []} label="Add audio" onChange={audio.set} />
             </Lockable>
           </Field>
           <Field label="FPS" {...print("fps")}>
-            {inheritText("fps", "FPS")}
+            {inheritText("fps", "FPS", suggestions("fps"))}
           </Field>
           <Field label="Sync" {...print("sync")}>
             <Lockable {...lockOf(sync)}>
@@ -526,6 +540,8 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
 export function SceneInspector({ project, scene }: { project: Project; scene: Scene }) {
   const sceneIndex = project.scenes.indexOf(scene);
   const number = sceneNumber(project, sceneIndex);
+  const myDefaults = usePrefsStore((s) => s.suggestionDefaults);
+  const sceneSuggestions = (field: SuggestionField) => suggestionsFor(project, field, myDefaults);
   const length = sceneLength(project, scene.shots.map((shot) => shot.id));
   const minutes = scene.shots.reduce((sum, shot) => sum + (shot.estimatedMinutes ?? 0), 0);
 
@@ -594,19 +610,19 @@ export function SceneInspector({ project, scene }: { project: Project; scene: Sc
         </Group>
         <Group name="scene-defaults" title="Shot defaults">
           <Field label="Movement" wide hint="Shots in this scene use these values until they set their own.">
-            <Chips values={scene.defaults.movement} label="Add movement" onChange={(movement) => defaults({ movement })} />
+            <TagPicker field="movement" values={scene.defaults.movement} label="Add movement" onChange={(movement) => defaults({ movement })} />
           </Field>
           <Field label="System" wide>
-            <Chips values={scene.defaults.system ?? []} label="Add system" onChange={(system) => defaults({ system })} />
+            <TagPicker field="system" values={scene.defaults.system ?? []} label="Add system" onChange={(system) => defaults({ system })} />
           </Field>
           <Field label="Camera and lens" wide>
             <CameraRows cameras={scene.defaults.cameras} onChange={(cameras) => defaults({ cameras })} />
           </Field>
           <Field label="Audio" wide>
-            <Chips values={scene.defaults.audio} label="Add audio" onChange={(audio) => defaults({ audio })} />
+            <TagPicker field="audio" values={scene.defaults.audio} label="Add audio" onChange={(audio) => defaults({ audio })} />
           </Field>
           <Field label="FPS">
-            <TextInput label="FPS" value={scene.defaults.fps ?? ""} onChange={(fps) => defaults({ fps })} />
+            <TextInput label="FPS" value={scene.defaults.fps ?? ""} suggestions={sceneSuggestions("fps")} onChange={(fps) => defaults({ fps })} />
           </Field>
           <Field label="Sync">
             <Select label="Sync" value={scene.defaults.sync ?? ""} options={syncOptions(project)} onChange={(sync) => defaults({ sync })} />

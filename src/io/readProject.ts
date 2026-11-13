@@ -562,6 +562,14 @@ function readSettings(raw: unknown): ProjectSettings {
     }
     settings.importMapping = mapping;
   }
+  if (isRecord(raw.suggestions)) {
+    const lists: Record<string, string[]> = {};
+    for (const [field, values] of Object.entries(raw.suggestions)) {
+      const list = stringList(values);
+      if (list) lists[field] = list;
+    }
+    settings.suggestions = lists;
+  }
   if (isRecord(raw.exportChoices)) {
     const choices: NonNullable<ProjectSettings["exportChoices"]> = {};
     if (isRecord(raw.exportChoices.linedPdf)) choices.linedPdf = { ...DEFAULT_PDF_OPTIONS, ...(raw.exportChoices.linedPdf as Partial<PdfExportOptions>) };

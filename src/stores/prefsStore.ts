@@ -2,6 +2,7 @@
  * Preferences saved in this browser: theme, panel sizes, zoom, shortcuts.
  * Never part of a project file.
  */
+import type { SuggestionLists } from "../model/suggestions";
 import { isLengthUnit, type LengthUnit } from "../lib/units";
 import { DEFAULT_PDF_OPTIONS, type PdfExportOptions } from "../model/pdfOptions";
 import { DEFAULT_SHOT_LIST_PDF, type ShotListPdfOptions } from "../model/shotListPdf";
@@ -78,6 +79,8 @@ type PrefsValues = {
   autosaveSeconds: number;
   /** Unit lengths are shown in (stored in points either way). */
   lengthUnit: LengthUnit;
+  /** My default suggestion lists (never Cast): projects without their own use these. */
+  suggestionDefaults: SuggestionLists;
 };
 
 type PrefsState = PrefsValues & {
@@ -110,6 +113,7 @@ type PrefsState = PrefsValues & {
   setAutosave: (on: boolean) => void;
   setAutosaveSeconds: (seconds: number) => void;
   setLengthUnit: (unit: LengthUnit) => void;
+  setSuggestionDefaults: (lists: SuggestionLists) => void;
 };
 
 const memory = new Map<string, string>();
@@ -206,6 +210,7 @@ export const usePrefsStore = create<PrefsState>()(
       autosave: true,
       autosaveSeconds: 3,
       lengthUnit: "pt",
+      suggestionDefaults: {},
       ...readOldKeys(),
 
       setColorTheme: (theme) => {
@@ -263,6 +268,7 @@ export const usePrefsStore = create<PrefsState>()(
       setAutosave: (autosave) => set({ autosave }),
       setAutosaveSeconds: (autosaveSeconds) => set({ autosaveSeconds }),
       setLengthUnit: (lengthUnit) => set({ lengthUnit }),
+      setSuggestionDefaults: (suggestionDefaults) => set({ suggestionDefaults }),
       setTableColumnOrder: (tableColumnOrder) => set({ tableColumnOrder }),
       setTableGroupBy: (tableGroupBy) => set({ tableGroupBy }),
       setTableColumnWidth: (column, width) =>
@@ -301,6 +307,7 @@ export const usePrefsStore = create<PrefsState>()(
           autosave: s.autosave !== false,
           autosaveSeconds: typeof s.autosaveSeconds === "number" && s.autosaveSeconds > 0 ? s.autosaveSeconds : 3,
           lengthUnit: isLengthUnit(s.lengthUnit) ? s.lengthUnit : "pt",
+          suggestionDefaults: s.suggestionDefaults && typeof s.suggestionDefaults === "object" ? (s.suggestionDefaults as SuggestionLists) : {},
           toolKeybinds: sanitizeToolKeybinds({ ...DEFAULT_TOOL_KEYBINDS, ...s.toolKeybinds }),
           panels: {
             widthPx: { ...d.widthPx, ...s.panels?.widthPx },
@@ -333,6 +340,7 @@ export const usePrefsStore = create<PrefsState>()(
         autosave,
         autosaveSeconds,
         lengthUnit,
+        suggestionDefaults,
       }): PrefsValues => ({
         colorTheme,
         uiScale,
@@ -355,6 +363,7 @@ export const usePrefsStore = create<PrefsState>()(
         autosave,
         autosaveSeconds,
         lengthUnit,
+        suggestionDefaults,
       }),
     }
   )
