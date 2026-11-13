@@ -9,7 +9,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { ChevronsDownUp, ChevronsUpDown, List, Plus, Search, Table2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import * as commands from "../../commands";
 import { confirm } from "../../commands";
 import { openContextMenu } from "../ContextMenu";
@@ -105,7 +105,24 @@ export function ScenePanel() {
    * until one of them has its own text. The page moves to its first line, but
    * the line stays unselected so the Line and Note tabs stay hidden.
    */
-  const selectShot = (shot: Shot) => {
+  const anchorRef = useRef<string | null>(null);
+  const selectShot = (shot: Shot, keys?: { shift: boolean; toggle: boolean }) => {
+    const current = selection?.kind === "shot" ? selection.ids : highlightedShotId ? [highlightedShotId] : [];
+    if (keys?.shift) {
+      // A run from the last shot clicked to this one, in list order.
+      const order = listed.flatMap((l) => l.shots.map((item) => item.shot.id));
+      const from = order.indexOf(anchorRef.current ?? current[current.length - 1] ?? shot.id);
+      const to = order.indexOf(shot.id);
+      const run = from < 0 ? [shot.id] : order.slice(Math.min(from, to), Math.max(from, to) + 1);
+      session().selectMany("shot", keys.toggle ? [...current, ...run] : run);
+      return;
+    }
+    if (keys?.toggle) {
+      anchorRef.current = shot.id;
+      session().selectMany("shot", current.includes(shot.id) ? current.filter((id) => id !== shot.id) : [...current, shot.id]);
+      return;
+    }
+    anchorRef.current = shot.id;
     session().select("shot", shot.id);
     const mark =
       project.marks.find((m) => m.kind === "line" && m.shotId === shot.id) ??
@@ -250,6 +267,12 @@ export function ScenePanel() {
         {project.scenes.length === 0 && (
           <div className="scene-list-empty">
             <p>No scenes yet. Add a scene, then add its shots.</p>
+            <button type="button" className="tool-btn" onClick={addScene}>
+              Add a scene
+            </button>
+            <button type="button" className="tool-btn" onClick={() => session().setImportOpen(true)}>
+              Import shot list…
+            </button>
             {project.script && (
               <button type="button" className="tool-btn" onClick={() => void commands.detectScenes()}>
                 Detect scenes from script
@@ -294,9 +317,9 @@ export function ScenePanel() {
                     item={item}
                     sceneId={l.scene.id}
                     project={project}
-                    selected={highlightedShotId === item.shot.id}
+                    selected={selection?.kind === "shot" ? selection.ids.includes(item.shot.id) : highlightedShotId === item.shot.id}
                     dragDisabled={searching}
-                    onSelect={() => selectShot(item.shot)}
+                    onSelect={(keys) => selectShot(item.shot, keys)}
                     onPatch={(patch) =>
                       step(
                         edits.updateShot(item.shot.id, (shot) => {

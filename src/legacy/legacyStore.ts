@@ -166,7 +166,7 @@ const actions: Omit<
   setSettingsOpen: (open) => session().setSettingsOpen(open),
   setConfirm: (confirm) => {
     // With "Delete asks first" off, deletes go straight through. Undo brings them back.
-    if (confirm?.confirmLabel === "Delete" && !prefs().confirmDeletes) confirm.onYes();
+    if (confirm?.confirmLabel === "Delete" && !prefs().confirmDeletes) confirm.onYes(false);
     else session().setConfirm(confirm);
   },
   setActiveTool: (tool) => session().setActiveTool(tool),

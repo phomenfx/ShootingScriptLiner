@@ -46,6 +46,12 @@ export function printsField(project: Project, shot: Shot, fieldId: string): bool
   return field?.print ?? CAPTION_FIELDS.find((f) => f.id === fieldId)?.print ?? false;
 }
 
+/** The shot as a line or note prints it: the mark's own checkboxes over the shot's. */
+export function withMarkPrint(found: FoundShot, own?: MarkOwn): FoundShot {
+  if (!own?.print) return found;
+  return { ...found, shot: { ...found.shot, print: { ...found.shot.print, ...own.print } } };
+}
+
 /** Whether the caption's number includes the scene part. Follows the Shot # checkbox unless set. */
 export function printsSceneNumber(project: Project, shot: Shot): boolean {
   const own = shot.print?.sceneNumber;
@@ -291,7 +297,8 @@ function appendField(previous: string, text: string, field: CaptionField): strin
  * own divider, so the usual settings read "1A-WS Subject (Info)" and any other
  * arrangement is made the same way.
  */
-export function shotCaption(project: Project, found: FoundShot, own?: MarkOwn): string {
+export function shotCaption(project: Project, foundShot: FoundShot, own?: MarkOwn): string {
+  const found = withMarkPrint(foundShot, own);
   let caption = "";
   let started = false;
   for (const field of project.settings.captions.fields) {

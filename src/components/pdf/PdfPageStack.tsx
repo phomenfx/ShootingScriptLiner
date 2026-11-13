@@ -1,3 +1,4 @@
+import { FindHighlights } from "./FindBar";
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -104,6 +105,7 @@ export function PdfPageStack({
     >
       {renderError && <p className="pdf-error pdf-page-error">{renderError}</p>}
       <canvas ref={canvasRef} />
+      {size.width > 0 && <FindHighlights pageNum={pageNum} />}
       {size.width > 0 && (
         <AnnotationLayer pageNum={pageNum} width={size.width} height={size.height} />
       )}

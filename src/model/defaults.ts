@@ -136,7 +136,7 @@ export function createShot(project: Project): Shot {
     id: newId(),
     color: project.settings.general.newShotColor,
     visible: true,
-    status: "planned",
+    status: project.settings.general.newShotStatus ?? "planned",
     priority: project.settings.general.newShotPriority,
   };
 }

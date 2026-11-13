@@ -54,3 +54,12 @@ describe("numbers", () => {
     expect(labels(clearShotNumbers(p, "scene1"))).toEqual(["b=1A", "c=1B", "a=1C"]);
   });
 });
+
+describe("switching letters and numbers", () => {
+  it("converts typed shot numbers", async () => {
+    const { setShotIdStyle } = await import("./numbering");
+    const p = done(renumberShot(project(["a", "b"]), "a", "", "D", true));
+    const next = setShotIdStyle(p, "decimal");
+    expect(labels(next)).toEqual(["b=1.2", "a=1.4"]);
+  });
+});

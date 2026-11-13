@@ -1,3 +1,4 @@
+import { FindBar } from "./FindBar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import * as commands from "../../commands";
@@ -28,6 +29,7 @@ type Props = {
 };
 
 export function PdfViewer({ file }: Props) {
+  const [dropping, setDropping] = useState(false);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const viewerPage = useSessionStore((s) => s.viewerPage);
   const activePage = useSessionStore((s) => s.activePage);
@@ -163,10 +165,29 @@ export function PdfViewer({ file }: Props) {
   return (
     <div className="pdf-viewer">
       <ScriptToolbar />
+      <FindBar />
       {loadError && <p className="pdf-error">{loadError}</p>}
       {!file && (
-        <div className="pdf-placeholder-inner">
-          <p>No script loaded.</p>
+        <div
+          className={`pdf-placeholder-inner${dropping ? " is-dropping" : ""}`}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes("Files")) return;
+            e.preventDefault();
+            setDropping(true);
+          }}
+          onDragLeave={() => setDropping(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDropping(false);
+            const dropped = e.dataTransfer.files[0];
+            if (!dropped) return;
+            const name = dropped.name.toLowerCase();
+            if (name.endsWith(".pdf")) void commands.importPdf(dropped);
+            else if (name.endsWith(".zip") || name.endsWith(".json")) void commands.openProject(dropped);
+          }}
+        >
+          <p className="pdf-placeholder-title">No script loaded</p>
+          <p>Drop a script PDF or a saved project here, or:</p>
           <div className="pdf-placeholder-actions">
             <button type="button" onClick={() => void commands.requestImportPdf()}>
               Import script

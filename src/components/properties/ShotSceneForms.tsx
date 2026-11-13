@@ -1,8 +1,9 @@
+import { revisionColor, revisionLabel } from "../../model/revisions";
 import { sceneNumber, shotSuffixes } from "../../model/numbering";
 import { Plus, X } from "lucide-react";
 import type { ReactNode } from "react";
 import * as commands from "../../commands";
-import { cameraRowPrints, captionFieldText, printsField, printsSceneNumber, shotCaption, withCameraRowPrint, withPrintField, withSceneNumberPrint } from "../../model/captions";
+import { cameraRowPrints, captionFieldText, printsField, printsSceneNumber, shotCaption, withCameraRowPrint, withMarkPrint, withPrintField, withSceneNumberPrint } from "../../model/captions";
 import { createShot } from "../../model/defaults";
 import * as edits from "../../model/edits";
 import { describeLength, formatEighths, formatPageRange, sceneLength, shotLength } from "../../model/pageLength";
@@ -191,9 +192,25 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
     if (value.trim() === "" && isOwn(key)) setMarkOwn(key, undefined);
   };
 
+  /*
+   * Caption checkboxes. On a line's or note's Shot tab they are that mark's
+   * own (stored where they differ from the shot); on the shot's form they set
+   * the shot's default.
+   */
+  const printShot = withMarkPrint(found, mark?.own).shot;
+  const setMarkPrint = (key: string, on: boolean, shotValue: boolean) => {
+    if (!mark) return;
+    const next = { ...markOwn.print };
+    if (on === shotValue) delete next[key];
+    else next[key] = on;
+    setMarkOwn("print", Object.keys(next).length > 0 ? next : undefined);
+  };
   const print = (fieldId: string) => ({
-    print: printsField(project, shot, fieldId),
-    onPrintChange: (on: boolean) => apply(edits.updateShot(shot.id, (current) => withPrintField(project, current, fieldId, on))),
+    print: printsField(project, printShot, fieldId),
+    onPrintChange: (on: boolean) =>
+      mark
+        ? setMarkPrint(fieldId, on, printsField(project, shot, fieldId))
+        : apply(edits.updateShot(shot.id, (current) => withPrintField(project, current, fieldId, on))),
   });
   const setOwn = <K extends keyof ShotOwn>(field: K, value: ShotOwn[K] | undefined) => apply(edits.setShotOwn(shot.id, field, value));
 
@@ -307,9 +324,11 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
   const audio = inherit("audio", []);
   const sync = inherit("sync", "");
   const rowPrint = {
-    prints: (part: "camera" | "lens", index: number) => cameraRowPrints(project, shot, part, index),
+    prints: (part: "camera" | "lens", index: number) => cameraRowPrints(project, printShot, part, index),
     set: (part: "camera" | "lens", index: number, on: boolean) =>
-      apply(edits.updateShot(shot.id, (current) => withCameraRowPrint(project, current, part, index, on))),
+      mark
+        ? setMarkPrint(`${part}:${index}`, on, cameraRowPrints(project, shot, part, index))
+        : apply(edits.updateShot(shot.id, (current) => withCameraRowPrint(project, current, part, index, on))),
     // Rows after a removed one move up, so their checkboxes move with them.
     removed: (index: number) =>
       apply(
@@ -332,17 +351,24 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
       <div className="pf-scroll">
         <div className="pf-shot-top">
           <ColorField color={shot.color} label={`Color of shot ${id}`} onChange={(color) => patch({ color })} />
+          {shot.revision && project.settings.revisions?.enabled && (
+            <span className="revision-chip" style={{ background: revisionColor(shot.revision) }} title={`Changed in the ${revisionLabel(shot.revision)} revision`} />
+          )}
           <div className="pf-caption-preview" style={{ color: shot.color }} title="Caption preview: how this shot's lines are labeled">
             {shotCaption(project, found, mark?.own) || <span className="pf-none">No caption</span>}
           </div>
         </div>
 
-        <Group name="shot" title="Shot">
+        <Group name="shot" title="Shot" note={mark ? `checkboxes: this ${mark.kind === "text" ? "note" : "line"} only` : undefined}>
           <Field
             label="Scene #"
             hint="Type another scene's number to move this shot there."
-            print={printsSceneNumber(project, shot)}
-            onPrintChange={(on) => apply(edits.updateShot(shot.id, (current) => withSceneNumberPrint(project, current, on)))}
+            print={printsSceneNumber(project, printShot)}
+            onPrintChange={(on) =>
+              mark
+                ? setMarkPrint("sceneNumber", on, printsSceneNumber(project, shot))
+                : apply(edits.updateShot(shot.id, (current) => withSceneNumberPrint(project, current, on)))
+            }
           >
             <CommitInput label="Scene number" value={sceneNo} onCommit={(text) => commands.renumberShot(shot.id, text || sceneNo, shotNo, linkId)} />
           </Field>

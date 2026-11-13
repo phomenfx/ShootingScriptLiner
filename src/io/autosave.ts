@@ -6,12 +6,12 @@
  *
  * This is a safety net, not a save: clearing the browser's site data removes it.
  */
+import { withCurrentView } from "../lib/projectView";
 import { usePrefsStore } from "../stores/prefsStore";
 import { useProjectStore } from "../stores/projectStore";
 import { serializeProject } from "./writeProject";
 
 export const AUTOSAVE_KEY = "shooting-script-liner-autosave";
-const DELAY_MS = 3000;
 
 export type Autosave = { savedAt: string; name: string; json: string };
 
@@ -58,7 +58,7 @@ export function startAutosave(): () => void {
       clearAutosave();
       return;
     }
-    const entry: Autosave = { savedAt: new Date().toISOString(), name: project.name, json: serializeProject(project) };
+    const entry: Autosave = { savedAt: new Date().toISOString(), name: project.name, json: serializeProject(withCurrentView(project)) };
     try {
       storage()?.setItem(AUTOSAVE_KEY, JSON.stringify(entry));
     } catch {
@@ -67,13 +67,24 @@ export function startAutosave(): () => void {
   };
   const unsubscribe = useProjectStore.subscribe((state, previous) => {
     if (state.project === previous.project && state.savedProject === previous.savedProject) return;
-    if (timer) clearTimeout(timer);
     // Saved: clear at once. Changed: write once things go quiet.
     if (state.project === state.savedProject) {
+      if (timer) clearTimeout(timer);
+      timer = undefined;
       clearAutosave();
       return;
     }
-    timer = setTimeout(write, DELAY_MS);
+    // A few seconds: once things go quiet. Longer: at most that often, however busy.
+    const seconds = usePrefsStore.getState().autosaveSeconds;
+    if (seconds <= 5) {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(write, Math.max(1, seconds) * 1000);
+    } else if (!timer) {
+      timer = setTimeout(() => {
+        timer = undefined;
+        write();
+      }, seconds * 1000);
+    }
   });
   // Last chance before the tab closes.
   const onHide = () => {

@@ -4,18 +4,20 @@
  * scene number ("2." or "2"), and may end with the number again.
  */
 import { createScene } from "./defaults";
-import { sceneNumber as sceneNumberOf } from "./numbering";
+import { sceneNumber as sceneNumberOf, sceneNumbers as sceneNumbersOf } from "./numbering";
 import type { Project, Scene, SceneHeading } from "./types";
 
 export type FoundHeading = {
   /** Printed scene number's whole part, when the script numbers its scenes. */
   number?: number;
+  /** The printed scene number as written (12, 12A). */
+  label?: string;
   heading: SceneHeading;
   page: number;
 };
 
 const INDICATOR = /^(INT\.?\s*\/\s*EXT\.?|EXT\.?\s*\/\s*INT\.?|I\s*\/\s*E\.?|INT\.|EXT\.|EST\.|INT|EXT|EST)(?=\s)/i;
-const NUMBER = /^(\d+)[A-Z]?\.?(?=\s)/i;
+const NUMBER = /^((\d+)[A-Z]?)\.?(?=\s)/i;
 const TRAILING_NUMBER = /\s+\d+[A-Z]?\.?$/i;
 /** Separators between location and time: " - ", " – ", " — ". */
 const TIME_SPLIT = /\s+[-–—]+\s+/;
@@ -35,9 +37,11 @@ function tidyIndicator(raw: string): string {
 export function parseSceneHeading(line: string): Omit<FoundHeading, "page"> | null {
   let text = line.replace(/\s+/g, " ").trim();
   let number: number | undefined;
+  let label: string | undefined;
   const numbered = NUMBER.exec(text);
   if (numbered) {
-    number = Number(numbered[1]);
+    number = Number(numbered[2]);
+    label = numbered[1]!.toUpperCase();
     text = text.slice(numbered[0].length).trim();
   }
   const indicator = INDICATOR.exec(text);
@@ -51,7 +55,7 @@ export function parseSceneHeading(line: string): Omit<FoundHeading, "page"> | nu
   const parts = rest.split(TIME_SPLIT);
   const time = parts.length > 1 ? parts.pop()!.trim() : "";
   const location = parts.join(" - ").trim();
-  return { ...(number !== undefined ? { number } : {}), heading: { indicator: tidyIndicator(indicator[1]!), location, time } };
+  return { ...(number !== undefined ? { number, label } : {}), heading: { indicator: tidyIndicator(indicator[1]!), location, time } };
 }
 
 /** Headings in reading order from the lines of each page. */
@@ -113,9 +117,12 @@ export function usableHeadings(found: FoundHeading[]): FoundHeading[] {
 /**
  * Puts found headings into the scene list. Numbered headings go to that scene
  * number, making blank scenes for any gap; unnumbered ones follow in order.
- * A scene that already has a heading keeps it.
+ * A scene that already has a heading keeps it. With `useScriptNumbers`, each
+ * numbered heading becomes the scene with that number as printed (12, 12A),
+ * typed onto the scene, with no blank scenes for gaps.
  */
-export function planScenes(project: Project, found: FoundHeading[]): ScenePlan {
+export function planScenes(project: Project, found: FoundHeading[], useScriptNumbers = false): ScenePlan {
+  if (useScriptNumbers) return planByScriptNumbers(project, found);
   const scenes = [...project.scenes];
   let filled = 0;
   let blanks = 0;
@@ -137,4 +144,28 @@ export function planScenes(project: Project, found: FoundHeading[]): ScenePlan {
     next = index + 1;
   }
   return { project: { ...project, scenes }, filled, blanks, kept, used };
+}
+
+function planByScriptNumbers(project: Project, found: FoundHeading[]): ScenePlan {
+  const scenes = [...project.scenes];
+  const byNumber = new Map(sceneNumbersOf(project).map((n, i) => [n.toUpperCase(), i]));
+  let filled = 0;
+  let kept = 0;
+  let next = 0;
+  const used = usableHeadings(found);
+  for (const hit of used) {
+    let index = hit.label ? byNumber.get(hit.label) : next < scenes.length ? next : undefined;
+    if (index === undefined) {
+      scenes.push({ ...createScene(), ...(hit.label ? { number: hit.label } : {}) });
+      index = scenes.length - 1;
+      if (hit.label) byNumber.set(hit.label, index);
+    }
+    const scene = scenes[index]!;
+    if (isBlank(scene)) {
+      scenes[index] = { ...scene, heading: { ...hit.heading } };
+      filled += 1;
+    } else kept += 1;
+    next = index + 1;
+  }
+  return { project: { ...project, scenes }, filled, blanks: 0, kept, used };
 }

@@ -3,6 +3,11 @@
  * shortcuts and the action bar all call these, so each action has one
  * implementation.
  */
+import { restoreView, withCurrentView } from "../lib/projectView";
+import type { PdfExportOptions } from "../model/pdfOptions";
+import type { ProjectSettings } from "../model/types";
+import { compareScripts } from "../model/scriptCompare";
+import { findMatches, type PageText } from "../model/findText";
 import { rejoinLine, splitLine } from "../drawing/marks";
 import { placeUnplacedV1Marks } from "../io/migrateV1";
 import { buildProjectZip, downloadBlob, readProjectFile, scriptNameInJson } from "../io/projectFiles";
@@ -22,9 +27,9 @@ import { insertOutline, outlineClipOf, type OutlineAnchor, type OutlineClip } fr
 import { markAsDefaults } from "../model/markDefaults";
 import * as numbering from "../model/numbering";
 import type { ShotListPdfOptions } from "../model/shotListPdf";
-import { orderColumns, TABLE_COLUMNS, type TableColumn } from "../model/shotTable";
+import { orderColumns, projectColumns, type TableColumn } from "../model/shotTable";
 import { formatExcelDate } from "../lib/dateFormat";
-import { findHeadings, planScenes, scenePage, type FoundHeading } from "../model/sceneDetect";
+import { findHeadings, planScenes, scenePage, usableHeadings, type FoundHeading } from "../model/sceneDetect";
 import type { Mark, Project, ScriptInfo } from "../model/types";
 import {
   applyWithoutUndo,
@@ -83,6 +88,27 @@ export function confirm(message: string, confirmLabel: string, danger = false): 
       onYes: () => {
         unsubscribe();
         resolve(true);
+      },
+    });
+  });
+}
+
+/** Like confirm, with a checkbox under the message. Resolves null when declined. */
+function confirmWithOption(message: string, confirmLabel: string, option: { label: string; checked: boolean }): Promise<boolean | null> {
+  return new Promise((resolve) => {
+    const unsubscribe = useSessionStore.subscribe((s) => {
+      if (s.confirm === null) {
+        unsubscribe();
+        resolve(null);
+      }
+    });
+    session().setConfirm({
+      message,
+      confirmLabel,
+      option,
+      onYes: (checked) => {
+        unsubscribe();
+        resolve(checked);
       },
     });
   });
@@ -207,24 +233,34 @@ export async function detectScenes(): Promise<void> {
       notify("No scene headings found. A heading starts with INT., EXT., INT./EXT., I/E or EST.");
       return;
     }
-    const plan = planScenes(project(), found);
+    // The script's own numbers (12, 12A) when its headings are numbered.
+    const numbered = usableHeadings(found).some((h) => h.label !== undefined);
+    const plan = planScenes(project(), found, numbered);
     const used = plan.used;
-    if (plan.filled === 0 && plan.blanks === 0) {
+    if (plan.filled === 0 && plan.blanks === 0 && plan.project.scenes.length === project().scenes.length) {
       notify(`Found ${used.length} scene headings, but those scenes already have headings. Nothing changed.`);
       return;
     }
     const sample = used
       .slice(0, 3)
-      .map((h) => `${h.number !== undefined ? `${h.number}. ` : ""}${h.heading.indicator} ${h.heading.location}${h.heading.time ? ` - ${h.heading.time}` : ""}`)
+      .map((h) => `${h.label !== undefined ? `${h.label}. ` : ""}${h.heading.indicator} ${h.heading.location}${h.heading.time ? ` - ${h.heading.time}` : ""}`)
       .join("; ");
     const parts = [`Found ${used.length} scene ${used.length === 1 ? "heading" : "headings"} (${sample}${used.length > 3 ? "; …" : ""}).`];
     parts.push(`This fills ${plan.filled} ${plan.filled === 1 ? "scene" : "scenes"}`);
     if (plan.blanks) parts[1] += ` and adds ${plan.blanks} blank ${plan.blanks === 1 ? "scene" : "scenes"} so the numbers line up`;
     parts[1] += ".";
     if (plan.kept) parts.push(`${plan.kept} ${plan.kept === 1 ? "scene keeps its" : "scenes keep their"} own heading.`);
-    if (!(await confirm(parts.join(" "), "Add scenes"))) return;
+    let useNumbers = false;
+    if (numbered) {
+      const answer = await confirmWithOption(parts.join(" "), "Add scenes", {
+        label: "Use the script's scene numbers (12, 12A…). Off: count 1, 2, 3 and add blank scenes for gaps.",
+        checked: true,
+      });
+      if (answer === null) return;
+      useNumbers = answer;
+    } else if (!(await confirm(parts.join(" "), "Add scenes"))) return;
     breakUndoGroup();
-    useProjectStore.getState().apply((current) => planScenes(current, found).project);
+    useProjectStore.getState().apply((current) => planScenes(current, found, useNumbers).project);
     breakUndoGroup();
   } catch (error) {
     notify(errorText(error, "Could not read the script's text."));
@@ -318,6 +354,8 @@ export async function openProject(file: File): Promise<void> {
     if (missing.length) notices.push(`${missing.length} image ${missing.length === 1 ? "file is" : "files are"} not in this file or this browser.`);
     notify(...notices);
     if (pdfFile) await cacheScript(opened, pdfFile);
+    // Back where it was left: page, zoom, layout, List or Table.
+    restoreView(opened.view);
   } catch (error) {
     notify(errorText(error, "Could not open this file. Use a project .zip or .json file."));
   }
@@ -331,6 +369,67 @@ async function scriptFileForExport(): Promise<File | null> {
   );
 }
 
+/* ---------- find on script ---------- */
+
+const layoutCache = new WeakMap<File, Promise<PageText[]>>();
+
+/** Opens the find bar (Ctrl+F). */
+export function openFind(): void {
+  if (!project().script) {
+    notify("Import the script PDF first, then search it.");
+    return;
+  }
+  session().setFind({ open: true });
+  requestAnimationFrame(() => (document.querySelector(".find-bar input") as HTMLInputElement | null)?.select());
+}
+
+export function closeFind(): void {
+  session().setFind({ open: false, matches: [], index: 0 });
+}
+
+/** Searches the script and shows the first match at or after the page in view. */
+export async function setFindQuery(query: string): Promise<void> {
+  session().setFind({ query });
+  if (!query.trim()) return session().setFind({ matches: [], index: 0, busy: false });
+  const file = await scriptFileForExport();
+  if (!file) return;
+  let layout = layoutCache.get(file);
+  if (!layout) {
+    session().setFind({ busy: true });
+    const { readScriptLayout } = await import("../io/scriptText");
+    layout = readScriptLayout(file);
+    layoutCache.set(file, layout);
+  }
+  try {
+    const pages = await layout;
+    if (session().find.query !== query) return; // typed on since
+    const matches = findMatches(pages, query);
+    const fromPage = session().viewerPage;
+    const first = Math.max(0, matches.findIndex((m) => m.page >= fromPage));
+    session().setFind({ matches, index: first, busy: false });
+    if (matches.length > 0) showFindMatch(first);
+  } catch (error) {
+    session().setFind({ busy: false });
+    notify(errorText(error, "Could not read the script's text."));
+  }
+}
+
+function showFindMatch(index: number): void {
+  const match = session().find.matches[index];
+  if (!match) return;
+  session().setViewerPage(match.page);
+  session().setActivePage(match.page);
+}
+
+/** The next match (or the previous one), wrapping around. */
+export function findStep(by: 1 | -1): void {
+  const { matches, index } = session().find;
+  if (matches.length === 0) return;
+  const next = (index + by + matches.length) % matches.length;
+  session().setFind({ index: next });
+  showFindMatch(next);
+}
+
 export async function saveZip(): Promise<void> {
   try {
     const p = project();
@@ -338,7 +437,7 @@ export async function saveZip(): Promise<void> {
     if (!pdfFile && p.script) {
       notify(`The script "${p.script.fileName}" is not loaded, so this save has no PDF in it. Import the script and save again.`);
     }
-    downloadBlob(await buildProjectZip(p, pdfFile, assetBlob), `${projectFileStem(p)}.zip`);
+    downloadBlob(await buildProjectZip(withCurrentView(p), pdfFile, assetBlob), `${projectFileStem(p)}.zip`);
     if (useProjectStore.getState().project === p) markProjectSaved();
     if (pdfFile) await cacheScript(p, pdfFile);
   } catch (error) {
@@ -351,6 +450,12 @@ export async function importPdf(file: File): Promise<void> {
   try {
     const script = await describeScript(await file.arrayBuffer(), file.name);
     const current = project();
+    // A script is already in use: compare page by page, so marks can follow their pages.
+    const oldFile = current.script ? await scriptFileForExport() : null;
+    if (oldFile && current.marks.length > 0) {
+      await updateScript(oldFile, file, script);
+      return;
+    }
     if (current.marks.length > 0) {
       const warning = scriptMismatchMessage(compareScript(current.script, script), current.script, script);
       if (warning && !(await confirm(warning, "Use this script"))) return;
@@ -359,6 +464,60 @@ export async function importPdf(file: File): Promise<void> {
   } catch (error) {
     notify(errorText(error, "Could not read this PDF."));
   }
+}
+
+/** Picks an updated script PDF and compares it with the one in use. */
+export async function requestUpdateScript(): Promise<void> {
+  if (!project().script) return requestImportPdf();
+  const file = await pickFile(".pdf,application/pdf");
+  if (file) await importPdf(file);
+}
+
+/**
+ * Swaps in an updated script: says which pages changed, were added or were
+ * removed, and (when chosen) moves each mark to the page its text moved to.
+ */
+async function updateScript(oldFile: File, newFile: File, script: ScriptInfo): Promise<void> {
+  const { readScriptLines } = await import("../io/scriptText");
+  const [oldPages, newPages] = await Promise.all([readScriptLines(oldFile), readScriptLines(newFile)]);
+  const noText = (pages: string[][]) => pages.every((lines) => lines.length === 0);
+  if (noText(oldPages) || noText(newPages)) {
+    // Scanned pages have no text to compare; fall back to the plain warning.
+    const warning = scriptMismatchMessage(compareScript(project().script, script), project().script, script);
+    if (warning && !(await confirm(warning, "Use this script"))) return;
+    await adoptScript(newFile, script);
+    return;
+  }
+  const c = compareScripts(oldPages, newPages);
+  const moves = c.pageMap.some((to, i) => to !== i + 1);
+  const list = (pages: number[]) => (pages.length > 8 ? `${pages.slice(0, 8).join(", ")}…` : pages.join(", "));
+  const parts = [`Compared with the script in use (${oldPages.length} → ${newPages.length} pages).`];
+  if (c.changed.length === 0 && c.removed.length === 0) parts.push("No page text changed.");
+  else {
+    const changedOnly = c.changed.filter((p) => !c.added.includes(p));
+    if (changedOnly.length) parts.push(`Changed: ${changedOnly.length === 1 ? "page" : "pages"} ${list(changedOnly)}.`);
+    if (c.added.length) parts.push(`New: ${c.added.length === 1 ? "page" : "pages"} ${list(c.added)}.`);
+    if (c.removed.length) parts.push(`Gone: old ${c.removed.length === 1 ? "page" : "pages"} ${list(c.removed)} (their marks go to the next page).`);
+  }
+  const follow = moves
+    ? await confirmWithOption(parts.join(" "), "Use updated script", { label: "Move marks to follow their pages", checked: true })
+    : (await confirm(parts.join(" "), "Use updated script"))
+      ? false
+      : null;
+  if (follow === null) return;
+  await adoptScript(newFile, script);
+  if (follow) {
+    breakUndoGroup();
+    useProjectStore.getState().apply((p) => ({
+      ...p,
+      marks: p.marks.map((mark) => {
+        const to = c.pageMap[mark.page - 1];
+        return to !== undefined && to !== mark.page ? { ...mark, page: to } : mark;
+      }),
+    }));
+    breakUndoGroup();
+  }
+  if (c.changed.length) notify(`Check your lines on changed ${c.changed.length === 1 ? "page" : "pages"} ${list(c.changed)}.`);
 }
 
 /**
@@ -391,7 +550,7 @@ export async function exportLinedPdf(): Promise<void> {
       await pdfFile.arrayBuffer(),
       project().marks.filter((mark) => mark.kind === "line"),
       project(),
-      session().pdfOptions
+      linedPdfOptions()
     );
     downloadBlob(new Blob([bytes], { type: "application/pdf" }), `${projectFileStem(project())}-lined.pdf`);
   } catch (error) {
@@ -412,11 +571,38 @@ export function requestExportLinedPdf(): void {
   session().setPdfExportOpen(true);
 }
 
+/* ---------- export choices: saved with the project, browser defaults for new ones ---------- */
+
+/** The lined PDF choices: this project's, else my defaults. */
+export function linedPdfOptions(p: Project = project()): PdfExportOptions {
+  return p.settings.exportChoices?.linedPdf ?? usePrefsStore.getState().linedPdf;
+}
+
+/** The shot list PDF choices: this project's, else my defaults. */
+export function shotListPdfOptions(p: Project = project()): ShotListPdfOptions {
+  return p.settings.exportChoices?.shotListPdf ?? usePrefsStore.getState().shotListPdf;
+}
+
+/** Saves export choices with the project (one undo step, like other settings). */
+export function setExportChoices(patch: NonNullable<ProjectSettings["exportChoices"]>): void {
+  useProjectStore.getState().apply(
+    updateSettings((s) => ({ ...s, exportChoices: { ...s.exportChoices, ...patch } }))
+  );
+}
+
+/** Makes this project's export choices the starting point for new projects. Scene picks stay with the project. */
+export function saveExportDefaults(kind: "linedPdf" | "shotListPdf"): void {
+  const prefs = usePrefsStore.getState();
+  if (kind === "linedPdf") prefs.setLinedPdf({ ...linedPdfOptions(), sceneIds: null });
+  else prefs.setShotListPdf({ ...shotListPdfOptions(), sceneIds: null });
+  notify("Saved as your defaults: new projects start with these export choices.");
+}
+
 /* ---------- shot list PDF ---------- */
 
 /** Every table column, in the table's order (for the export dialog). */
 export function shotListPdfColumnChoices(): TableColumn[] {
-  return orderColumns(TABLE_COLUMNS, usePrefsStore.getState().tableColumnOrder);
+  return orderColumns(projectColumns(project()), usePrefsStore.getState().tableColumnOrder);
 }
 
 /** The columns that print: the chosen ones, or the table's shown ones, in the table's order. */
@@ -449,7 +635,7 @@ export function requestExportShotListPdf(): void {
 
 export async function exportShotListPdf(): Promise<void> {
   try {
-    const options = usePrefsStore.getState().shotListPdf;
+    const options = shotListPdfOptions();
     const { buildShotListPdfBytes } = await import("../lib/shotListPdfBytes");
     const bytes = await buildShotListPdfBytes(project(), options, shotListPdfColumns(options), usePrefsStore.getState().tableColumnWidths, shotListPdfExtra());
     downloadBlob(new Blob([bytes], { type: "application/pdf" }), `${projectFileStem(project())}-shot-list.pdf`);
@@ -554,6 +740,31 @@ export function deleteSelection(): void {
   breakUndoGroup();
   useProjectStore.getState().apply(deleteMarks(marks.map((m) => m.id)));
   session().clearSelection();
+}
+
+/** Whether every selected mark is locked in place. */
+export function selectionLocked(): boolean {
+  const marks = selectedMarks();
+  return marks.length > 0 && marks.every((mark) => mark.locked);
+}
+
+/** Locks the selected marks in place, or unlocks them when all are locked (Ctrl+L). */
+export function toggleLockSelection(): void {
+  const marks = selectedMarks();
+  if (marks.length === 0) return;
+  const lock = !marks.every((mark) => mark.locked);
+  const ids = new Set(marks.map((mark) => mark.id));
+  breakUndoGroup();
+  useProjectStore.getState().apply((p) => ({
+    ...p,
+    marks: p.marks.map((mark) => {
+      if (!ids.has(mark.id)) return mark;
+      if (lock) return { ...mark, locked: true };
+      const { locked: _gone, ...rest } = mark;
+      return rest as Mark;
+    }),
+  }));
+  breakUndoGroup();
 }
 
 export function duplicateSelection(): void {

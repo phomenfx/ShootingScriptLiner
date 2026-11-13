@@ -1,3 +1,4 @@
+import { revisionColor, revisionLabel } from "../../model/revisions";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -188,7 +189,7 @@ export type ShotRowProps = {
   project: Project;
   selected: boolean;
   dragDisabled: boolean;
-  onSelect: () => void;
+  onSelect: (keys?: { shift: boolean; toggle: boolean }) => void;
   onPatch: (patch: Partial<Shot>) => void;
   onCycleStatus: () => void;
   onCyclePriority: () => void;
@@ -222,6 +223,12 @@ export function ShotRow({
   );
   const onRowClick = (e: React.MouseEvent) => {
     const onField = (e.target as HTMLElement).closest(".inline-value");
+    // Ctrl/Cmd-click adds or removes the shot; Shift-click selects a run.
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      onSelect({ shift: e.shiftKey, toggle: e.ctrlKey || e.metaKey });
+      return;
+    }
     if (!onField) {
       onSelect();
       return;
@@ -285,6 +292,9 @@ export function ShotRow({
       </span>
       <span className="shot-dot" style={{ background: shot.color }} />
       <span className="shot-id">{id}</span>
+      {shot.revision && project.settings.revisions?.enabled && (
+        <span className="revision-chip" style={{ background: revisionColor(shot.revision) }} title={`Changed in the ${revisionLabel(shot.revision)} revision`} />
+      )}
       <span className="shot-fields">
         {field(0, "type", "Shot type", "Type")}
         {field(1, "subject", "Subject", "Subject")}

@@ -19,6 +19,10 @@
   display: flex;
   align-items: center;
   flex: none;
+  /* Narrow windows wrap onto a second row instead of cutting controls off. */
+  flex-wrap: wrap;
+  row-gap: 4px;
+  min-width: 0;
   background: var(--color-card);
 }
 
@@ -504,4 +508,69 @@
   height: 100%;
   opacity: 0;
   cursor: pointer;
+}
+
+/* Empty script area: also a drop target. */
+.pdf-placeholder-inner {
+  margin: 16px;
+  border: 2px dashed transparent;
+  border-radius: var(--radius-md);
+}
+.pdf-placeholder-inner.is-dropping {
+  border-color: var(--color-accent);
+  background: var(--color-btn-hover);
+}
+.pdf-placeholder-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.script-iconbtn.on {
+  background: var(--color-btn-hover);
+  color: var(--color-accent);
+}
+
+/* Find on script. */
+.find-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 4px 10px;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.find-bar input {
+  flex: 1;
+  min-width: 6rem;
+  max-width: 22rem;
+  height: 1.625rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  background: var(--color-input);
+  color: var(--color-text);
+  font: inherit;
+}
+.find-count {
+  min-width: 5.5rem;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+.find-highlights {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.find-hit {
+  position: absolute;
+  background: rgba(255, 200, 0, 0.35);
+  border-radius: 2px;
+}
+.find-hit.is-current {
+  background: rgba(255, 140, 0, 0.55);
+  outline: 2px solid rgba(255, 120, 0, 0.9);
 }

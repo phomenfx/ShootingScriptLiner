@@ -288,6 +288,8 @@ export function cloneMark(mark: Mark, options: { page?: number; nudgePt?: number
   const base = structuredClone(mark);
   base.id = newId();
   base.page = page;
+  // A copy starts free to move, so it can be placed.
+  delete base.locked;
   if (base.kind === "line") {
     base.points = base.points.map((p) => ({ x: p.x + d, y: p.y + d }));
     delete (base as LineMark).marginContinuation;

@@ -1,3 +1,4 @@
+import { MultiShotInspector } from "./MultiShotForm";
 import { captionFieldText } from "../../model/captions";
 import * as edits from "../../model/edits";
 import { useProjectStore } from "../../stores/projectStore";
@@ -32,6 +33,14 @@ function PropertiesBody() {
   if (selection?.kind === "scene") {
     const scene = project.scenes.find((sc) => sc.id === id);
     if (scene) return <div className="pf" key={scene.id}><SceneInspector project={project} scene={scene} /></div>;
+  }
+
+  if (selection?.kind === "shot" && selection.ids.length > 1) {
+    return (
+      <div className="pf">
+        <MultiShotInspector project={project} ids={selection.ids} />
+      </div>
+    );
   }
 
   if (selection?.kind === "shot") {

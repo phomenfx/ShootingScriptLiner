@@ -1,3 +1,5 @@
+import { fromPoints, lengthStep, toPoints, type LengthUnit } from "../../lib/units";
+import { clearRevisionTags, REVISION_COLORS, revisionColor } from "../../model/revisions";
 import * as Dialog from "@radix-ui/react-dialog";
 import { EndingPicker, FillToggle } from "../properties/EndingPicker";
 import {
@@ -23,6 +25,7 @@ import { formatLineCaption } from "../../lib/lineCaption";
 import { CAPTION_DIVIDERS, customDividerSeed, isCaptionDivider } from "../../model/captions";
 import { defaultSettings } from "../../model/defaults";
 import { setName, updateSettings } from "../../model/edits";
+import { setShotIdStyle } from "../../model/numbering";
 import { clearAutosave } from "../../io/autosave";
 import { CAPTION_FIELDS, choiceEntries, isCaptionFieldId } from "../../model/registry";
 import type { CaptionDivider, Ending, LineDefaults, Outline, ProjectSettings, ShapeDefaults, TextDefaults, WaveSide } from "../../model/types";
@@ -66,6 +69,9 @@ const DEFAULT_OUTLINE: Outline = { color: "#FFFFFF", widthPt: 1.5 };
 
 const FIXED_SHORTCUTS: [string, string][] = [
   ["Save", "Ctrl+S"],
+  ["Settings", "Ctrl+,"],
+  ["Find on script", "Ctrl+F (Enter / Shift+Enter: next / previous)"],
+  ["This list of shortcuts", "?"],
   ["Open", "Ctrl+O"],
   ["Export lined PDF", "Ctrl+E"],
   ["Undo", "Ctrl+Z"],
@@ -73,6 +79,7 @@ const FIXED_SHORTCUTS: [string, string][] = [
   ["Cut / Copy / Paste", "Ctrl+X / C / V"],
   ["Paste in place", "Ctrl+Shift+V"],
   ["Duplicate", "Ctrl+D"],
+  ["Lock in place / unlock", "Ctrl+L"],
   ["Hide shot (selected shot, or a selected line's shot)", "Ctrl+H"],
   ["Hide scene", "Ctrl+Shift+H"],
   ["Show everything hidden", "Alt+H"],
@@ -158,7 +165,23 @@ function tuneHint(field: TuneField): string {
   return "How far the wave or zigzag swings.";
 }
 
-function NumberField({
+/** A number in Settings. Unit "len" is a length stored in points, shown in the chosen unit. */
+function NumberField(props: { value: number; min: number; max?: number; step?: number; unit?: string; onChange: (value: number) => void }) {
+  const u = usePrefsStore((s) => s.lengthUnit);
+  if (props.unit !== "len") return <PlainNumberField {...props} />;
+  return (
+    <PlainNumberField
+      value={fromPoints(props.value, u)}
+      min={fromPoints(props.min, u)}
+      max={props.max === undefined ? undefined : fromPoints(props.max, u)}
+      step={lengthStep(props.step ?? 1, u)}
+      unit={u}
+      onChange={(v) => props.onChange(toPoints(v, u))}
+    />
+  );
+}
+
+function PlainNumberField({
   value,
   min,
   max,
@@ -389,6 +412,17 @@ export function SettingsDialog() {
                 <input type="checkbox" checked={prefs.autosave} onChange={(e) => prefs.setAutosave(e.target.checked)} />
                 Keep unsaved work in this browser
               </label>
+              <select
+                aria-label="How often"
+                value={prefs.autosaveSeconds}
+                disabled={!prefs.autosave}
+                onChange={(e) => prefs.setAutosaveSeconds(Number(e.target.value))}
+              >
+                <option value={3}>A few seconds after a change</option>
+                <option value={30}>At most every 30 seconds</option>
+                <option value={60}>At most every minute</option>
+                <option value={300}>At most every 5 minutes</option>
+              </select>
               <button type="button" className="dialog-btn" onClick={clearAutosave}>
                 Discard saved copy
               </button>
@@ -405,6 +439,7 @@ export function SettingsDialog() {
       rows: [
         {
           label: "Shot IDs",
+          hint: "Shots count on in list order unless you type a Shot # (gaps like 1A, 1C are fine). Switching converts typed numbers too.",
           control: (
             <Segmented
               value={s.general.shotIdStyle}
@@ -412,8 +447,56 @@ export function SettingsDialog() {
                 { value: "letter", label: "Letters · 1A, 1B" },
                 { value: "decimal", label: "Numbers · 1.1, 1.2" },
               ]}
-              onChange={(shotIdStyle) => setGeneral({ shotIdStyle })}
+              onChange={(shotIdStyle) => useProjectStore.getState().apply((p) => setShotIdStyle(p, shotIdStyle))}
             />
+          ),
+        },
+        {
+          label: "Script revisions",
+          hint: "For scripts that go out in colored revision pages. While on, shots that are added or changed, or whose lines change, get the current revision's color tag.",
+          control: (
+            <label className="set-inline">
+              <input
+                type="checkbox"
+                checked={!!s.revisions?.enabled}
+                onChange={(e) => set((p) => ({ ...p, revisions: { current: p.revisions?.current ?? "white", enabled: e.target.checked } }))}
+              />
+              Track revisions
+            </label>
+          ),
+        },
+        ...(s.revisions?.enabled
+          ? [
+              {
+                label: "Current revision",
+                control: (
+                  <span className="set-inline">
+                    <span className="revision-chip" style={{ background: revisionColor(s.revisions.current) }} />
+                    <select value={s.revisions.current} onChange={(e) => set((p) => ({ ...p, revisions: { enabled: true, current: e.target.value } }))}>
+                      {REVISION_COLORS.map((r) => (
+                        <option key={r.key} value={r.key}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" className="dialog-btn" onClick={() => useProjectStore.getState().apply(clearRevisionTags)}>
+                      Clear all tags
+                    </button>
+                  </span>
+                ),
+              },
+            ]
+          : []),
+        {
+          label: "New shot status",
+          control: (
+            <select value={s.general.newShotStatus ?? "planned"} onChange={(e) => setGeneral({ newShotStatus: e.target.value })}>
+              {choiceEntries("status", s.lists).map((entry) => (
+                <option key={entry.key} value={entry.key}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
           ),
         },
         {
@@ -530,17 +613,17 @@ export function SettingsDialog() {
         {
           label: "Offset across",
           hint: "How far a caption starts to the right of its line's first point. Negative moves it to the left, beside the line.",
-          control: <NumberField value={s.captions.offsetAcrossPt} min={-400} max={400} unit="pt" onChange={(offsetAcrossPt) => setCaptions({ offsetAcrossPt })} />,
+          control: <NumberField value={s.captions.offsetAcrossPt} min={-400} max={400} unit="len" onChange={(offsetAcrossPt) => setCaptions({ offsetAcrossPt })} />,
         },
         {
           label: "Offset up",
           hint: "Negative moves the caption below the line's first point.",
-          control: <NumberField value={s.captions.offsetAbovePt} min={-200} max={200} unit="pt" onChange={(offsetAbovePt) => setCaptions({ offsetAbovePt })} />,
+          control: <NumberField value={s.captions.offsetAbovePt} min={-200} max={200} unit="len" onChange={(offsetAbovePt) => setCaptions({ offsetAbovePt })} />,
         },
         {
           label: '"(cont.)" gap',
           hint: "Space between the end of a continued line and its (cont.) caption.",
-          control: <NumberField value={s.captions.contGapPt} min={0} max={48} unit="pt" onChange={(contGapPt) => setCaptions({ contGapPt })} />,
+          control: <NumberField value={s.captions.contGapPt} min={0} max={48} unit="len" onChange={(contGapPt) => setCaptions({ contGapPt })} />,
         },
       ],
     },
@@ -561,7 +644,7 @@ export function SettingsDialog() {
         },
         {
           label: "Line thickness",
-          control: <NumberField value={line.stroke.widthPt} min={0.25} max={24} step={0.25} unit="pt" onChange={(widthPt) => setLine({ stroke: { ...line.stroke, widthPt } })} />,
+          control: <NumberField value={line.stroke.widthPt} min={0.25} max={24} step={0.25} unit="len" onChange={(widthPt) => setLine({ stroke: { ...line.stroke, widthPt } })} />,
         },
         ...patternFields(line.stroke.pattern).map((field) => strokeTuneRow(line.stroke, field, (stroke) => setLine({ stroke }))),
         { label: "Line start", control: <EndingField value={line.start} onChange={(start) => setLine({ start })} /> },
@@ -594,7 +677,7 @@ export function SettingsDialog() {
               min={0.25}
               max={24}
               step={0.25}
-              unit="pt"
+              unit="len"
               onChange={(widthPt) => setShape({ stroke: { ...(shape.stroke ?? { pattern: "straight", widthPt: 2 }), widthPt } })}
             />
           ),
@@ -649,7 +732,7 @@ export function SettingsDialog() {
                     <input type="color" value={outline.color} onChange={(e) => setOutline({ ...outline, color: e.target.value })} />
                     {outline.color}
                   </span>
-                  <NumberField value={outline.widthPt} min={0.25} max={6} step={0.25} unit="pt" onChange={(widthPt) => setOutline({ ...outline, widthPt })} />
+                  <NumberField value={outline.widthPt} min={0.25} max={6} step={0.25} unit="len" onChange={(widthPt) => setOutline({ ...outline, widthPt })} />
                 </>
               )}
             </span>
@@ -717,6 +800,17 @@ export function SettingsDialog() {
               ]}
               onChange={prefs.setColorTheme}
             />
+          ),
+        },
+        {
+          label: "Units for sizes",
+          hint: "Thickness, outlines, offsets and shape and image sizes. Font sizes stay in points.",
+          control: (
+            <select value={prefs.lengthUnit} onChange={(e) => prefs.setLengthUnit(e.target.value as LengthUnit)}>
+              <option value="pt">Points (pt)</option>
+              <option value="in">Inches (in)</option>
+              <option value="mm">Millimeters (mm)</option>
+            </select>
           ),
         },
         {
@@ -853,6 +947,18 @@ export function SettingsDialog() {
     setActive(id);
     scroller.current?.querySelector(`#settings-${id}`)?.scrollIntoView({ block: "start" });
   };
+
+  // Opened at a section (the ? key opens Shortcuts).
+  const openSection = useSessionStore((s) => s.settingsSection);
+  useEffect(() => {
+    if (!open || !openSection) return;
+    const frame = requestAnimationFrame(() => {
+      setQuery("");
+      jumpTo(openSection);
+      useSessionStore.setState({ settingsSection: null });
+    });
+    return () => cancelAnimationFrame(frame);
+  });
 
   /** The list on the left follows whichever section is at the top of the page. */
   const onScroll = () => {

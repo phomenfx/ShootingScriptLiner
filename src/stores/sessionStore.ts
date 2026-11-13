@@ -2,6 +2,7 @@
  * What is going on in this window right now: selection, tool, page, open
  * dialogs, clipboard, the loaded script PDF. None of it is saved.
  */
+import type { FindMatch } from "../model/findText";
 import type { OutlineClip } from "../model/outlineClipboard";
 import { DEFAULT_PDF_OPTIONS, type PdfExportOptions } from "../model/pdfOptions";
 import { create } from "zustand";
@@ -14,7 +15,10 @@ export type Selection = { kind: "scene" | "shot" | "mark"; ids: string[] } | nul
 
 export type ConfirmRequest = {
   message: string;
-  onYes: () => void;
+  /** Gets the checkbox's state when `option` is given. */
+  onYes: (checked: boolean) => void;
+  /** A checkbox shown under the message. */
+  option?: { label: string; checked: boolean };
   /** Names the action on the confirm button, such as "Delete" or "Replace project". */
   confirmLabel?: string;
   /** The action destroys something. */
@@ -51,7 +55,12 @@ type SessionState = {
   clipboard: Mark[] | null;
   /** Copied shots or scenes from the Scenes list. Only one of the two clipboards is filled. */
   outlineClipboard: OutlineClip | null;
+  /** Find on script (Ctrl+F). */
+  find: { open: boolean; query: string; matches: FindMatch[]; index: number; busy: boolean };
+  setFind: (patch: Partial<SessionState["find"]>) => void;
   settingsOpen: boolean;
+  /** Section to show when Settings opens (then cleared). */
+  settingsSection: string | null;
   confirm: ConfirmRequest | null;
   /** Messages shown in the page: skipped records, script warnings, errors. */
   notices: string[];
@@ -67,6 +76,8 @@ type SessionState = {
   select: (kind: "scene" | "shot" | "mark", id: string) => void;
   /** Several marks at once (a drag box or Shift/Ctrl-click). An empty list clears. */
   selectMarks: (ids: string[]) => void;
+  /** Several shots or scenes (Ctrl- or Shift-click in the Scenes list). */
+  selectMany: (kind: "scene" | "shot", ids: string[]) => void;
   clearSelection: () => void;
   setLineSegment: (lineId: string, index: number) => void;
   clearLineSegment: () => void;
@@ -87,7 +98,7 @@ type SessionState = {
   setActionBarOffset: (offset: { x: number; y: number }) => void;
   setClipboard: (marks: Mark[] | null) => void;
   setOutlineClipboard: (clip: OutlineClip | null) => void;
-  setSettingsOpen: (open: boolean) => void;
+  setSettingsOpen: (open: boolean, section?: string) => void;
   setConfirm: (confirm: ConfirmRequest | null) => void;
   addNotices: (notices: string[]) => void;
   dismissNotice: (index: number) => void;
@@ -123,7 +134,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   actionBarOffset: { x: 0, y: 0 },
   clipboard: null,
   outlineClipboard: null,
+  find: { open: false, query: "", matches: [], index: 0, busy: false },
+  setFind: (patch) => set((s) => ({ find: { ...s.find, ...patch } })),
   settingsOpen: false,
+  settingsSection: null,
   confirm: null,
   notices: [],
   viewerPage: 1,
@@ -139,6 +153,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       // A line or note opens its own form. A shot opens the shot, with no mark tabs.
       ...(kind === "mark" ? { markTab: "own" as const } : {}),
     }),
+  selectMany: (kind, ids) => set({ selection: ids.length > 0 ? { kind, ids: [...new Set(ids)] } : null, lineSegment: null }),
   selectMarks: (ids) =>
     set({ selection: ids.length > 0 ? { kind: "mark", ids: [...new Set(ids)] } : null, lineSegment: null, markTab: "own" }),
   clearSelection: () => set({ selection: null, lineSegment: null }),
@@ -169,7 +184,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   setActionBarOffset: (actionBarOffset) => set({ actionBarOffset }),
   setClipboard: (clipboard) => set({ clipboard, outlineClipboard: null }),
   setOutlineClipboard: (outlineClipboard) => set({ outlineClipboard, clipboard: null }),
-  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  setSettingsOpen: (settingsOpen, section) => set({ settingsOpen, settingsSection: settingsOpen ? (section ?? null) : null }),
   setConfirm: (confirm) => set({ confirm }),
   addNotices: (notices) =>
     set((s) => (notices.length === 0 ? s : { notices: [...s.notices, ...notices] })),

@@ -16,9 +16,10 @@ const FONTS = ["Arial", "Calibri", "Georgia", "Courier New", "Consolas"];
 export function ShotListPdfDialog() {
   const open = useSessionStore((s) => s.shotListPdfOpen);
   const setOpen = useSessionStore((s) => s.setShotListPdfOpen);
-  const options = usePrefsStore((s) => s.shotListPdf);
-  const set = (patch: Partial<ShotListPdfOptions>) => usePrefsStore.getState().setShotListPdf({ ...options, ...patch });
   const project = useProjectStore((s) => s.project);
+  usePrefsStore((s) => s.shotListPdf);
+  const options = commands.shotListPdfOptions(project);
+  const set = (patch: Partial<ShotListPdfOptions>) => commands.setExportChoices({ shotListPdf: { ...options, ...patch } });
   const order = usePrefsStore((s) => s.tableColumnOrder);
   const hidden = usePrefsStore((s) => s.hiddenTableColumns);
   const widths = usePrefsStore((s) => s.tableColumnWidths);
@@ -239,6 +240,9 @@ export function ShotListPdfDialog() {
             </p>
           </div>
           <div className="dialog-buttons">
+            <button type="button" className="dialog-btn dialog-btn-left" title="New projects start with these choices. They are also saved with this project." onClick={() => commands.saveExportDefaults("shotListPdf")}>
+              Save as my defaults
+            </button>
             <button type="button" className="dialog-btn" onClick={() => setOpen(false)}>
               Cancel
             </button>

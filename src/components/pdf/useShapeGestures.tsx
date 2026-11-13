@@ -289,6 +289,8 @@ export function useShapeGestures({
 
   /** Select tool, before lines and notes: grabs a handle of the selected shape. */
   const grabHandle = (n: Pt, e: ReactPointerEvent): boolean => {
+    // Locked in place: no resizing, rotating or moving corners.
+    if (selected?.locked || (!selected && selectedImage?.locked)) return false;
     if (!selected && selectedImage) {
       // Images resize from their corners only, keeping their proportions.
       const p = toPt(n);
@@ -322,12 +324,14 @@ export function useShapeGestures({
       const img = [...images].reverse().find((image) => hitsShape(imageBox(image), p, 0));
       if (!img) return false;
       useSessionStore.getState().select("mark", img.id);
+      if (img.locked) return true;
       breakUndoGroup();
       dragRef.current = { type: "image-move", origin: img, start: p };
       capture(e);
       return true;
     }
     useSessionStore.getState().select("mark", hit.id);
+    if (hit.locked) return true;
     breakUndoGroup();
     dragRef.current = { type: "move", origin: hit, start: p };
     capture(e);

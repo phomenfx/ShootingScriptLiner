@@ -5,9 +5,10 @@ import { findHeadings, parseSceneHeading, planScenes } from "./sceneDetect";
 describe("reading scene headings", () => {
   it("splits a heading into indicator, location and time", () => {
     expect(parseSceneHeading("INT. KITCHEN - DAY")).toEqual({ heading: { indicator: "INT.", location: "KITCHEN", time: "DAY" } });
-    expect(parseSceneHeading("2. EXT. STREET – NIGHT")).toEqual({ number: 2, heading: { indicator: "EXT.", location: "STREET", time: "NIGHT" } });
+    expect(parseSceneHeading("2. EXT. STREET – NIGHT")).toEqual({ number: 2, label: "2", heading: { indicator: "EXT.", location: "STREET", time: "NIGHT" } });
     expect(parseSceneHeading("12A INT./EXT. CAR - MOVING - CONTINUOUS 12A")).toEqual({
       number: 12,
+      label: "12A",
       heading: { indicator: "INT./EXT.", location: "CAR - MOVING", time: "CONTINUOUS" },
     });
     expect(parseSceneHeading("I/E VAN - LATER")?.heading.indicator).toBe("I/E");
@@ -43,5 +44,15 @@ describe("placing found headings", () => {
     const plan = planScenes(createProject(), found);
     expect(plan.used.map((h) => h.number)).toEqual([1, 2]);
     expect(plan.project.scenes).toHaveLength(2);
+  });
+});
+
+describe("using the script's scene numbers", () => {
+  it("types each printed number onto its scene, with no blank scenes for gaps", () => {
+    const found = findHeadings([["3. INT. HALL - DAY", "3A INT. HALL - LATER"], ["7. EXT. ROOF - NIGHT"]]);
+    const plan = planScenes(createProject(), found, true);
+    expect(plan.project.scenes.map((s) => s.number)).toEqual(["3", "3A", "7"]);
+    expect(plan.blanks).toBe(0);
+    expect(plan.filled).toBe(3);
   });
 });

@@ -6,6 +6,8 @@
  * Unknown fields are ignored. Unknown choice keys are kept as they are.
  * Version 1 files go through `migrateV1` first.
  */
+import { DEFAULT_PDF_OPTIONS, type PdfExportOptions } from "../model/pdfOptions";
+import { DEFAULT_SHOT_LIST_PDF, type ShotListPdfOptions } from "../model/shotListPdf";
 import { DATA_REVISION } from "../model/defaults";
 import {
   DEFAULT_NOTE_COLOR,
@@ -154,6 +156,11 @@ function readMarkOwn(value: unknown): MarkOwn | undefined {
   }
   const cameras = readCameras(value.cameras);
   if (cameras) own.cameras = cameras;
+  if (isRecord(value.print)) {
+    const print: Record<string, boolean> = {};
+    for (const [key, on] of Object.entries(value.print)) if (typeof on === "boolean") print[key] = on;
+    if (Object.keys(print).length > 0) own.print = print;
+  }
   return Object.keys(own).length > 0 ? own : undefined;
 }
 
@@ -210,6 +217,7 @@ function readShot(raw: unknown, settings: ProjectSettings): Shot {
     visible: bool(raw.visible, true),
     status: nonEmpty(raw.status) ?? "planned",
     priority: nonEmpty(raw.priority) ?? "nice",
+    ...(nonEmpty(raw.revision) !== undefined ? { revision: nonEmpty(raw.revision)! } : {}),
     ...(nonEmpty(raw.number) !== undefined ? { number: nonEmpty(raw.number)! } : {}),
   };
   for (const key of ["type", "angle", "subject", "additionalInfo", "setup", "notes"] as const) {
@@ -450,6 +458,12 @@ function readImage(raw: Raw, ctx: MarkContext): ImageMark {
 
 function readMark(raw: unknown, ctx: MarkContext, notes: string[], what: string): Mark {
   if (!isRecord(raw)) throw new Skip("it is not a record");
+  const mark = readMarkKind(raw, ctx, notes, what);
+  if (raw.locked === true) mark.locked = true;
+  return mark;
+}
+
+function readMarkKind(raw: Raw, ctx: MarkContext, notes: string[], what: string): Mark {
   switch (raw.kind) {
     case "line":
       return readLine(raw, ctx, notes, what);
@@ -476,6 +490,8 @@ function readSettings(raw: unknown): ProjectSettings {
   settings.general.newShotColor = nonEmpty(general.newShotColor) ?? settings.general.newShotColor;
   settings.general.newShotPriority =
     nonEmpty(general.newShotPriority) ?? settings.general.newShotPriority;
+  const newShotStatus = nonEmpty(general.newShotStatus);
+  if (newShotStatus) settings.general.newShotStatus = newShotStatus;
 
   const captions = isRecord(raw.captions) ? raw.captions : {};
   settings.captions.fields = completeCaptionFields(captions.fields, settings.general.additionalInfoStyle);
@@ -545,6 +561,15 @@ function readSettings(raw: unknown): ProjectSettings {
       if (typeof field === "string") mapping[header] = field;
     }
     settings.importMapping = mapping;
+  }
+  if (isRecord(raw.exportChoices)) {
+    const choices: NonNullable<ProjectSettings["exportChoices"]> = {};
+    if (isRecord(raw.exportChoices.linedPdf)) choices.linedPdf = { ...DEFAULT_PDF_OPTIONS, ...(raw.exportChoices.linedPdf as Partial<PdfExportOptions>) };
+    if (isRecord(raw.exportChoices.shotListPdf)) choices.shotListPdf = { ...DEFAULT_SHOT_LIST_PDF, ...(raw.exportChoices.shotListPdf as Partial<ShotListPdfOptions>) };
+    settings.exportChoices = choices;
+  }
+  if (isRecord(raw.revisions)) {
+    settings.revisions = { enabled: raw.revisions.enabled === true, current: nonEmpty(raw.revisions.current) ?? "white" };
   }
   return settings;
 }
@@ -697,6 +722,16 @@ export function readV2(input: unknown): ReadResult {
   if (script) project.script = script;
   if (Array.isArray(raw.unplacedV1Marks) && raw.unplacedV1Marks.length > 0) {
     project.unplacedV1Marks = raw.unplacedV1Marks;
+  }
+  if (isRecord(raw.view)) {
+    const v = raw.view;
+    const layout = v.layout === "single" || v.layout === "scroll" || v.layout === "spread" ? v.layout : "scroll";
+    project.view = {
+      page: typeof v.page === "number" && v.page >= 1 ? Math.floor(v.page) : 1,
+      zoomPercent: typeof v.zoomPercent === "number" && v.zoomPercent > 0 ? v.zoomPercent : 100,
+      layout,
+      scenesView: v.scenesView === "table" ? "table" : "list",
+    };
   }
   return { project, notices };
 }

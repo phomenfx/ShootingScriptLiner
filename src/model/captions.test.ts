@@ -87,6 +87,12 @@ describe("effective shot values", () => {
 });
 
 describe("shot captions", () => {
+  it("lets a line hide a field just for itself, leaving the shot as it is", () => {
+    const project = sample();
+    expect(shotCaption(project, found(project, "a"), { print: { type: false } })).toBe("1A Kitchen");
+    expect(shotCaption(project, found(project, "a"))).toBe("1A-WS Kitchen");
+  });
+
   it("joins number and type, and attaches additional info to the subject", () => {
     const project = sample();
     expect(shotCaption(project, found(project, "a"))).toBe("1A-WS Kitchen");

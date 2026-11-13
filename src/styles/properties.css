@@ -787,3 +787,9 @@ textarea.pf-input {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Buttons side by side in a form row. */
+.pf-row-buttons {
+  display: flex;
+  gap: 0.375rem;
+}

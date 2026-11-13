@@ -36,12 +36,14 @@ export function TopBar() {
     { label: "Both", onSelect: () => void commands.exportBoth() },
   ];
 
+  const hasScript = useProjectStore((s) => !!s.project.script);
   const fileEntries: MenuEntry[] = [
     { label: "New project", onSelect: () => void commands.requestNewProject() },
     { label: "Open…", shortcut: "Ctrl+O", onSelect: () => void commands.requestOpenProject() },
     { label: "Save", shortcut: "Ctrl+S", onSelect: () => void commands.saveZip() },
     SEPARATOR,
     { label: "Import script PDF…", onSelect: () => void commands.requestImportPdf() },
+    { label: "Update script PDF…", disabled: !hasScript, onSelect: () => void commands.requestUpdateScript() },
     { label: "Detect scenes from script", onSelect: () => void commands.detectScenes() },
     { label: "Import shot list…", onSelect: () => useSessionStore.getState().setImportOpen(true) },
     SEPARATOR,
@@ -49,9 +51,11 @@ export function TopBar() {
     { label: "Export shot list PDF…", onSelect: commands.requestExportShotListPdf },
     { label: "Export shot list CSV…", onSelect: () => void commands.exportShotListCsv() },
     SEPARATOR,
-    { label: "Project settings…", onSelect: () => openSettings(true) },
+    { label: "Project settings…", shortcut: "Ctrl+,", onSelect: () => openSettings(true) },
+    { label: "Keyboard shortcuts", shortcut: "?", onSelect: () => openSettings(true, "shortcuts") },
   ];
 
+  const findEntry: MenuEntry = { label: "Find on script…", shortcut: "Ctrl+F", onSelect: commands.openFind };
   const editEntries: MenuEntry[] = [
     { label: "Undo", shortcut: "Ctrl+Z", disabled: !canUndo, onSelect: commands.undo },
     { label: "Redo", shortcut: "Ctrl+Shift+Z", disabled: !canRedo, onSelect: commands.redo },
@@ -65,6 +69,8 @@ export function TopBar() {
     SEPARATOR,
     { label: "Select all on page", shortcut: "Ctrl+A", disabled: true, hint: NOT_YET, onSelect: () => {} },
     { label: "Deselect", shortcut: "Esc", disabled: !hasSelection, onSelect: commands.deselect },
+    SEPARATOR,
+    findEntry,
   ];
 
   const viewEntries: MenuEntry[] = [
@@ -141,7 +147,8 @@ export function TopBar() {
     SEPARATOR,
     ...exportEntries.map((entry): MenuEntry => ("label" in entry ? { ...entry, label: `Export: ${entry.label}` } : entry)),
     SEPARATOR,
-    { label: "Settings…", onSelect: () => openSettings(true) },
+    { label: "Settings…", shortcut: "Ctrl+,", onSelect: () => openSettings(true) },
+    { label: "Keyboard shortcuts", shortcut: "?", onSelect: () => openSettings(true, "shortcuts") },
   ];
 
   return (
@@ -193,7 +200,7 @@ export function TopBar() {
               </button>
             ))}
           </div>
-          <button type="button" className="topbar-btn" onClick={() => openSettings(true)}>
+          <button type="button" className="topbar-btn" title="Settings (Ctrl+,)" onClick={() => openSettings(true)}>
             <Settings {...ICON} />
             Settings
           </button>

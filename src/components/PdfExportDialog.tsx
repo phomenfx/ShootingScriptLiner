@@ -6,6 +6,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import * as commands from "../commands";
 import { choiceEntries } from "../model/registry";
 import { markPrints, pagesToKeep, type PdfExportOptions } from "../model/pdfOptions";
+import { usePrefsStore } from "../stores/prefsStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 
@@ -14,9 +15,10 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 export function PdfExportDialog() {
   const open = useSessionStore((s) => s.pdfExportOpen);
   const setOpen = useSessionStore((s) => s.setPdfExportOpen);
-  const options = useSessionStore((s) => s.pdfOptions);
-  const setOptions = (patch: Partial<PdfExportOptions>) => useSessionStore.getState().setPdfOptions({ ...options, ...patch });
   const project = useProjectStore((s) => s.project);
+  usePrefsStore((s) => s.linedPdf);
+  const options = commands.linedPdfOptions(project);
+  const setOptions = (patch: Partial<PdfExportOptions>) => commands.setExportChoices({ linedPdf: { ...options, ...patch } });
   const lists = project.settings.lists;
 
   const toggle = (list: string[], key: string, on: boolean) => (on ? list.filter((k) => k !== key) : [...new Set([...list, key])]);
@@ -147,6 +149,9 @@ export function PdfExportDialog() {
             </p>
           </div>
           <div className="dialog-buttons">
+            <button type="button" className="dialog-btn dialog-btn-left" title="New projects start with these choices. They are also saved with this project." onClick={() => commands.saveExportDefaults("linedPdf")}>
+              Save as my defaults
+            </button>
             <button type="button" className="dialog-btn" onClick={() => setOpen(false)}>
               Cancel
             </button>

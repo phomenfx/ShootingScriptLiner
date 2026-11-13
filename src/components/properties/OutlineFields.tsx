@@ -33,7 +33,7 @@ export function OutlineFields({ label, value, onChange }: { label: string; value
               min={0.25}
               max={6}
               step={0.25}
-              unit="pt"
+              unit="len"
               onChange={(widthPt) => widthPt && onChange({ ...value, widthPt })}
             />
           </Field>

@@ -179,7 +179,7 @@ export function ShapeInspector({ project, shape }: { project: Project; shape: Sh
                 value={stroke.widthPt}
                 min={0.25}
                 step={0.25}
-                unit="pt"
+                unit="len"
                 onChange={(widthPt) => widthPt && setStroke({ ...stroke, widthPt })}
               />
             </Field>
@@ -268,7 +268,7 @@ export function ShapeInspector({ project, shape }: { project: Project; shape: Sh
                     min={0.25}
                     max={6}
                     step={0.25}
-                    unit="pt"
+                    unit="len"
                     onChange={(widthPt) => widthPt && update((s) => (s.outline ? { ...s, outline: { ...s.outline, widthPt } } : s))}
                   />
                 </Field>
@@ -279,10 +279,10 @@ export function ShapeInspector({ project, shape }: { project: Project; shape: Sh
 
         <Group name="shape-box" title="Size">
           <Field label="Width">
-            <NumberInput label="Width" value={Math.round(shape.widthPt)} min={4} unit="pt" onChange={(widthPt) => widthPt && update((s) => ({ ...s, widthPt }))} />
+            <NumberInput label="Width" value={Math.round(shape.widthPt)} min={4} unit="len" onChange={(widthPt) => widthPt && update((s) => ({ ...s, widthPt }))} />
           </Field>
           <Field label="Height">
-            <NumberInput label="Height" value={Math.round(shape.heightPt)} min={4} unit="pt" onChange={(heightPt) => heightPt && update((s) => ({ ...s, heightPt }))} />
+            <NumberInput label="Height" value={Math.round(shape.heightPt)} min={4} unit="len" onChange={(heightPt) => heightPt && update((s) => ({ ...s, heightPt }))} />
           </Field>
           <Field label="Rotation">
             <NumberInput

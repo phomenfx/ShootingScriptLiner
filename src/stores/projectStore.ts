@@ -5,6 +5,7 @@
  * Undo steps are grouped: changes that follow each other quickly (a drag,
  * typing in a field) make one step. `breakUndoGroup` ends a group early.
  */
+import { stampRevisions } from "../model/revisions";
 import { create } from "zustand";
 import { temporal } from "zundo";
 import { createProject } from "../model/defaults";
@@ -39,7 +40,8 @@ export const useProjectStore = create<ProjectState>()(
         savedProject: project,
         apply: (edit) =>
           set((state) => {
-            const next = edit(state.project);
+            // While revisions are tracked, changed shots get the current revision's tag.
+            const next = stampRevisions(state.project, edit(state.project));
             return next === state.project ? state : { project: next };
           }),
       };

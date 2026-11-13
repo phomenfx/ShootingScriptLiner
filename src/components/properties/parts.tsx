@@ -1,4 +1,5 @@
 /** Building blocks shared by every Properties form. */
+import { fromPoints, lengthStep, toPoints } from "../../lib/units";
 import { ChevronDown, ChevronRight, Lock, LockOpen, X } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { usePrefsStore } from "../../stores/prefsStore";
@@ -188,7 +189,26 @@ type NumberInputProps = {
 };
 
 /** A number with its unit inside the field. Typing is free; the value is applied when it is valid. */
-export function NumberInput({ value, label, min, max, step = 1, unit, disabled, onChange, allowEmpty }: NumberInputProps) {
+export function NumberInput(props: NumberInputProps) {
+  // "len": a length stored in points, shown in the chosen unit.
+  const lengthUnit = usePrefsStore((s) => s.lengthUnit);
+  if (props.unit !== "len") return <PlainNumberInput {...props} />;
+  const u = lengthUnit;
+  const { value, min, max, step = 1, onChange } = props;
+  return (
+    <PlainNumberInput
+      {...props}
+      unit={u}
+      value={value === undefined ? undefined : fromPoints(value, u)}
+      min={fromPoints(min, u)}
+      max={max === undefined ? undefined : fromPoints(max, u)}
+      step={lengthStep(step, u)}
+      onChange={(v) => onChange(v === undefined ? undefined : toPoints(v, u))}
+    />
+  );
+}
+
+function PlainNumberInput({ value, label, min, max, step = 1, unit, disabled, onChange, allowEmpty }: NumberInputProps) {
   const [draft, setDraft] = useState(value === undefined ? "" : String(value));
   useEffect(() => setDraft(value === undefined ? "" : String(value)), [value]);
   return (

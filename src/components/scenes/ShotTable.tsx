@@ -59,7 +59,8 @@ export function ShotTable() {
   const gridRef = useRef<HTMLDivElement>(null);
 
   const order = usePrefsStore((s) => s.tableColumnOrder);
-  const ordered = useMemo(() => orderColumns(TABLE_COLUMNS, order), [order]);
+  const tracking = !!project.settings.revisions?.enabled;
+  const ordered = useMemo(() => orderColumns(tracking ? TABLE_COLUMNS : TABLE_COLUMNS.filter((c) => c.id !== "revision"), order), [order, tracking]);
   const columns = useMemo(() => ordered.filter((c) => c.id === "shot" || !hidden.includes(c.id)), [ordered, hidden]);
   const widths = usePrefsStore((s) => s.tableColumnWidths);
   const zoom = usePrefsStore((s) => s.tableZoom);

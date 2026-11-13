@@ -47,7 +47,7 @@ export function ImageInspector({ project, image }: { project: Project; image: Im
             </p>
           </Field>
           <Field label="Width">
-            <NumberInput label="Image width" value={Math.round(image.widthPt)} min={8} unit="pt" onChange={(widthPt) => widthPt && update({ widthPt })} />
+            <NumberInput label="Image width" value={Math.round(image.widthPt)} min={8} unit="len" onChange={(widthPt) => widthPt && update({ widthPt })} />
           </Field>
           <Field label="Height">
             <p className="pf-readonly">{Math.round(image.widthPt * ratio)} pt</p>

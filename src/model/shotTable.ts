@@ -2,6 +2,7 @@
  * The shot-list table: its columns, how each cell reads and writes, pasting a
  * block of cells, and filters. Columns match the CSV export.
  */
+import { revisionLabel } from "./revisions";
 import { cameraNames, effectiveShot } from "./captions";
 import * as edits from "./edits";
 import { formatEighths, formatPageRange, shotLength } from "./pageLength";
@@ -147,6 +148,9 @@ function camerasFromLenses(text: string, current: CameraRow[] = []): CameraRow[]
   );
 }
 
+/** The table's columns for this project: Revision only while revisions are tracked. */
+export const projectColumns = (project: Project) => (project.settings.revisions?.enabled ? TABLE_COLUMNS : TABLE_COLUMNS.filter((c) => c.id !== "revision"));
+
 export const TABLE_COLUMNS: TableColumn[] = [
   {
     id: "shot",
@@ -157,6 +161,13 @@ export const TABLE_COLUMNS: TableColumn[] = [
       const sceneIndex = project.scenes.indexOf(scene);
       return { text: shotIdLabel(project, sceneIndex, scene.shots.indexOf(shot)) };
     },
+  },
+  {
+    id: "revision",
+    label: "Revision",
+    width: 6,
+    readOnly: true,
+    read: (_p, _s, shot) => ({ text: shot.revision ? revisionLabel(shot.revision) : "" }),
   },
   {
     id: "status",

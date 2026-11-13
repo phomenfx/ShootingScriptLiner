@@ -2,6 +2,8 @@
  * Preferences saved in this browser: theme, panel sizes, zoom, shortcuts.
  * Never part of a project file.
  */
+import { isLengthUnit, type LengthUnit } from "../lib/units";
+import { DEFAULT_PDF_OPTIONS, type PdfExportOptions } from "../model/pdfOptions";
 import { DEFAULT_SHOT_LIST_PDF, type ShotListPdfOptions } from "../model/shotListPdf";
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
@@ -68,8 +70,14 @@ type PrefsValues = {
   tableZoom: number;
   /** Export shot list PDF choices. */
   shotListPdf: ShotListPdfOptions;
+  /** "Save as my defaults" for the lined PDF: new projects start from these. */
+  linedPdf: PdfExportOptions;
   /** Keep unsaved work in this browser between visits. */
   autosave: boolean;
+  /** How often unsaved work is copied to the browser, in seconds. */
+  autosaveSeconds: number;
+  /** Unit lengths are shown in (stored in points either way). */
+  lengthUnit: LengthUnit;
 };
 
 type PrefsState = PrefsValues & {
@@ -98,7 +106,10 @@ type PrefsState = PrefsValues & {
   setTableColumnWidth: (column: string, width: number | null) => void;
   setTableZoom: (zoom: number) => void;
   setShotListPdf: (options: ShotListPdfOptions) => void;
+  setLinedPdf: (options: PdfExportOptions) => void;
   setAutosave: (on: boolean) => void;
+  setAutosaveSeconds: (seconds: number) => void;
+  setLengthUnit: (unit: LengthUnit) => void;
 };
 
 const memory = new Map<string, string>();
@@ -191,7 +202,10 @@ export const usePrefsStore = create<PrefsState>()(
       tableColumnWidths: {},
       tableZoom: 1,
       shotListPdf: DEFAULT_SHOT_LIST_PDF,
+      linedPdf: DEFAULT_PDF_OPTIONS,
       autosave: true,
+      autosaveSeconds: 3,
+      lengthUnit: "pt",
       ...readOldKeys(),
 
       setColorTheme: (theme) => {
@@ -247,6 +261,8 @@ export const usePrefsStore = create<PrefsState>()(
         }),
       showAllTableColumns: () => set({ hiddenTableColumns: [] }),
       setAutosave: (autosave) => set({ autosave }),
+      setAutosaveSeconds: (autosaveSeconds) => set({ autosaveSeconds }),
+      setLengthUnit: (lengthUnit) => set({ lengthUnit }),
       setTableColumnOrder: (tableColumnOrder) => set({ tableColumnOrder }),
       setTableGroupBy: (tableGroupBy) => set({ tableGroupBy }),
       setTableColumnWidth: (column, width) =>
@@ -258,6 +274,7 @@ export const usePrefsStore = create<PrefsState>()(
         }),
       setTableZoom: (zoom) => set({ tableZoom: clampTableZoom(zoom) }),
       setShotListPdf: (shotListPdf) => set({ shotListPdf }),
+      setLinedPdf: (linedPdf) => set({ linedPdf }),
       setTableColumnHidden: (column, hidden) =>
         set((s) => ({
           hiddenTableColumns: hidden ? [...new Set([...s.hiddenTableColumns, column])] : s.hiddenTableColumns.filter((c) => c !== column),
@@ -280,7 +297,10 @@ export const usePrefsStore = create<PrefsState>()(
           tableColumnWidths: s.tableColumnWidths && typeof s.tableColumnWidths === "object" ? s.tableColumnWidths : {},
           tableZoom: typeof s.tableZoom === "number" ? clampTableZoom(s.tableZoom) : 1,
           shotListPdf: { ...DEFAULT_SHOT_LIST_PDF, ...(s.shotListPdf && typeof s.shotListPdf === "object" ? s.shotListPdf : {}) },
+          linedPdf: { ...DEFAULT_PDF_OPTIONS, ...(s.linedPdf && typeof s.linedPdf === "object" ? s.linedPdf : {}) },
           autosave: s.autosave !== false,
+          autosaveSeconds: typeof s.autosaveSeconds === "number" && s.autosaveSeconds > 0 ? s.autosaveSeconds : 3,
+          lengthUnit: isLengthUnit(s.lengthUnit) ? s.lengthUnit : "pt",
           toolKeybinds: sanitizeToolKeybinds({ ...DEFAULT_TOOL_KEYBINDS, ...s.toolKeybinds }),
           panels: {
             widthPx: { ...d.widthPx, ...s.panels?.widthPx },
@@ -309,7 +329,10 @@ export const usePrefsStore = create<PrefsState>()(
         tableColumnWidths,
         tableZoom,
         shotListPdf,
+        linedPdf,
         autosave,
+        autosaveSeconds,
+        lengthUnit,
       }): PrefsValues => ({
         colorTheme,
         uiScale,
@@ -328,7 +351,10 @@ export const usePrefsStore = create<PrefsState>()(
         tableColumnWidths,
         tableZoom,
         shotListPdf,
+        linedPdf,
         autosave,
+        autosaveSeconds,
+        lengthUnit,
       }),
     }
   )

@@ -116,6 +116,28 @@ export function findShotBySuffix(project: Project, sceneIndex: number, text: str
   return shotSuffixes(scene, project.settings.general.shotIdStyle).findIndex((s) => s === wanted);
 }
 
+/** Switches letters and numbers, converting typed shot numbers (C ↔ 3) so they keep their place. */
+export function setShotIdStyle(project: Project, style: Style): Project {
+  const from = project.settings.general.shotIdStyle;
+  if (from === style) return project;
+  return {
+    ...project,
+    settings: { ...project.settings, general: { ...project.settings.general, shotIdStyle: style } },
+    scenes: project.scenes.map((scene) =>
+      !scene.shots.some((s) => s.number !== undefined)
+        ? scene
+        : {
+            ...scene,
+            shots: scene.shots.map((shot) => {
+              if (shot.number === undefined) return shot;
+              const value = suffixValue(shot.number, from);
+              return value === undefined ? shot : { ...shot, number: formatSuffix(value, style) };
+            }),
+          }
+    ),
+  };
+}
+
 /* ---------- renumbering ---------- */
 
 /** Keeps every shot of a scene at the number it shows now, so changing one moves no others. */

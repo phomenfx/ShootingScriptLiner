@@ -110,3 +110,35 @@
 .export-warning {
   color: var(--color-danger-text);
 }
+
+/* A checkbox under a confirm message. */
+.confirm-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  color: var(--color-text-muted);
+}
+.confirm-option input {
+  margin-top: 0.15rem;
+}
+
+/* Revision tag: the color of the revision pages a shot last changed in. */
+.revision-chip {
+  display: inline-block;
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.set-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* A dialog button kept at the left, away from Cancel and the main action. */
+.dialog-btn-left {
+  margin-right: auto;
+}

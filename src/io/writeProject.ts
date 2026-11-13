@@ -18,6 +18,7 @@ export function serializeProject(project: Project, now: Date = new Date()): stri
     marks: project.marks,
     assets: project.assets,
     ...(project.unplacedV1Marks?.length ? { unplacedV1Marks: project.unplacedV1Marks } : {}),
+    ...(project.view ? { view: project.view } : {}),
   };
   return JSON.stringify(out, null, 2);
 }

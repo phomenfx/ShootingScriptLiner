@@ -1,4 +1,4 @@
-import { ClipboardCopy, ClipboardPaste, Copy, GripVertical, Link2, Merge, Scissors, Trash2, X } from "lucide-react";
+import { ClipboardCopy, ClipboardPaste, Copy, GripVertical, Link2, Lock, LockOpen, Merge, Scissors, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as commands from "../../commands";
 import { shiftActionBar } from "../../lib/actionBarLayout";
@@ -21,7 +21,7 @@ type Props = {
   pageHeight: number;
 };
 
-/** Color, duplicate, copy, paste, rejoin, split, link, and delete beside the selected mark. */
+/** Color, duplicate, copy, paste, rejoin, split, link, lock, and delete beside the selected mark. */
 export function ScriptActionBar({ markId, shotId, isLine, anchorLeft, anchorTop, pageWidth, pageHeight }: Props) {
   const project = useProjectStore((s) => s.project);
   const offset = useSessionStore((s) => s.actionBarOffset);
@@ -184,6 +184,15 @@ export function ScriptActionBar({ markId, shotId, isLine, anchorLeft, anchorTop,
         triggerLabel="Link to shot"
         entries={entries}
       />
+      <button
+        type="button"
+        className={`script-iconbtn${mark?.locked ? " on" : ""}`}
+        title={mark?.locked ? "Locked in place (Ctrl+L to unlock)" : "Lock in place (Ctrl+L)"}
+        aria-pressed={!!mark?.locked}
+        onClick={() => commands.toggleLockSelection()}
+      >
+        {mark?.locked ? <Lock size={14} strokeWidth={1.75} /> : <LockOpen size={14} strokeWidth={1.75} />}
+      </button>
       <button type="button" className="script-iconbtn" title="Delete" onClick={() => commands.deleteSelection()}>
         <Trash2 size={14} strokeWidth={1.75} />
       </button>

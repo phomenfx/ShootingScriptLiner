@@ -1,3 +1,6 @@
+import type { PdfExportOptions } from "./pdfOptions";
+import type { ShotListPdfOptions } from "./shotListPdf";
+
 /**
  * Project data, version 2. This is both the save format and what the stores hold.
  *
@@ -93,12 +96,19 @@ export type MarkOwn = {
   fps?: string;
   sync?: string;
   date?: string;
+  /**
+   * This line's or note's own caption checkboxes, where they differ from its
+   * shot's (same keys as Shot.print). The shot's form sets the default.
+   */
+  print?: Record<string, boolean>;
 };
 
 export type Shot = {
   id: string;
   /** Typed number within its scene (C, or 3). Without one it counts on from the shot before. */
   number?: string;
+  /** Script revision this shot (or its lines) last changed in, when revisions are tracked. */
+  revision?: string;
   color: string;
   visible: boolean;
   type?: string;
@@ -213,6 +223,8 @@ type MarkBase = {
   page: number;
   /** Present only when the mark is linked to a shot. */
   shotId?: string;
+  /** Locked in place: can be selected and edited, but not dragged on the page. */
+  locked?: boolean;
 };
 
 export type LineMark = MarkBase & {
@@ -293,6 +305,8 @@ export type ImageMark = {
   /** Height follows the image's proportions. */
   widthPt: number;
   assetId: string;
+  /** Locked in place: can be selected and edited, but not dragged on the page. */
+  locked?: boolean;
 };
 
 export type Mark = LineMark | TextMark | ShapeMark | ImageMark;
@@ -371,6 +385,8 @@ export type ProjectSettings = {
     additionalInfoStyle: "parens" | "hyphen";
     newShotColor: string;
     newShotPriority: string;
+    /** Status key new shots start with (planned unless changed). */
+    newShotStatus?: string;
   };
   captions: {
     /** Print order and default inclusion. */
@@ -397,6 +413,10 @@ export type ProjectSettings = {
   lists: Record<string, ListEntry[]>;
   /** Remembered shot-list import column mapping: source header to field. */
   importMapping?: Record<string, string>;
+  /** Script revision tracking (off unless turned on). */
+  revisions?: { enabled: boolean; current: string };
+  /** Export choices saved with the project (lined PDF and shot list PDF dialogs). */
+  exportChoices?: { linedPdf?: PdfExportOptions; shotListPdf?: ShotListPdfOptions };
 };
 
 export type Project = {
@@ -421,4 +441,6 @@ export type Project = {
    * as soon as the script is imported.
    */
   unplacedV1Marks?: unknown[];
+  /** Where the project was left (page, zoom, layout, List/Table), so it reopens the same way. */
+  view?: { page: number; zoomPercent: number; layout: "single" | "scroll" | "spread"; scenesView: "list" | "table" };
 };

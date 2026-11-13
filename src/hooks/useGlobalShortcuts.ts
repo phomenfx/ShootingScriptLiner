@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import * as commands from "../commands";
 import { isProjectUnsaved, useProjectStore } from "../stores/projectStore";
+import { useSessionStore } from "../stores/sessionStore";
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -15,6 +16,8 @@ const ALWAYS: Record<string, () => void> = {
   s: () => void commands.saveZip(),
   o: () => void commands.requestOpenProject(),
   e: () => commands.requestExportLinedPdf(),
+  ",": () => useSessionStore.getState().setSettingsOpen(true),
+  f: () => commands.openFind(),
   "=": commands.zoomIn,
   "+": commands.zoomIn,
   "-": commands.zoomOut,
@@ -29,6 +32,7 @@ const OUTSIDE_FIELDS: Record<string, (shift: boolean) => void> = {
   c: () => commands.copy(),
   v: (shift) => (shift ? commands.pasteInPlace() : commands.paste()),
   d: () => commands.duplicateSelection(),
+  l: () => commands.toggleLockSelection(),
   h: (shift) => (shift ? commands.hideSelectedScene() : commands.hideSelectedShot()),
 };
 
@@ -53,6 +57,9 @@ export function useGlobalShortcuts() {
             e.preventDefault();
             commands.deleteSelection();
           }
+        } else if (e.key === "?" && !document.querySelector('[role="dialog"]')) {
+          e.preventDefault();
+          useSessionStore.getState().setSettingsOpen(true, "shortcuts");
         } else if (key === "escape" && !document.querySelector('[role="dialog"], [role="menu"]')) {
           commands.deselect();
         }

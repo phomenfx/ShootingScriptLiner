@@ -390,6 +390,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
   };
 
+  const lockedIds = new Set(v2Project.marks.filter((mark) => mark.locked).map((mark) => mark.id));
   const handlePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
@@ -477,6 +478,20 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       const additive = e.shiftKey || e.ctrlKey || e.metaKey;
       const grabsHandle = target.type === "handle" || target.type === "note-resize" || target.type === "label-resize" || target.type === "alt-clone";
       const clickedId = grabsHandle ? null : markIdAt(e);
+      // A mark locked in place is only selected, never dragged.
+      const targetId =
+        target.type === "handle"
+          ? target.line.id
+          : target.type === "label-move" || target.type === "label-resize"
+            ? target.label.line.id
+            : target.type === "note-move" || target.type === "note-resize"
+              ? target.note.id
+              : null;
+      if (!additive && targetId && lockedIds.has(targetId)) {
+        e.preventDefault();
+        selectMark(targetId);
+        return;
+      }
       // Shift/Ctrl-click adds a mark to the selection, or takes it out.
       if (additive && clickedId) {
         toggleMark(clickedId);
@@ -484,7 +499,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       }
       // Several selected: dragging any of them moves them all.
       if (!additive && clickedId && selectedIds.length > 1 && selectedSet.has(clickedId)) {
-        const origins = v2Project.marks.filter((mark) => selectedSet.has(mark.id));
+        const origins = v2Project.marks.filter((mark) => selectedSet.has(mark.id) && !mark.locked);
         breakUndoGroup();
         groupRef.current = { startPx, origins };
         capture(e);
@@ -743,6 +758,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       { label: "Copy", shortcut: "Ctrl+C", onSelect: commands.copy },
       ...pasteItems,
       { label: "Duplicate", shortcut: "Ctrl+D", onSelect: commands.duplicateSelection },
+      { label: mark?.locked ? "Unlock position" : "Lock in place", shortcut: "Ctrl+L", onSelect: commands.toggleLockSelection },
       ...(mark && mark.kind !== "image" ? [{ label: "Set as default style", onSelect: commands.setSelectionAsDefault }] : []),
       ...(isLine
         ? [

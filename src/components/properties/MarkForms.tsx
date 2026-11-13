@@ -279,7 +279,7 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
                 min={0.25}
                 max={24}
                 step={0.25}
-                unit="pt"
+                unit="len"
                 onChange={(widthPt) => {
                   if (!widthPt) return;
                   update((l) => ({ ...l, stroke: { ...l.stroke, widthPt } }));
@@ -303,7 +303,7 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
                   min={0.25}
                   max={24}
                   step={0.25}
-                  unit="pt"
+                  unit="len"
                   onChange={(widthPt) => {
                     if (!widthPt) return;
                     update((l) =>
