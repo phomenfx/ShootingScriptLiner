@@ -58,7 +58,8 @@ export function ColorBar() {
         <Pipette size={13} strokeWidth={1.75} aria-hidden="true" />
         <input type="color" aria-label="Pick any color" value={current} onChange={(e) => applyColor(e.target.value.toUpperCase(), true)} />
       </label>
-      <span className="color-bar-divider" />
+      {/* 12 swatches: one row, or two rows of 6, or three of 4, so wrapped rows stay even. */}
+      <div className="color-bar-swatches">
       {SWATCHES.map((color) => (
         <button
           key={color}
@@ -70,6 +71,7 @@ export function ColorBar() {
           onClick={() => applyColor(color)}
         />
       ))}
+      </div>
     </div>
   );
 }

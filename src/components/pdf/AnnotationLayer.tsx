@@ -28,7 +28,7 @@ import { newId } from "../../lib/ids";
 import * as commands from "../../commands";
 import { legacyEnding, toLegacyProject } from "../../legacy/legacyView";
 import { addLine, addLineJoined, addText, applyMarginContinuationTrim, replaceLine, selectMark, updateText } from "../../drawing/marks";
-import { useProjectStore } from "../../stores/projectStore";
+import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
 import { shotIdLabel } from "../../model/shotList";
 import { usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -50,6 +50,7 @@ import { lineAngleRad, renderLineCap } from "../../lib/lineCaps";
 import { labelDragPatch } from "../../gestures/labelDrag";
 import { useShapeGestures } from "./useShapeGestures";
 import * as edits from "../../model/edits";
+import type { Mark } from "../../model/types";
 import { openContextMenu, type ContextMenuItem } from "../ContextMenu";
 import { clonedLinePoints, closestOnLine, dragLinePoints, drawPreviewEnd, finishDrawEnd, type LineHandle } from "../../gestures/lineDrag";
 import { noteMovePatch, noteResizePatch } from "../../gestures/noteDrag";
@@ -133,12 +134,17 @@ type PlacedNote = {
   italic: boolean;
 };
 
+const NO_IDS: string[] = [];
+
 export function AnnotationLayer({ pageNum, width, height }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const v2Project = useProjectStore((s) => s.project);
   const project = useMemo(() => toLegacyProject(v2Project), [v2Project]);
   const activeTool = useSessionStore((s) => s.activeTool);
-  const selectedId = useSessionStore((s) => (s.selection?.kind === "mark" ? s.selection.ids[0] : undefined));
+  const selectedIds = useSessionStore((s) => (s.selection?.kind === "mark" ? s.selection.ids : NO_IDS));
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  // One mark: its handles, action bar and form. Several: they highlight and move together.
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : undefined;
   const cursorClass =
     activeTool === "line" || activeTool === "shape" || activeTool === "pen" || activeTool === "polygon"
       ? "tool-draw"
@@ -155,7 +161,17 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   const setActivePage = useSessionStore((s) => s.setActivePage);
   const linkedShotId = useSessionStore((s) => (s.selection?.kind === "shot" ? s.selection.ids[0] : undefined));
   const lineSegment = useSessionStore((s) => s.lineSegment);
-  const shapeGestures = useShapeGestures({ pageNum, width, selectedId, snapDegrees });
+  const shapeGestures = useShapeGestures({ pageNum, width, selectedId, selectedIds, snapDegrees });
+
+  /* ---------- several marks: drag box, toggle, move together ---------- */
+  const ptPerPx = (v2Project.script?.pages[pageNum - 1]?.widthPt ?? 612) / Math.max(1, width);
+  const groupRef = useRef<{ startPx: { x: number; y: number }; origins: Mark[] } | null>(null);
+  const marqueeRef = useRef<{ start: { x: number; y: number }; end: { x: number; y: number }; add: boolean } | null>(null);
+  const [marquee, setMarquee] = useState<{ start: { x: number; y: number }; end: { x: number; y: number } } | null>(null);
+  const toggleMark = (id: string) => {
+    const ids = useSessionStore.getState().selection?.kind === "mark" ? useSessionStore.getState().selection!.ids : [];
+    useSessionStore.getState().selectMarks(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  };
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -191,6 +207,19 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   );
 
   const labelScale = viewerScalePxPerPt(height, pageHeightPt);
+
+  // Outlines saved on the marks: a line's caption and a note each carry their own.
+  const markById = useMemo(() => new Map(v2Project.marks.map((mark) => [mark.id, mark])), [v2Project.marks]);
+  const captionOutlineOf = (id: string) => {
+    const mark = markById.get(id);
+    return mark?.kind === "line" ? mark.caption.outline : undefined;
+  };
+  const noteOutlineOf = (id: string) => {
+    const mark = markById.get(id);
+    return mark?.kind === "text" ? mark.outline : undefined;
+  };
+  const textHalo = (outline: { color: string; widthPt: number } | undefined) =>
+    outline && outline.widthPt > 0 ? { color: outline.color, widthPx: outline.widthPt * labelScale } : undefined;
 
   const placedLabels: PlacedLabel[] = lines.flatMap((line) => {
     const labels = getLineScriptLabels(line, project);
@@ -424,6 +453,28 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         lineAtPoint: findLineAt(p),
       });
       const startPx = { x: px.x, y: px.y };
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+      const grabsHandle = target.type === "handle" || target.type === "note-resize" || target.type === "label-resize" || target.type === "alt-clone";
+      const clickedId = grabsHandle ? null : markIdAt(e);
+      // Shift/Ctrl-click adds a mark to the selection, or takes it out.
+      if (additive && clickedId) {
+        toggleMark(clickedId);
+        return;
+      }
+      // Several selected: dragging any of them moves them all.
+      if (!additive && clickedId && selectedIds.length > 1 && selectedSet.has(clickedId)) {
+        const origins = v2Project.marks.filter((mark) => selectedSet.has(mark.id));
+        breakUndoGroup();
+        groupRef.current = { startPx, origins };
+        capture(e);
+        return;
+      }
+      if (additive && !grabsHandle) {
+        marqueeRef.current = { start: startPx, end: startPx, add: true };
+        setMarquee({ start: startPx, end: startPx });
+        capture(e);
+        return;
+      }
       if (target.type === "alt-clone") {
         selectMark(target.line.id);
         setDrag({ type: "alt-clone", lineId: target.line.id, origin: target.line, offset: { x: 0, y: 0 } });
@@ -489,7 +540,10 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         return;
       }
       if (shapeGestures.grabShape(pu, e)) return;
-      useSessionStore.getState().clearSelection();
+      // Empty page: a drag draws a selection box; a plain click clears the selection.
+      marqueeRef.current = { start: startPx, end: startPx, add: false };
+      setMarquee({ start: startPx, end: startPx });
+      capture(e);
       return;
     }
 
@@ -501,6 +555,17 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    if (groupRef.current) {
+      const px = eventPx(e);
+      const g = groupRef.current;
+      useProjectStore.getState().apply(edits.translateMarks(g.origins, (px.x - g.startPx.x) * ptPerPx, (px.y - g.startPx.y) * ptPerPx));
+      return;
+    }
+    if (marqueeRef.current) {
+      marqueeRef.current.end = eventPx(e);
+      setMarquee({ start: marqueeRef.current.start, end: marqueeRef.current.end });
+      return;
+    }
     if (shapeGestures.move(getPointUnclamped(e), e)) return;
     const current = dragRef.current;
     if (!current) return;
@@ -579,6 +644,43 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         })
       );
     }
+  };
+
+  /** The mark under the pointer, the way a click would pick it: notes, captions, lines, then shapes. */
+  const markIdAt = (e: { clientX: number; clientY: number; target: EventTarget | null }): string | null => {
+    const pu = getPointUnclamped(e as React.PointerEvent);
+    const p = { x: clamp01(pu.x), y: clamp01(pu.y) };
+    const px = eventPx(e);
+    const note = [...placedNotes].reverse().find((n) => pointInFrame(px.x, px.y, n.frame));
+    if (note) return note.text.id;
+    const label = [...placedLabels].reverse().find((l) => pointInFrame(px.x, px.y, l.frame));
+    if (label) return label.line.id;
+    const hitId = (e.target as Element | null)?.closest?.("[data-hit-id]")?.getAttribute("data-hit-id");
+    if (hitId) return hitId;
+    return findSegmentAt(p)?.line.id ?? shapeGestures.shapeAt(pu)?.id ?? null;
+  };
+
+  /** Marks touching a box (page pixels): lines, captions, notes and shapes. */
+  const marksInBox = (a: { x: number; y: number }, b: { x: number; y: number }): string[] => {
+    const box = { left: Math.min(a.x, b.x), top: Math.min(a.y, b.y), right: Math.max(a.x, b.x), bottom: Math.max(a.y, b.y) };
+    const touches = (l: number, t: number, r: number, bt: number) => l <= box.right && r >= box.left && t <= box.bottom && bt >= box.top;
+    const ids: string[] = [];
+    for (const line of lines) {
+      const pts = line.points.map((point) => normalizedToPx(point, width, height));
+      const xs = pts.map((q) => q.x);
+      const ys = pts.map((q) => q.y);
+      if (touches(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys))) ids.push(line.id);
+    }
+    for (const label of placedLabels) {
+      const f = label.frame;
+      if (touches(f.left, f.top, f.left + f.width, f.top + f.height)) ids.push(label.line.id);
+    }
+    for (const note of placedNotes) {
+      const f = note.frame;
+      if (touches(f.left, f.top, f.left + f.width, f.top + f.height)) ids.push(note.text.id);
+    }
+    ids.push(...shapeGestures.shapesInBox({ x: box.left * ptPerPx, y: box.top * ptPerPx }, { x: box.right * ptPerPx, y: box.bottom * ptPerPx }));
+    return [...new Set(ids)];
   };
 
   /** Right-click: picks the mark under the pointer the way a click would, then offers its actions. */
@@ -669,6 +771,25 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
+    if (groupRef.current) {
+      groupRef.current = null;
+      breakUndoGroup();
+      return;
+    }
+    if (marqueeRef.current) {
+      const m = marqueeRef.current;
+      marqueeRef.current = null;
+      setMarquee(null);
+      const tiny = Math.abs(m.end.x - m.start.x) < 3 && Math.abs(m.end.y - m.start.y) < 3;
+      if (tiny) {
+        if (!m.add) useSessionStore.getState().clearSelection();
+        return;
+      }
+      const found = marksInBox(m.start, m.end);
+      const before = m.add && useSessionStore.getState().selection?.kind === "mark" ? useSessionStore.getState().selection!.ids : [];
+      useSessionStore.getState().selectMarks([...before, ...found]);
+      return;
+    }
     if (shapeGestures.up(getPointUnclamped(e), e)) return;
     const current = dragRef.current;
     if (!current) return;
@@ -688,7 +809,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         trimLineId = line.id;
       } else {
         const line = createLineFromShot(pageNum, [current.start, end], project, linkedShotId);
-        addLine(line);
+        addLine(line, true);
         trimLineId = line.id;
       }
       trimHint = "drawEnd";
@@ -771,81 +892,92 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         const pts = line.points.map((point) => normalizedToPx(point, width, height));
         const last = pts.length - 1;
         if (last < 1) return null;
-        const isSel = line.id === selectedId;
+        const isSel = selectedSet.has(line.id);
         const strokePx = style.widthPt * labelScale;
         const startInset = (endingGeometry(style.start, style.widthPt)?.shaftInsetPt ?? 0) * labelScale;
         const endInset = (endingGeometry(style.end, style.widthPt)?.shaftInsetPt ?? 0) * labelScale;
         const startAng = lineAngleRad(pts[0]!.x, pts[0]!.y, pts[1]!.x, pts[1]!.y);
         const endAng = lineAngleRad(pts[last - 1]!.x, pts[last - 1]!.y, pts[last]!.x, pts[last]!.y);
-        const startCap = renderLineCap(style.start, style.color, strokePx, startAng, true, labelScale);
-        const endCap = renderLineCap(style.end, style.color, strokePx, endAng, false, labelScale);
-        // Mid markers sit on each split point, pointing along the segment that arrives there.
-        const midSource = v2Project.marks.find((mark) => mark.id === line.id);
-        const midEnding = midSource?.kind === "line" && midSource.mid ? legacyEnding(midSource.mid) : null;
-        const midCaps = midEnding
-          ? pts.slice(1, -1).map((point, index) => {
-              const before = pts[index]!;
-              const cap = renderLineCap(midEnding, style.color, strokePx, lineAngleRad(before.x, before.y, point.x, point.y), false, labelScale);
-              return cap && <g key={`mid-${index}`} transform={`translate(${point.x}, ${point.y})`}>{cap.elements}</g>;
-            })
-          : null;
+        const source = v2Project.marks.find((mark) => mark.id === line.id);
+        const owned = source?.kind === "line" ? source : undefined;
+        // Outline: a halo under the whole line (every segment, strand and ending), drawn before the line itself.
+        const halo = owned?.outline && owned.outline.widthPt > 0 ? owned.outline : null;
+        const haloStrokePx = halo ? strokePx + halo.widthPt * 2.5 * labelScale : 0;
+        const capsFor = (color: string, width: number) => {
+          const startCap = renderLineCap(style.start, color, width, startAng, true, labelScale);
+          const endCap = renderLineCap(style.end, color, width, endAng, false, labelScale);
+          // Mid markers sit on each split point, pointing along the segment that arrives there.
+          const midEnding = owned?.mid ? legacyEnding(owned.mid) : null;
+          return (
+            <>
+              {startCap && <g transform={`translate(${pts[0]!.x}, ${pts[0]!.y})`}>{startCap.elements}</g>}
+              {endCap && <g transform={`translate(${pts[last]!.x}, ${pts[last]!.y})`}>{endCap.elements}</g>}
+              {midEnding &&
+                pts.slice(1, -1).map((point, index) => {
+                  const before = pts[index]!;
+                  const cap = renderLineCap(midEnding, color, width, lineAngleRad(before.x, before.y, point.x, point.y), false, labelScale);
+                  return cap && <g key={`mid-${index}`} transform={`translate(${point.x}, ${point.y})`}>{cap.elements}</g>;
+                })}
+            </>
+          );
+        };
+        const segments = pts.slice(0, -1).map((start, index) => {
+          const end = pts[index + 1]!;
+          const look = owned
+            ? segmentLook(owned, index)
+            : { pattern: style.stroke === "solid" ? "straight" : style.stroke, widthPt: style.widthPt };
+          const [shaftStart, shaftEnd] = shaftEnds(start, end, index === 0 ? startInset : 0, index === last - 1 ? endInset : 0);
+          const strands = segmentStrands(
+            { x: shaftStart.x / labelScale, y: shaftStart.y / labelScale },
+            { x: shaftEnd.x / labelScale, y: shaftEnd.y / labelScale },
+            look.pattern,
+            look.widthPt,
+            look
+          );
+          return { index, look, shaftStart, shaftEnd, strands };
+        });
+        const strandLines = (color: string, extraPt: number, key: string) =>
+          segments.flatMap(({ index, strands }) =>
+            strands.map((strand, strandIndex) => (
+              <polyline
+                key={`${key}-${index}-${strandIndex}`}
+                points={strand.points.map((point) => `${point.x * labelScale},${point.y * labelScale}`).join(" ")}
+                fill="none"
+                stroke={color}
+                strokeWidth={(strand.widthPt + extraPt) * labelScale}
+                strokeDasharray={strand.dash?.map((part) => part * labelScale).join(" ")}
+                strokeOpacity={strand.opacity}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            ))
+          );
 
         return (
           <g key={line.id} className={isSel ? "line-selected" : undefined}>
-            {pts.slice(0, -1).map((start, index) => {
-              const end = pts[index + 1]!;
-              const source = v2Project.marks.find((mark) => mark.id === line.id);
-              const owned = source?.kind === "line" ? source : undefined;
-              const look = owned
-                ? segmentLook(owned, index)
-                : { pattern: style.stroke === "solid" ? "straight" : style.stroke, widthPt: style.widthPt };
-              const [shaftStart, shaftEnd] = shaftEnds(
-                start,
-                end,
-                index === 0 ? startInset : 0,
-                index === last - 1 ? endInset : 0
-              );
-              const strands = segmentStrands(
-                { x: shaftStart.x / labelScale, y: shaftStart.y / labelScale },
-                { x: shaftEnd.x / labelScale, y: shaftEnd.y / labelScale },
-                look.pattern,
-                look.widthPt,
-                look
-              );
-              const segmentOn = last > 1 && lineSegment?.lineId === line.id && lineSegment.index === index;
-              return (
-                <g key={index}>
-                  {segmentOn && (
-                    <line
-                      x1={shaftStart.x}
-                      y1={shaftStart.y}
-                      x2={shaftEnd.x}
-                      y2={shaftEnd.y}
-                      stroke="#4a9eff"
-                      strokeWidth={look.widthPt * labelScale + 6}
-                      strokeOpacity={0.45}
-                      strokeLinecap="round"
-                    />
-                  )}
-                  {strands.map((strand, strandIndex) => (
-                    <polyline
-                      key={strandIndex}
-                      points={strand.points.map((point) => `${point.x * labelScale},${point.y * labelScale}`).join(" ")}
-                      fill="none"
-                      stroke={style.color}
-                      strokeWidth={strand.widthPt * labelScale}
-                      strokeDasharray={strand.dash?.map((part) => part * labelScale).join(" ")}
-                      strokeOpacity={strand.opacity}
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                    />
-                  ))}
-                </g>
-              );
-            })}
-            {startCap && <g transform={`translate(${pts[0]!.x}, ${pts[0]!.y})`}>{startCap.elements}</g>}
-            {endCap && <g transform={`translate(${pts[last]!.x}, ${pts[last]!.y})`}>{endCap.elements}</g>}
-            {midCaps}
+            {segments.map(({ index, look, shaftStart, shaftEnd }) =>
+              last > 1 && lineSegment?.lineId === line.id && lineSegment.index === index ? (
+                <line
+                  key={`sel-${index}`}
+                  x1={shaftStart.x}
+                  y1={shaftStart.y}
+                  x2={shaftEnd.x}
+                  y2={shaftEnd.y}
+                  stroke="#4a9eff"
+                  strokeWidth={look.widthPt * labelScale + 6}
+                  strokeOpacity={0.45}
+                  strokeLinecap="round"
+                />
+              ) : null
+            )}
+            {halo && (
+              <g className="line-halo">
+                {strandLines(halo.color, halo.widthPt * 2, "halo")}
+                {capsFor(halo.color, haloStrokePx)}
+              </g>
+            )}
+            {strandLines(style.color, 0, "stroke")}
+            {capsFor(style.color, strokePx)}
           </g>
         );
       })}
@@ -858,10 +990,11 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
           fontFamily={label.fontFamily}
           bold={label.bold}
           italic={label.italic}
-          selected={label.line.id === selectedId}
+          selected={selectedSet.has(label.line.id)}
           hitId={label.line.id}
           align={label.align}
           anchor={label.anchor}
+          halo={textHalo(captionOutlineOf(label.line.id))}
         />
       ))}
       {lines.map((line) => {
@@ -896,8 +1029,9 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
           fontFamily={note.fontFamily}
           bold={note.bold}
           italic={note.italic}
-          selected={note.text.id === selectedId}
+          selected={selectedSet.has(note.text.id)}
           hitId={note.text.id}
+          halo={textHalo(noteOutlineOf(note.text.id))}
         />
       ))}
       {drag?.type === "draw" && previewEnd && (
@@ -913,6 +1047,16 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         />
       )}
       {shapeGestures.handlesLayer}
+      {marquee && (
+        <rect
+          className="select-box"
+          x={Math.min(marquee.start.x, marquee.end.x)}
+          y={Math.min(marquee.start.y, marquee.end.y)}
+          width={Math.abs(marquee.end.x - marquee.start.x)}
+          height={Math.abs(marquee.end.y - marquee.start.y)}
+          pointerEvents="none"
+        />
+      )}
     </svg>
     {barPos && selectedId && (
       <ScriptActionBar

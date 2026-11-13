@@ -129,11 +129,14 @@ export function useShapeGestures({
   pageNum,
   width,
   selectedId,
+  selectedIds = [],
   snapDegrees,
 }: {
   pageNum: number;
   width: number;
   selectedId: string | undefined;
+  /** Every selected mark; with several, each selected shape gets a dashed box. */
+  selectedIds?: string[];
   snapDegrees: number | null | undefined;
 }) {
   const project = useProjectStore((s) => s.project);
@@ -295,6 +298,17 @@ export function useShapeGestures({
     return true;
   };
 
+  /** Shapes whose box touches a box given in page points. */
+  const shapesInBox = (a: Pt, b: Pt): string[] =>
+    shapes
+      .filter((shape) => {
+        const corners = shapeHandles(shape, 0).filter((h) => h.handle.kind === "resize").map((h) => h.at);
+        const xs = corners.map((c) => c.x);
+        const ys = corners.map((c) => c.y);
+        return Math.min(...xs) <= b.x && Math.max(...xs) >= a.x && Math.min(...ys) <= b.y && Math.max(...ys) >= a.y;
+      })
+      .map((shape) => shape.id);
+
   /** The top shape under a normalized page point, if any. */
   const shapeAt = (n: Pt): ShapeMark | null => {
     const p = toPt(n);
@@ -429,6 +443,22 @@ export function useShapeGestures({
       </svg>
     ) : null;
 
+  const multi = selectedIds.length > 1 ? shapes.filter((shape) => selectedIds.includes(shape.id)) : [];
+  const multiLayer: ReactNode = multi.length ? (
+    <g className="shape-multi" pointerEvents="none">
+      {multi.map((shape) => {
+        const corners = shapeHandles(shape, 0)
+          .filter((h) => h.handle.kind === "resize" && h.handle.sx !== 0 && h.handle.sy !== 0)
+          .map((h) => h.at);
+        const c = shapeCenter(shape);
+        corners.sort((p, q) => Math.atan2(p.y - c.y, p.x - c.x) - Math.atan2(q.y - c.y, q.x - c.x));
+        return (
+          <polygon key={shape.id} points={corners.map((p) => `${p.x * k},${p.y * k}`).join(" ")} fill="none" stroke="#4a9eff" strokeWidth={1.25} strokeDasharray="4 3" />
+        );
+      })}
+    </g>
+  ) : null;
+
   const handlesLayer: ReactNode = selected ? (
     <g className="shape-handles" pointerEvents="none">
       <polygon
@@ -463,5 +493,5 @@ export function useShapeGestures({
     </g>
   ) : null;
 
-  return { startDraw, startPen, polyClick, finishPoly, grabHandle, grabShape, shapeAt, move, up, shapesLayer, highlightLayer, handlesLayer };
+  return { startDraw, startPen, polyClick, finishPoly, grabHandle, grabShape, shapeAt, shapesInBox, move, up, shapesLayer, highlightLayer, handlesLayer: multiLayer ?? handlesLayer };
 }

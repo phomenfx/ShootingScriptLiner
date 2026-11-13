@@ -3,6 +3,7 @@
  * dialogs, clipboard, the loaded script PDF. None of it is saved.
  */
 import type { OutlineClip } from "../model/outlineClipboard";
+import { DEFAULT_PDF_OPTIONS, type PdfExportOptions } from "../model/pdfOptions";
 import { create } from "zustand";
 import type { Mark } from "../model/types";
 import type { ScriptTool } from "../types/annotations";
@@ -33,6 +34,12 @@ type SessionState = {
   shapeKind: string;
   /** The Scenes panel as a list, or widened into the shot-list table. */
   scenesView: "list" | "table";
+  /** The Import shot list dialog, and a file's text handed to it (a drop on the table). */
+  importOpen: boolean;
+  /** The Export lined PDF dialog and its choices (kept for the session). */
+  pdfExportOpen: boolean;
+  pdfOptions: PdfExportOptions;
+  importText: { text: string; name: string } | null;
   /** Shots and scenes hidden from the table for now (Alt+H shows them). Not saved. */
   hiddenTableRows: string[];
   /** Snap button. Shift still snaps while this is off. Not saved with the project. */
@@ -57,6 +64,8 @@ type SessionState = {
   scriptPdfFile: File | null;
 
   select: (kind: "scene" | "shot" | "mark", id: string) => void;
+  /** Several marks at once (a drag box or Shift/Ctrl-click). An empty list clears. */
+  selectMarks: (ids: string[]) => void;
   clearSelection: () => void;
   setLineSegment: (lineId: string, index: number) => void;
   clearLineSegment: () => void;
@@ -66,6 +75,10 @@ type SessionState = {
   setActiveTool: (tool: ScriptTool) => void;
   setShapeKind: (kind: string) => void;
   setScenesView: (view: "list" | "table") => void;
+  setImportOpen: (open: boolean) => void;
+  setPdfExportOpen: (open: boolean) => void;
+  setPdfOptions: (options: PdfExportOptions) => void;
+  setImportText: (file: { text: string; name: string } | null) => void;
   hideTableRow: (id: string) => void;
   showAllTableRows: () => void;
   setSnapEnabled: (on: boolean) => void;
@@ -99,6 +112,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   shapeKind: "rectangle",
   scenesView: "list",
   hiddenTableRows: [],
+  importOpen: false,
+  pdfExportOpen: false,
+  pdfOptions: DEFAULT_PDF_OPTIONS,
+  importText: null,
   snapEnabled: true,
   actionBarOffset: { x: 0, y: 0 },
   clipboard: null,
@@ -119,6 +136,8 @@ export const useSessionStore = create<SessionState>((set) => ({
       // A line or note opens its own form. A shot opens the shot, with no mark tabs.
       ...(kind === "mark" ? { markTab: "own" as const } : {}),
     }),
+  selectMarks: (ids) =>
+    set({ selection: ids.length > 0 ? { kind: "mark", ids: [...new Set(ids)] } : null, lineSegment: null, markTab: "own" }),
   clearSelection: () => set({ selection: null, lineSegment: null }),
   setLineSegment: (lineId, index) => set({ lineSegment: { lineId, index } }),
   clearLineSegment: () => set({ lineSegment: null }),
@@ -136,6 +155,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   setActiveTool: (activeTool) => set({ activeTool }),
   setShapeKind: (shapeKind) => set({ shapeKind, activeTool: "shape" }),
   setScenesView: (scenesView) => set({ scenesView }),
+  setImportOpen: (importOpen) => set({ importOpen }),
+  setPdfExportOpen: (pdfExportOpen) => set({ pdfExportOpen }),
+  setPdfOptions: (pdfOptions) => set({ pdfOptions }),
+  setImportText: (importText) => set({ importText }),
   hideTableRow: (id) => set((s) => ({ hiddenTableRows: [...new Set([...s.hiddenTableRows, id])] })),
   showAllTableRows: () => set({ hiddenTableRows: [] }),
   setSnapEnabled: (snapEnabled) => set({ snapEnabled }),

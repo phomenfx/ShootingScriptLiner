@@ -281,7 +281,22 @@ export function ShotTable() {
   const width = columns.reduce((n, c) => n + c.width, 0);
 
   return (
-    <div className="shot-table">
+    <div
+      className="shot-table"
+      // Dropping a CSV on the table opens Import with it.
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        const file = e.dataTransfer.files[0];
+        if (!file || !/\.(csv|tsv|txt)$/i.test(file.name)) return;
+        e.preventDefault();
+        void file.text().then((text) => {
+          session().setImportText({ text, name: file.name });
+          session().setImportOpen(true);
+        });
+      }}
+    >
       <div className="shot-table-bar">
         <label className="scene-search">
           <Search size={14} strokeWidth={1.75} aria-hidden="true" />
@@ -331,6 +346,9 @@ export function ShotTable() {
             </Dropdown.Content>
           </Dropdown.Portal>
         </Dropdown.Root>
+        <button type="button" className="tool-btn" onClick={() => session().setImportOpen(true)}>
+          Import…
+        </button>
         <button type="button" className="tool-btn" onClick={() => void commands.exportShotListCsv()}>
           Export CSV
         </button>

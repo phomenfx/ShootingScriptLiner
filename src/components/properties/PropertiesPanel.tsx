@@ -4,6 +4,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { LineInspector, OtherMarkInspector, TextInspector } from "./MarkForms";
 import { ColorBar } from "./ColorBar";
+import { MultiMarkInspector } from "./MultiMarkForm";
 import { ShapeInspector } from "./ShapeForm";
 import { SceneInspector, ShotInspector } from "./ShotSceneForms";
 
@@ -35,6 +36,15 @@ function PropertiesBody() {
   if (selection?.kind === "shot") {
     const found = edits.findShot(project, id);
     if (found) return <div className="pf" key={found.shot.id}><ShotInspector project={project} found={found} asTab={false} /></div>;
+  }
+
+  // Several marks: what they are, and what can be done to all of them at once.
+  if (selection?.kind === "mark" && selection.ids.length > 1) {
+    return (
+      <div className="pf">
+        <MultiMarkInspector project={project} ids={selection.ids} />
+      </div>
+    );
   }
 
   if (selection?.kind === "mark") {

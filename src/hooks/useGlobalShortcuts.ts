@@ -14,7 +14,7 @@ function isTyping(target: EventTarget | null): boolean {
 const ALWAYS: Record<string, () => void> = {
   s: () => void commands.saveZip(),
   o: () => void commands.requestOpenProject(),
-  e: () => void commands.exportLinedPdf(),
+  e: () => commands.requestExportLinedPdf(),
   "=": commands.zoomIn,
   "+": commands.zoomIn,
   "-": commands.zoomOut,

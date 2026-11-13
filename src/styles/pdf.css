@@ -448,3 +448,11 @@
   mix-blend-mode: multiply;
   pointer-events: none;
 }
+
+/* Drag box for selecting several marks */
+.select-box {
+  fill: rgba(74, 158, 255, 0.12);
+  stroke: #4a9eff;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}

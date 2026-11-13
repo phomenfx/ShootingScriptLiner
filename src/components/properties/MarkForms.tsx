@@ -12,6 +12,7 @@ import { segmentLook, editSegmentTune, editStrokeTune, setSegmentPattern, setSeg
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { EndingPicker, FillToggle } from "./EndingPicker";
+import { OutlineFields } from "./OutlineFields";
 import { PatternPicker } from "./PatternPicker";
 import { ColorField, Field, Footer, FooterButton, Group, Lockable, NumberInput, Segmented, Select, TextInput, Toggles } from "./parts";
 
@@ -236,6 +237,18 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
             }
           />
           <TextStyleFields style={line.caption} fonts={fonts} onChange={caption} />
+          <OutlineFields
+            label="Caption outline"
+            value={line.caption.outline}
+            onChange={(outline) =>
+              update((l) => {
+                const next = { ...l, caption: { ...l.caption } };
+                if (outline) next.caption.outline = outline;
+                else delete next.caption.outline;
+                return next;
+              })
+            }
+          />
           {line.caption.offset && (
             <div className="pf-wide">
               <FooterButton
@@ -413,6 +426,20 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
           )}
         </Group>
 
+        <Group name="line-outline" title="Outline">
+          <OutlineFields
+            label="Line outline"
+            value={line.outline}
+            onChange={(outline) =>
+              update((l) => {
+                if (outline) return { ...l, outline };
+                const { outline: _removed, ...rest } = l;
+                return rest;
+              })
+            }
+          />
+        </Group>
+
         <p className="pf-summary">This line: {describeLength(lineLength(project, line)).replace(/^1 line · /, "")}</p>
       </div>
       <MarkFooter onUseAsDefault={useAsDefault} />
@@ -459,6 +486,17 @@ export function TextInspector({ project, note }: { project: Project; note: TextM
             }
           />
           <TextStyleFields style={note.style} fonts={fonts} onChange={(patch) => update((n) => ({ ...n, style: { ...n.style, ...patch } }))} />
+          <OutlineFields
+            label="Text outline"
+            value={note.outline}
+            onChange={(outline) =>
+              update((n) => {
+                if (outline) return { ...n, outline };
+                const { outline: _removed, ...rest } = n;
+                return rest;
+              })
+            }
+          />
           <Field label="Color" wide>
             <ColorField
               label="Text color"

@@ -1,6 +1,12 @@
 import {
   BlendMode,
+  LineJoinStyle,
   PDFDocument,
+  TextRenderingMode,
+  setLineJoin,
+  setLineWidth,
+  setStrokingRgbColor,
+  setTextRenderingMode,
   concatTransformationMatrix,
   popGraphicsState,
   pushGraphicsState,
@@ -37,6 +43,7 @@ import { legacyEnding } from "../legacy/legacyView";
 import { segmentStrands, type StrokeStrand } from "./strokeGeometry";
 import { segmentLook } from "../model/segments";
 import type { LineMark, Project as V2Project, ShapeMark } from "../model/types";
+import { DEFAULT_PDF_OPTIONS, markPrints, pagesToKeep, type PdfExportOptions } from "../model/pdfOptions";
 import { isShapeShown, outlineEdges, shapeColor, shapeFill, shapeHalo, shapeHasStroke, shapeOutline, stampScalePercent, stampTip } from "./shapeGeometry";
 import { drawPdfLineCap } from "./pdfLineCaps";
 import { resolvePdfExportFont, sanitizePdfExportText } from "./pdfExportFonts";
@@ -76,8 +83,10 @@ function drawWrappedPdfText(
   underline: boolean,
   italic: boolean,
   color: ReturnType<typeof hexToRgb>,
-  pinOrigin = false
+  pinOrigin = false,
+  halo?: { color: string; widthPt: number }
 ) {
+  const haloInk = halo && halo.widthPt > 0 ? hexToRgb(halo.color) : null;
   const safe = sanitizePdfExportText(text);
   if (!safe) return;
   const laid = layoutTextBlock({
@@ -103,6 +112,18 @@ function drawWrappedPdfText(
           concatTransformationMatrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f)
         );
       }
+      if (haloInk && halo) {
+        // The glyphs once more as a wide stroke in the outline color, under the text.
+        page.pushOperators(
+          pushGraphicsState(),
+          setTextRenderingMode(TextRenderingMode.Outline),
+          setLineWidth(halo.widthPt * 2),
+          setLineJoin(LineJoinStyle.Round),
+          setStrokingRgbColor(haloInk.red, haloInk.green, haloInk.blue)
+        );
+        page.drawText(run.text, { x: run.x, y: run.baseline, size: fontSize, font, color: haloInk });
+        page.pushOperators(popGraphicsState());
+      }
       page.drawText(run.text, {
         x: run.x,
         y: run.baseline,
@@ -111,6 +132,14 @@ function drawWrappedPdfText(
         color,
       });
       if (italic) page.pushOperators(popGraphicsState());
+    }
+    if (run.underline && haloInk && halo) {
+      page.drawLine({
+        start: { x: run.underline.x1, y: run.underline.y },
+        end: { x: run.underline.x2, y: run.underline.y },
+        thickness: Math.max(0.4, fontSize * UNDERLINE_THICKNESS_EM) + halo.widthPt * 2,
+        color: haloInk,
+      });
     }
     if (run.underline) {
       page.drawLine({
@@ -129,8 +158,17 @@ export async function buildLinedPdfBytes(
   pdfBytes: ArrayBuffer,
   sourceLines: LineMark[] = [],
   /** The saved project, for box shapes. */
-  source?: V2Project
+  source?: V2Project,
+  /** Which shots, marks and pages go in (Export dialog). */
+  options: PdfExportOptions = DEFAULT_PDF_OPTIONS
 ): Promise<Uint8Array> {
+  const v2ById = new Map((source?.marks ?? []).map((mark) => [mark.id, mark]));
+  // A line counts as printed for its caption even when line strokes are off.
+  const lineOptions = { ...options, include: { ...options.include, lines: true } };
+  const prints = (id: string, opts = options) => {
+    const mark = v2ById.get(id);
+    return !source || !mark || markPrints(source, mark, opts);
+  };
   const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
 
   const fontCache = new Map<string, Awaited<ReturnType<typeof resolvePdfExportFont>>>();
@@ -155,16 +193,16 @@ export async function buildLinedPdfBytes(
     // Shapes go under lines and notes, as on screen.
     if (source) {
       for (const mark of source.marks) {
-        if (mark.kind === "shape" && mark.page === pageNum && isShapeShown(source, mark)) drawShape(page, ph, source, mark);
+        if (mark.kind === "shape" && mark.page === pageNum && isShapeShown(source, mark) && markPrints(source, mark, options)) drawShape(page, ph, source, mark);
       }
     }
 
     // Hidden shots and scenes stay out of the PDF, as they are off the page on screen.
     const lines = project.annotations.filter(
-      (a) => isLineAnnotation(a) && a.page === pageNum && isAnnotationVisible(project, a)
+      (a) => isLineAnnotation(a) && a.page === pageNum && isAnnotationVisible(project, a) && prints(a.id, lineOptions)
     );
     const texts = project.annotations.filter(
-      (a) => isTextAnnotation(a) && a.page === pageNum && isTextShown(project, a)
+      (a) => isTextAnnotation(a) && a.page === pageNum && isTextShown(project, a) && prints(a.id)
     );
 
     for (const line of lines) {
@@ -182,6 +220,7 @@ export async function buildLinedPdfBytes(
       const ink = hexToRgb(style.color);
       const startInset = endingGeometry(style.start, style.widthPt)?.shaftInsetPt ?? 0;
       const endInset = endingGeometry(style.end, style.widthPt)?.shaftInsetPt ?? 0;
+      const strands: StrokeStrand[] = [];
       for (let index = 0; index < last; index += 1) {
         const start = pts[index]!;
         const end = pts[index + 1]!;
@@ -192,7 +231,7 @@ export async function buildLinedPdfBytes(
         // Build strands with y pointing down, as on screen, so sided patterns land on the same side; then flip for the PDF.
         const flip = (point: { x: number; y: number }) => ({ x: point.x, y: ph - point.y });
         for (const strand of segmentStrands(flip(shaftStart), flip(shaftEnd), look.pattern, look.widthPt, look)) {
-          if (strand.export) drawStrand(page, { ...strand, points: strand.points.map(flip) }, ink);
+          if (strand.export) strands.push({ ...strand, points: strand.points.map(flip) });
         }
       }
 
@@ -200,18 +239,30 @@ export async function buildLinedPdfBytes(
       const p1 = pts[last]!;
       const startAngle = Math.atan2(pts[1]!.y - p0.y, pts[1]!.x - p0.x);
       const endAngle = Math.atan2(p1.y - pts[last - 1]!.y, p1.x - pts[last - 1]!.x);
-      drawPdfLineCap(page, p0.x, p0.y, startAngle, style.start, style.color, style.widthPt, true);
-      drawPdfLineCap(page, p1.x, p1.y, endAngle, style.end, style.color, style.widthPt, false);
-      if (source?.mid) {
-        const mid = legacyEnding(source.mid);
+      const mid = source?.mid ? legacyEnding(source.mid) : null;
+      const drawEndings = (color: string, haloPt: number) => {
+        drawPdfLineCap(page, p0.x, p0.y, startAngle, style.start, color, style.widthPt, true, haloPt);
+        drawPdfLineCap(page, p1.x, p1.y, endAngle, style.end, color, style.widthPt, false, haloPt);
+        if (!mid) return;
         for (let index = 1; index < last; index += 1) {
           const at = pts[index]!;
           const before = pts[index - 1]!;
-          drawPdfLineCap(page, at.x, at.y, Math.atan2(at.y - before.y, at.x - before.x), mid, style.color, style.widthPt, false);
+          drawPdfLineCap(page, at.x, at.y, Math.atan2(at.y - before.y, at.x - before.x), mid, color, style.widthPt, false, haloPt);
         }
+      };
+      // Outline: a halo under the whole line, every strand and ending, before the line itself.
+      const lineHalo = source?.outline && source.outline.widthPt > 0 ? source.outline : null;
+      if (lineHalo && options.include.lines) {
+        const haloInk = hexToRgb(lineHalo.color);
+        for (const strand of strands) drawStrand(page, { ...strand, widthPt: strand.widthPt + lineHalo.widthPt * 2 }, haloInk);
+        drawEndings(lineHalo.color, lineHalo.widthPt);
+      }
+      if (options.include.lines) {
+        for (const strand of strands) drawStrand(page, strand, ink);
+        drawEndings(style.color, 0);
       }
 
-      if (line.showLabel) {
+      if (line.showLabel && options.include.captions) {
         const { primary, secondary } = getLineScriptLabels(line, project);
         const fs = getLineFontSizePt(line, project);
         const primaryText = primary ? sanitizePdfExportText(primary) : "";
@@ -245,7 +296,8 @@ export async function buildLinedPdfBytes(
             underline,
             italic,
             color,
-            true
+            true,
+            source?.caption.outline
           );
         }
         if (secondaryText) {
@@ -273,12 +325,17 @@ export async function buildLinedPdfBytes(
             underline,
             italic,
             color,
-            true
+            true,
+            source?.caption.outline
           );
         }
       }
     }
 
+    const noteOutline = (id: string) => {
+      const mark = source?.marks.find((m) => m.id === id);
+      return mark?.kind === "text" ? mark.outline : undefined;
+    };
     for (const t of texts) {
       if (!isTextAnnotation(t)) continue;
       const tp = normToPdf(t.x, t.y, pw, ph);
@@ -298,11 +355,25 @@ export async function buildLinedPdfBytes(
         t.align ?? "left",
         t.labelUnderline === true,
         t.labelItalic === true,
-        hexToRgb(resolveTextColor(t, project))
+        hexToRgb(resolveTextColor(t, project)),
+        false,
+        noteOutline(t.id)
       );
     }
   }
 
+  // Pages left out by the export choices are dropped, last first so the numbering holds.
+  if (source && options.pages !== "all") {
+    const keep = new Set(
+      pagesToKeep(source, options, pageCount, (mark) => {
+        if (mark.kind === "image" || !mark.shotId) return true;
+        const found = source.scenes.flatMap((scene) => scene.shots.map((shot) => ({ scene, shot }))).find((x) => x.shot.id === mark.shotId);
+        return !found || (found.shot.visible && found.scene.visible);
+      })
+    );
+    if (keep.size === 0) throw new Error("Nothing to export: no page has a mark with these choices.");
+    for (let i = pageCount - 1; i >= 0; i -= 1) if (!keep.has(i + 1)) doc.removePage(i);
+  }
   return doc.save();
 }
 

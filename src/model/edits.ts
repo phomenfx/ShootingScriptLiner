@@ -264,6 +264,24 @@ export const deleteLinesForShot =
 export const CLONE_NUDGE_PT = 12;
 
 /** A copy with a new ID, optionally on another page and nudged down and right. */
+/** Moves marks by a distance in points, as one edit. */
+export const translateMarks =
+  (origins: Mark[], dx: number, dy: number): Edit =>
+  (project) => {
+    const moved = new Map(
+      origins.map((mark) => {
+        const next = structuredClone(mark);
+        if (next.kind === "line") next.points = next.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+        else {
+          next.x += dx;
+          next.y += dy;
+        }
+        return [mark.id, next];
+      })
+    );
+    return { ...project, marks: project.marks.map((mark) => moved.get(mark.id) ?? mark) };
+  };
+
 export function cloneMark(mark: Mark, options: { page?: number; nudgePt?: number } = {}): Mark {
   const d = options.nudgePt ?? 0;
   const page = options.page ?? mark.page;

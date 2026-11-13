@@ -246,7 +246,14 @@ export function ScenePanel() {
 
       <div className="scene-list" role="grid" aria-label="Scenes and shots" onContextMenu={rowMenu}>
         {project.scenes.length === 0 && (
-          <p className="scene-list-empty">No scenes yet. Add a scene, then add its shots.</p>
+          <div className="scene-list-empty">
+            <p>No scenes yet. Add a scene, then add its shots.</p>
+            {project.script && (
+              <button type="button" className="tool-btn" onClick={() => void commands.detectScenes()}>
+                Detect scenes from script
+              </button>
+            )}
+          </div>
         )}
         {project.scenes.length > 0 && listed.length === 0 && (
           <p className="scene-list-empty">Nothing matches "{search.trim()}".</p>

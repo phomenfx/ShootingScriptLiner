@@ -386,3 +386,7 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
   font-size: var(--font-size);
 }
+
+.scene-list-empty p {
+  margin: 0 0 0.5rem;
+}

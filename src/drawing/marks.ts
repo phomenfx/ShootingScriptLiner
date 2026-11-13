@@ -8,6 +8,7 @@ import { computeMarginContinuationTrim, type MarginTrimHint } from "../lib/lineM
 import { FALLBACK_PAGE } from "../io/migrateV1";
 import { legacyLine, legacyText, lineToV2, textToV2, toLegacyProject } from "../legacy/legacyView";
 import * as edits from "../model/edits";
+import type { LineMark as V2LineMark, TextMark as V2TextMark } from "../model/types";
 import { applyIntoLastStep, breakUndoGroup, useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 import type { LineAnnotation, NormalizedPoint, TextAnnotation } from "../types/annotations";
@@ -93,20 +94,37 @@ export function replaceLine(id: string, patch: Partial<LineAnnotation>): void {
   useProjectStore.getState().apply(edits.replaceMark(lineToV2({ ...shown, ...patch } as typeof shown, v2(), base)));
 }
 
+/** A newly drawn line takes the default outlines from Settings. */
+function lineWithDefaultOutlines(mark: V2LineMark): V2LineMark {
+  const d = v2().settings.markDefaults.line;
+  const next = { ...mark, caption: { ...mark.caption } };
+  if (d.outline && !next.outline) next.outline = { ...d.outline };
+  if (d.captionOutline && !next.caption.outline) next.caption.outline = { ...d.captionOutline };
+  return next;
+}
+
+/** A new note takes the default outline from Settings. */
+function noteWithDefaultOutline(mark: V2TextMark): V2TextMark {
+  const d = v2().settings.markDefaults.text;
+  return d.outline && !mark.outline ? { ...mark, outline: { ...d.outline } } : mark;
+}
+
 /** Adds a line in the same undo step as the edit just before it (the new shot of a Ctrl+drag). */
 export function addLineJoined(line: LineAnnotation): void {
-  useProjectStore.getState().apply(edits.addMarks([lineToV2(line, v2())]));
+  useProjectStore.getState().apply(edits.addMarks([lineWithDefaultOutlines(lineToV2(line, v2()))]));
   breakUndoGroup();
   session().select("mark", line.id);
 }
 
-export function addLine(line: LineAnnotation): void {
-  applyStep(edits.addMarks([lineToV2(line, v2())]));
+/** `fresh`: a newly drawn line, which starts with the default outlines (a copy keeps its own). */
+export function addLine(line: LineAnnotation, fresh = false): void {
+  const mark = lineToV2(line, v2());
+  applyStep(edits.addMarks([fresh ? lineWithDefaultOutlines(mark) : mark]));
   session().select("mark", line.id);
 }
 
 export function addText(text: TextAnnotation): void {
-  applyStep(edits.addMarks([textToV2(text, v2())]));
+  applyStep(edits.addMarks([noteWithDefaultOutline(textToV2(text, v2()))]));
   session().select("mark", text.id);
 }
 

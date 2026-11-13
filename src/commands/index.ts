@@ -17,6 +17,7 @@ import { clearAutosave, readAutosave, startAutosave, type Autosave } from "../io
 import { addScene, addShot, updateScene, updateShot } from "../model/edits";
 import { CLONE_NUDGE_PT, addMarks, cloneMark, deleteMarks, deleteScene, deleteShot, findShot, setScript, unlinkMark, updateMark, updateSettings } from "../model/edits";
 import { insertOutline, outlineClipOf, type OutlineAnchor, type OutlineClip } from "../model/outlineClipboard";
+import { findHeadings, planScenes } from "../model/sceneDetect";
 import type { Mark, Project, ScriptInfo } from "../model/types";
 import {
   applyWithoutUndo,
@@ -175,6 +176,53 @@ export async function requestImportPdf(): Promise<void> {
   if (file) await importPdf(file);
 }
 
+/**
+ * Reads scene headings from the script's text (INT., EXT., INT./EXT., I/E,
+ * EST.) and puts them into the scene list, after a summary and a confirm.
+ * Numbered headings keep their number, with blank scenes for any gap.
+ */
+export async function detectScenes(): Promise<void> {
+  const file = await scriptFileForExport();
+  if (!file) {
+    notify("Import the script PDF first, then detect scenes.");
+    return;
+  }
+  try {
+    const { readScriptLines } = await import("../io/scriptText");
+    const pages = await readScriptLines(file);
+    if (pages.every((lines) => lines.length === 0)) {
+      notify("This PDF has no text to read (it may be a scanned script), so no scene headings could be found.");
+      return;
+    }
+    const found = findHeadings(pages);
+    if (found.length === 0) {
+      notify("No scene headings found. A heading starts with INT., EXT., INT./EXT., I/E or EST.");
+      return;
+    }
+    const plan = planScenes(project(), found);
+    const used = plan.used;
+    if (plan.filled === 0 && plan.blanks === 0) {
+      notify(`Found ${used.length} scene headings, but those scenes already have headings. Nothing changed.`);
+      return;
+    }
+    const sample = used
+      .slice(0, 3)
+      .map((h) => `${h.number !== undefined ? `${h.number}. ` : ""}${h.heading.indicator} ${h.heading.location}${h.heading.time ? ` - ${h.heading.time}` : ""}`)
+      .join("; ");
+    const parts = [`Found ${used.length} scene ${used.length === 1 ? "heading" : "headings"} (${sample}${used.length > 3 ? "; …" : ""}).`];
+    parts.push(`This fills ${plan.filled} ${plan.filled === 1 ? "scene" : "scenes"}`);
+    if (plan.blanks) parts[1] += ` and adds ${plan.blanks} blank ${plan.blanks === 1 ? "scene" : "scenes"} so the numbers line up`;
+    parts[1] += ".";
+    if (plan.kept) parts.push(`${plan.kept} ${plan.kept === 1 ? "scene keeps its" : "scenes keep their"} own heading.`);
+    if (!(await confirm(parts.join(" "), "Add scenes"))) return;
+    breakUndoGroup();
+    useProjectStore.getState().apply((current) => planScenes(current, found).project);
+    breakUndoGroup();
+  } catch (error) {
+    notify(errorText(error, "Could not read the script's text."));
+  }
+}
+
 export async function exportBoth(): Promise<void> {
   await exportLinedPdf();
   await exportShotListCsv();
@@ -284,16 +332,26 @@ export async function exportLinedPdf(): Promise<void> {
       toLegacyProject(project()),
       await pdfFile.arrayBuffer(),
       project().marks.filter((mark) => mark.kind === "line"),
-      project()
+      project(),
+      session().pdfOptions
     );
     downloadBlob(new Blob([bytes], { type: "application/pdf" }), `${projectFileStem(project())}-lined.pdf`);
   } catch (error) {
     notify(
-      error instanceof Error && error.message.includes("font")
+      error instanceof Error && (error.message.includes("font") || error.message.startsWith("Nothing to export"))
         ? error.message
         : "Could not export the PDF. Check that the font files are in public/fonts/."
     );
   }
+}
+
+/** Opens the Export lined PDF dialog: choose shots, marks and pages, then export. */
+export function requestExportLinedPdf(): void {
+  if (!project().script) {
+    notify("Import the script PDF first, then export again.");
+    return;
+  }
+  session().setPdfExportOpen(true);
 }
 
 export async function exportShotListCsv(): Promise<void> {
@@ -364,22 +422,39 @@ export function rejoinSelection(): void {
 
 /** Links the mark to a shot, or unlinks it when `shotId` is empty. Linking follows the shot. */
 export function linkMarkToShot(markId: string, shotId: string): void {
+  linkMarksToShot([markId], shotId);
+}
+
+/**
+ * Links lines, notes and shapes to a shot, or unlinks them when `shotId` is
+ * empty, as one undo step. A linked mark follows the shot's color and text.
+ */
+export function linkMarksToShot(markIds: string[], shotId: string): void {
   const p = project();
   breakUndoGroup();
-  useProjectStore.getState().apply(
-    updateMark(markId, (mark) => {
-      if (mark.kind !== "line" && mark.kind !== "text") return mark;
-      if (!shotId) return mark.shotId ? unlinkMark(p, mark) : mark;
-      if (mark.shotId === shotId || !findShot(p, shotId)) return mark;
-      const next = structuredClone(mark);
-      next.shotId = shotId;
-      delete next.color;
-      delete next.own;
-      if (next.kind === "line") delete next.caption.text;
-      else delete next.text;
-      return next;
-    })
+  useProjectStore.getState().apply((current) =>
+    markIds.reduce(
+      (acc, id) =>
+        updateMark(id, (mark) => {
+          if (mark.kind === "image") return mark;
+          if (!shotId) return mark.shotId ? unlinkMark(p, mark) : mark;
+          if (mark.shotId === shotId || !findShot(p, shotId)) return mark;
+          const next = structuredClone(mark);
+          next.shotId = shotId;
+          delete next.color;
+          if (next.kind === "line") {
+            delete next.own;
+            delete next.caption.text;
+          } else if (next.kind === "text") {
+            delete next.own;
+            delete next.text;
+          }
+          return next;
+        })(acc),
+      current
+    )
   );
+  breakUndoGroup();
 }
 
 /** The selected shots or scenes in the Scenes list, if that is what is selected. */
@@ -494,10 +569,17 @@ function selectedShotFound() {
 
 /** Ctrl+H: hides the selected shot (or a selected mark's shot), like its eye in the Scenes list. */
 export function hideSelectedShot(): void {
-  const found = selectedShotFound();
-  if (!found) return;
+  const selection = session().selection;
+  // Several marks: every shot they link to.
+  const shotIds =
+    selection?.kind === "mark"
+      ? [...new Set(project().marks.filter((m) => selection.ids.includes(m.id) && m.kind !== "image").map((m) => (m.kind === "image" ? undefined : m.shotId)))].filter(
+          (id): id is string => !!id && !!findShot(project(), id)
+        )
+      : [selectedShotFound()?.shot.id].filter((id): id is string => !!id);
+  if (shotIds.length === 0) return;
   breakUndoGroup();
-  useProjectStore.getState().apply(updateShot(found.shot.id, (shot) => ({ ...shot, visible: false })));
+  useProjectStore.getState().apply((current) => shotIds.reduce((acc, id) => updateShot(id, (shot) => ({ ...shot, visible: false }))(acc), current));
   breakUndoGroup();
   if (session().selection?.kind === "mark") session().clearSelection();
 }

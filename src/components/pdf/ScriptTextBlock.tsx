@@ -21,6 +21,8 @@ type Props = {
   /** Line labels only. The box alignment point is the origin; this is the line point it is offset from. */
   anchor?: { x: number; y: number };
   align?: TextAlign;
+  /** Outline: a halo around every glyph (and underline), in page pixels per side. */
+  halo?: { color: string; widthPx: number };
 };
 
 export function ScriptTextBlock({
@@ -34,14 +36,36 @@ export function ScriptTextBlock({
   hitId,
   anchor,
   align = "left",
+  halo,
 }: Props) {
   const origin = anchor ? alignmentPoint(frame, align, true) : null;
   const stroke = Math.max(0.75, frame.fontSize * UNDERLINE_THICKNESS_EM);
 
   return (
     <g className={selected ? "text-selected" : undefined} data-hit-id={hitId}>
+      {halo &&
+        runs.map((run, index) =>
+          run.underline ? (
+            <line
+              key={`uh-${index}`}
+              x1={run.underline.x1}
+              y1={run.underline.y}
+              x2={run.underline.x2}
+              y2={run.underline.y}
+              stroke={halo.color}
+              strokeWidth={stroke + halo.widthPx * 2}
+              strokeLinecap="round"
+              pointerEvents="none"
+            />
+          ) : null
+        )}
       <text
         fill={fill}
+        // The halo is a stroke painted under the fill, so the letters keep their shape.
+        stroke={halo?.color}
+        strokeWidth={halo ? halo.widthPx * 2 : undefined}
+        strokeLinejoin="round"
+        paintOrder="stroke"
         fontFamily={fontFamily}
         fontSize={frame.fontSize}
         fontWeight={bold ? 600 : 400}
