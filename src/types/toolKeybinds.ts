@@ -12,10 +12,10 @@ export type ToolKeybinds = {
 
 export const DEFAULT_TOOL_KEYBINDS: ToolKeybinds = {
   select: "v",
-  line: "l",
+  line: "f",
   text: "t",
   shape: "r",
-  pen: "p",
+  pen: "b",
   polygon: "g",
   image: "i",
 };

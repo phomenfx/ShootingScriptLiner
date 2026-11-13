@@ -144,7 +144,7 @@ describe("shot captions", () => {
     const on = ["angle", "cast", "tags", "movement", "lens", "camera", "audio", "sync", "date", "location"];
     project.settings.captions.fields = project.settings.captions.fields.map((f) => ({ ...f, print: f.print || on.includes(f.id) }));
     expect(shotCaption(project, found(project, "b"))).toBe(
-      "1B-CU Alice (Moving) Sticks 85mm, 135mm, 50mm KITCHEN Saturday, November 14 A, B MOS Low Alice, Ben VFX, drone"
+      "1B-CU-Low Alice (Moving) Sticks 85mm, 135mm, 50mm KITCHEN Saturday, November 14 A, B MOS Alice, Ben VFX, drone"
     );
     // Shot a has its scene's audio; shot b deliberately has none.
     expect(shotCaption(project, found(project, "a"))).toContain("Boom");

@@ -4,7 +4,6 @@
  * in this browser), else the built-in starting list. Cast belongs to one
  * project only and never becomes a default.
  */
-import { builtInEntries } from "./registry";
 import type { Project, ProjectSettings } from "./types";
 
 export const SUGGESTION_FIELDS = [
@@ -25,14 +24,21 @@ export type SuggestionLists = Partial<Record<SuggestionField, string[]>>;
 export const PROJECT_ONLY: SuggestionField[] = ["cast"];
 
 export const BUILT_IN_SUGGESTIONS: Record<SuggestionField, string[]> = {
-  type: ["WS", "MWS", "MS", "MCU", "CU", "ECU", "OTS", "POV", "Two Shot", "Insert", "Establishing"],
-  angle: builtInEntries("angle").map((e) => e.label),
+  // Wide to tight, then by how many people, then special shots.
+  type: ["Establishing", "ES", "LS", "FS", "WS", "MWS", "MLS", "Cowboy", "CB", "MS", "MCU", "CU", "ECU", "Single", "1S", "Two Shot", "2 Shot", "2S", "3 Shot", "3S", "OTS", "POV", "Insert"],
+  // By camera height, top to bottom, then tilted and point-of-view angles.
+  angle: [
+    "Aerial", "Birds Eye", "Overhead", "OH", "High", "HA", "Eye level", "EL", "Shoulder level", "SL", "Hip level", "HL",
+    "Knee level", "KL", "Low", "LA", "Ground level", "GL", "Ground", "Dutch", "Canted", "Over the shoulder", "OTS", "POV",
+  ],
   cast: [],
-  movement: ["Static", "Pan", "Tilt", "Push In", "Pull Out", "Dolly In", "Dolly Out", "Truck", "Zoom", "Tracking", "Crane Up", "Crane Down"],
-  system: ["Sticks", "Handheld", "Steadicam", "Gimbal", "Dolly", "Slider", "Jib", "Crane", "Drone", "Car Mount"],
+  // Still, then turning in place, then moving the camera, then rising and falling.
+  movement: ["Static", "Fixed", "Pan", "Whip", "Tilt", "Zoom", "Push In", "Pull Out", "Dolly In", "Dolly Out", "Dolly Zoom", "Truck", "Crab", "Arc", "Tracking", "Car", "Crane Up", "Crane Down"],
+  // On the ground and handheld, then on wheels or arms, then vehicles and air.
+  system: ["Sticks", "Handheld", "EasyRig", "Steadicam", "Gimbal", "Slider", "Dolly", "Jib", "Crane", "Car Mount", "Drone"],
   lenses: ["14mm", "18mm", "25mm", "35mm", "50mm", "75mm", "85mm", "100mm", "135mm"],
-  audio: ["Boom", "Lav", "Plant", "Wild", "Room Tone"],
-  fps: ["23.976", "24", "25", "29.97", "30", "48", "50", "59.94", "60", "120"],
+  audio: ["Boom", "Lav", "Handheld", "Recorder"],
+  fps: ["23.976", "24", "25", "29.97", "30", "59.94", "60", "120"],
 };
 
 /** The list a field offers in this project. */

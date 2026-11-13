@@ -151,7 +151,7 @@ function camerasFromLenses(text: string, current: CameraRow[] = []): CameraRow[]
 /** The table's columns for this project: Revision only while revisions are tracked. */
 export const projectColumns = (project: Project) => (project.settings.revisions?.enabled ? TABLE_COLUMNS : TABLE_COLUMNS.filter((c) => c.id !== "revision"));
 
-export const TABLE_COLUMNS: TableColumn[] = [
+const ALL_COLUMNS: TableColumn[] = [
   {
     id: "shot",
     label: "Shot",
@@ -269,6 +269,19 @@ export const TABLE_COLUMNS: TableColumn[] = [
     read: (p, _s, shot) => ({ text: String(shotLength(p, shot.id).lineCount) }),
   },
 ];
+
+/** The table's starting column order. Columns not named here follow, in the order above. */
+const DEFAULT_COLUMN_ORDER = [
+  "shot", "status", "priority", "type", "angle", "subject", "movement", "additionalInfo", "system", "cast", "tags",
+  "notes", "date", "pages", "eighths", "setup", "estimatedMinutes", "camera", "lens", "audio", "fps", "sync", "lines",
+];
+const rank = (id: string) => {
+  const at = DEFAULT_COLUMN_ORDER.indexOf(id);
+  return at < 0 ? DEFAULT_COLUMN_ORDER.length : at;
+};
+export const TABLE_COLUMNS: TableColumn[] = ALL_COLUMNS.map((c, i) => ({ c, i }))
+  .sort((a, b) => rank(a.c.id) - rank(b.c.id) || a.i - b.i)
+  .map(({ c }) => c);
 
 export const DEFAULT_HIDDEN_COLUMNS: string[] = [];
 

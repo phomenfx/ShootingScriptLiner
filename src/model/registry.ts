@@ -95,12 +95,13 @@ const BUILT_IN: Record<ChoiceField, ListEntry[]> = {
 /** The tag list a new project starts with. */
 export const DEFAULT_TAGS: ListEntry[] = [
   { key: "vfx", label: "VFX" },
-  { key: "stunt", label: "Stunt" },
   { key: "sfx", label: "SFX" },
+  { key: "stunt", label: "Stunt" },
+  { key: "vehicle", label: "Vehicle" },
   { key: "animal", label: "Animal" },
   { key: "child", label: "Child" },
-  { key: "vehicle", label: "Vehicle" },
   { key: "insert", label: "Insert" },
+  { key: "pick-up", label: "Pick Up" },
 ];
 
 export function builtInEntries(field: ChoiceField): readonly ListEntry[] {
@@ -165,6 +166,7 @@ export function keyForText(
 export const CAPTION_FIELDS: { id: string; label: string; print: boolean }[] = [
   { id: "shotNumber", label: "Shot number", print: true },
   { id: "type", label: "Shot type", print: true },
+  { id: "angle", label: "Angle", print: false },
   { id: "subject", label: "Subject", print: true },
   { id: "additionalInfo", label: "Additional info", print: true },
   { id: "movement", label: "Movement", print: false },
@@ -179,7 +181,6 @@ export const CAPTION_FIELDS: { id: string; label: string; print: boolean }[] = [
   { id: "camera", label: "Camera", print: false },
   { id: "fps", label: "FPS", print: false },
   { id: "sync", label: "Sync", print: false },
-  { id: "angle", label: "Angle", print: false },
   { id: "cast", label: "Cast", print: false },
   { id: "tags", label: "Tags", print: false },
   { id: "setup", label: "Setup", print: false },

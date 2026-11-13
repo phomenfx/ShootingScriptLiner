@@ -141,9 +141,9 @@ describe("version 1 migration: each conversion", () => {
     expect(project.settings.captions.fields.slice(0, 5)).toEqual([
       { id: "shotNumber", print: true, divider: "space" },
       { id: "type", print: true, divider: "hyphen" },
+      { id: "angle", print: false, divider: "hyphen" },
       { id: "subject", print: true, divider: "space" },
       { id: "additionalInfo", print: true, divider: "parens" },
-      { id: "movement", print: false, divider: "space" },
     ]);
   });
 
@@ -505,9 +505,9 @@ describe("version 2 reader and writer", () => {
 
   it("fills in settings that are missing", () => {
     const { project: back } = read({ version: 2, name: "Bare" });
-    expect(back.settings.general.newShotColor).toBe("#FF0000");
+    expect(back.settings.general.newShotColor).toBe("#E53935");
     expect(back.settings.captions.fields).toHaveLength(20);
-    expect(back.settings.lists.tags).toHaveLength(7);
+    expect(back.settings.lists.tags).toHaveLength(8);
     expect(back).toMatchObject({ scenes: [], marks: [], assets: [] });
   });
 });

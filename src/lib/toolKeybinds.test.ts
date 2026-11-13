@@ -14,7 +14,7 @@ describe("toolKeybinds", () => {
   });
 
   it("maps key to tool", () => {
-    expect(toolForKey("l", DEFAULT_TOOL_KEYBINDS)).toBe("line");
+    expect(toolForKey("f", DEFAULT_TOOL_KEYBINDS)).toBe("line");
   });
 
   it("rejects duplicate keys", () => {

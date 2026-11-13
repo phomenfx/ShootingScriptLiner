@@ -199,7 +199,8 @@ export function isCaptionDivider(value: unknown): value is CaptionDivider {
 
 /** The divider a field uses when the project has not chosen one. */
 export function defaultDivider(id: string, additionalInfoStyle: "parens" | "hyphen" = "parens"): CaptionDivider {
-  if (id === "type") return "hyphen";
+  if (id === "type" || id === "angle") return "hyphen";
+  if (id === "system") return "brackets";
   if (id === "additionalInfo") return additionalInfoStyle === "hyphen" ? "spacedHyphen" : "parens";
   return "space";
 }

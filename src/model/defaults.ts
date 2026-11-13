@@ -12,7 +12,10 @@ import type {
   TextStyle,
 } from "./types";
 
+/** What version 1 saves used when they named no font. */
 export const DEFAULT_FONT = '"Arial", sans-serif';
+/** Captions and notes in new projects: typewriter type, like the script. */
+export const DEFAULT_TEXT_FONT = '"Courier New", monospace';
 export const DEFAULT_NOTE_COLOR = "#111111";
 export const DEFAULT_DATE_FORMAT = "dddd, mmmm d";
 
@@ -20,7 +23,7 @@ export const NO_ENDING: Ending = { type: "none", sizePct: 100, filled: true };
 
 export function defaultTextStyle(): TextStyle {
   return {
-    font: DEFAULT_FONT,
+    font: DEFAULT_TEXT_FONT,
     sizePt: 11,
     bold: true,
     italic: false,
@@ -65,14 +68,14 @@ export function defaultSettings(): ProjectSettings {
     general: {
       shotIdStyle: "letter",
       additionalInfoStyle: "parens",
-      newShotColor: "#FF0000",
+      newShotColor: "#E53935",
       newShotPriority: "nice",
     },
     captions: {
       fields: defaultCaptionFields(),
-      offsetAcrossPt: 3,
-      offsetAbovePt: 4,
-      contGapPt: 4,
+      offsetAcrossPt: 6,
+      offsetAbovePt: 6,
+      contGapPt: 2,
       dateFormat: DEFAULT_DATE_FORMAT,
     },
     markDefaults: {
