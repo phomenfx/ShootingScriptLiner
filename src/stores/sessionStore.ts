@@ -39,6 +39,7 @@ type SessionState = {
   /** The Export lined PDF dialog and its choices (kept for the session). */
   pdfExportOpen: boolean;
   pdfOptions: PdfExportOptions;
+  shotListPdfOpen: boolean;
   importText: { text: string; name: string } | null;
   /** Shots and scenes hidden from the table for now (Alt+H shows them). Not saved. */
   hiddenTableRows: string[];
@@ -78,6 +79,7 @@ type SessionState = {
   setImportOpen: (open: boolean) => void;
   setPdfExportOpen: (open: boolean) => void;
   setPdfOptions: (options: PdfExportOptions) => void;
+  setShotListPdfOpen: (open: boolean) => void;
   setImportText: (file: { text: string; name: string } | null) => void;
   hideTableRow: (id: string) => void;
   showAllTableRows: () => void;
@@ -115,6 +117,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   importOpen: false,
   pdfExportOpen: false,
   pdfOptions: DEFAULT_PDF_OPTIONS,
+  shotListPdfOpen: false,
   importText: null,
   snapEnabled: true,
   actionBarOffset: { x: 0, y: 0 },
@@ -158,6 +161,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   setImportOpen: (importOpen) => set({ importOpen }),
   setPdfExportOpen: (pdfExportOpen) => set({ pdfExportOpen }),
   setPdfOptions: (pdfOptions) => set({ pdfOptions }),
+  setShotListPdfOpen: (shotListPdfOpen) => set({ shotListPdfOpen }),
   setImportText: (importText) => set({ importText }),
   hideTableRow: (id) => set((s) => ({ hiddenTableRows: [...new Set([...s.hiddenTableRows, id])] })),
   showAllTableRows: () => set({ hiddenTableRows: [] }),

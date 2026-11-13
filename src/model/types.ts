@@ -39,7 +39,10 @@ export type CameraRow = { name: string; lenses: string[] };
 
 /** Scene values that its shots inherit until they override them. */
 export type SceneDefaults = {
+  /** Camera moves: dolly in, pan, handheld push… */
   movement: string[];
+  /** Camera system or support: sticks, Steadicam, gimbal… */
+  system: string[];
   cameras: CameraRow[];
   audio: string[];
   fps?: string;
@@ -57,6 +60,7 @@ export type ShotOwn = {
   location?: string;
   time?: string;
   movement?: string[];
+  system?: string[];
   cameras?: CameraRow[];
   audio?: string[];
   fps?: string;
@@ -83,6 +87,7 @@ export type MarkOwn = {
   location?: string;
   time?: string;
   movement?: string[];
+  system?: string[];
   cameras?: CameraRow[];
   audio?: string[];
   fps?: string;
@@ -392,6 +397,11 @@ export type ProjectSettings = {
 
 export type Project = {
   version: 2;
+  /**
+   * Changes inside version 2. 1: System and Movement are separate fields (before,
+   * "movement" held System/Movement, which is now System).
+   */
+  dataRevision?: number;
   /** Set when saving. */
   savedAt?: string;
   appVersion?: string;

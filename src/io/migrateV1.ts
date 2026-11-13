@@ -11,6 +11,7 @@
  * - Single values become one-entry lists; the old camera pairs with the old lens.
  * - Saved order numbers, slugline strings and copied captions are dropped.
  */
+import { DATA_REVISION } from "../model/defaults";
 import { newId } from "../lib/ids";
 import { splitSlugline } from "../lib/slugline";
 import {
@@ -47,7 +48,7 @@ export const V1_CAPTION_FIELD_IDS: Record<string, string> = {
   shotType: "type",
   subject: "subject",
   additionalInfo: "additionalInfo",
-  cameraSupport: "movement",
+  cameraSupport: "system",
   lens: "lens",
   audio: "audio",
   location: "location",
@@ -387,7 +388,7 @@ export function shotFromV1(raw: Raw, scene: Pick<Scene, "defaults">): Shot {
   setIf(own, "indicator", trimmed(raw.indicator) || undefined);
   setIf(own, "location", trimmed(raw.location) || undefined);
   setIf(own, "time", trimmed(raw.timeOfDay) || undefined);
-  if (trimmed(raw.cameraSupport)) own.movement = oneEntry(raw.cameraSupport);
+  if (trimmed(raw.cameraSupport)) own.system = oneEntry(raw.cameraSupport);
   if (trimmed(raw.audioSource)) own.audio = oneEntry(raw.audioSource);
   const camera = trimmed(raw.camera);
   const lens = trimmed(raw.lens);
@@ -441,7 +442,8 @@ export function sceneFromV1(raw: Raw): Scene {
     visible: raw.visible !== false,
     heading: { indicator, location, time },
     defaults: {
-      movement: oneEntry(raw.cameraSupport),
+      movement: [],
+      system: oneEntry(raw.cameraSupport),
       cameras: camerasFromV1(raw.camera, raw.lens),
       audio: oneEntry(raw.audioSource),
     },
@@ -566,6 +568,7 @@ export function migrateV1(raw: unknown, script?: ScriptInfo): MigrationResult {
 
   let project: Project = {
     version: 2,
+    dataRevision: DATA_REVISION,
     name: str(raw.name) || "Untitled",
     settings: settingsFromV1(raw),
     scenes: byOrder(Array.isArray(raw.scenes) ? raw.scenes : []).map(sceneFromV1),

@@ -177,14 +177,15 @@ describe("version 1 migration: each conversion", () => {
 
   it("turns single scene values into lists and pairs the camera with the lens", () => {
     expect(project.scenes[0]!.defaults).toEqual({
-      movement: ["Tripod"],
+      movement: [],
+      system: ["Tripod"],
       cameras: [{ name: "A", lenses: ["35mm"] }],
       audio: ["Boom"],
       fps: "24",
       sync: "sync",
       date: "2026-03-14",
     });
-    expect(project.scenes[1]!.defaults).toEqual({ movement: [], cameras: [], audio: [] });
+    expect(project.scenes[1]!.defaults).toEqual({ movement: [], system: [], cameras: [], audio: [] });
   });
 
   it("leaves blank shot values inherited and turns non-blank ones into overrides", () => {
@@ -220,7 +221,7 @@ describe("version 1 migration: each conversion", () => {
     });
     expect(p.scenes[0]!.defaults.sync).toBe("adr");
     expect(p.scenes[0]!.shots.map((s) => s.own?.sync)).toEqual(["sync", "Wild track"]);
-    expect(p.scenes[0]!.shots[0]!.print).toEqual({ type: false, movement: true });
+    expect(p.scenes[0]!.shots[0]!.print).toEqual({ type: false, system: true });
   });
 
   it("turns page fractions into PDF points, using each page's own size", () => {
@@ -505,7 +506,7 @@ describe("version 2 reader and writer", () => {
   it("fills in settings that are missing", () => {
     const { project: back } = read({ version: 2, name: "Bare" });
     expect(back.settings.general.newShotColor).toBe("#FF0000");
-    expect(back.settings.captions.fields).toHaveLength(19);
+    expect(back.settings.captions.fields).toHaveLength(20);
     expect(back.settings.lists.tags).toHaveLength(7);
     expect(back).toMatchObject({ scenes: [], marks: [], assets: [] });
   });

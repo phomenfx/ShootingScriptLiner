@@ -5,7 +5,7 @@
  */
 import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useMemo, useState } from "react";
-import { IMPORT_FIELDS, matchHeader, parseTable, planImport, type ImportField, type ImportMode } from "../model/shotImport";
+import { guessMapping, IMPORT_FIELDS, parseTable, planImport, rememberMapping, type ImportField, type ImportMode } from "../model/shotImport";
 import { breakUndoGroup, useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 
@@ -33,13 +33,13 @@ export function ImportDialog() {
     setText(next);
     setSource(name);
     const header = parseTable(next)[0] ?? [];
-    setMapping(header.map(matchHeader));
+    setMapping(guessMapping(header, useProjectStore.getState().project.settings.importMapping));
   }
 
   const rows = useMemo(() => parseTable(text), [text]);
   const header = rows[0] ?? [];
   const plan = useMemo(
-    () => (rows.length > 1 ? planImport(project, rows, mapping.length === header.length ? mapping : header.map(matchHeader), mode) : null),
+    () => (rows.length > 1 ? planImport(project, rows, mapping.length === header.length ? mapping : guessMapping(header, project.settings.importMapping), mode) : null),
     [project, rows, mapping, mode, header]
   );
 
@@ -63,9 +63,13 @@ export function ImportDialog() {
 
   const apply = () => {
     if (!plan) return;
-    const used = mapping.length === header.length ? mapping : header.map(matchHeader);
+    const used = mapping.length === header.length ? mapping : guessMapping(header, project.settings.importMapping);
     breakUndoGroup();
-    useProjectStore.getState().apply((current) => planImport(current, rows, used, mode).project);
+    // The column choices are remembered with the project for the next import.
+    useProjectStore.getState().apply((current) => {
+      const next = planImport(current, rows, used, mode).project;
+      return { ...next, settings: { ...next.settings, importMapping: rememberMapping(current.settings.importMapping, header, used) } };
+    });
     breakUndoGroup();
     close();
   };

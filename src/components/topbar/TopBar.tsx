@@ -31,6 +31,7 @@ export function TopBar() {
 
   const exportEntries: MenuEntry[] = [
     { label: "Lined script PDF…", shortcut: "Ctrl+E", onSelect: commands.requestExportLinedPdf },
+    { label: "Shot list PDF…", onSelect: commands.requestExportShotListPdf },
     { label: "Shot list CSV", onSelect: () => void commands.exportShotListCsv() },
     { label: "Both", onSelect: () => void commands.exportBoth() },
   ];
@@ -45,6 +46,7 @@ export function TopBar() {
     { label: "Import shot list…", onSelect: () => useSessionStore.getState().setImportOpen(true) },
     SEPARATOR,
     { label: "Export lined PDF…", shortcut: "Ctrl+E", onSelect: commands.requestExportLinedPdf },
+    { label: "Export shot list PDF…", onSelect: commands.requestExportShotListPdf },
     { label: "Export shot list CSV…", onSelect: () => void commands.exportShotListCsv() },
     SEPARATOR,
     { label: "Project settings…", onSelect: () => openSettings(true) },

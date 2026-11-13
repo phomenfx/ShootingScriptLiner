@@ -2,6 +2,7 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ContextMenuHost } from "./components/ContextMenu";
 import { ImportDialog } from "./components/ImportDialog";
 import { PdfExportDialog } from "./components/PdfExportDialog";
+import { ShotListPdfDialog } from "./components/ShotListPdfDialog";
 import { NoticeArea } from "./components/NoticeArea";
 import { ScenePanel, ScenesViewSwitch } from "./components/scenes/ScenePanel";
 import { ScriptPane } from "./components/pdf/ScriptPane";
@@ -30,6 +31,7 @@ function App() {
       <SettingsDialog />
       <ImportDialog />
       <PdfExportDialog />
+      <ShotListPdfDialog />
       <ConfirmDialog />
       <ContextMenuHost />
     </>

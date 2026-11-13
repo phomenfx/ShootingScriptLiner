@@ -65,6 +65,30 @@ export function findHeadings(pages: string[][]): FoundHeading[] {
   return found;
 }
 
+const headingKey = (h: SceneHeading) => [h.indicator, h.location, h.time].map((s) => s.trim().toUpperCase().replace(/\s+/g, " ")).join("|");
+
+/**
+ * The script page a scene starts on: the heading with the same text (the nth
+ * scene with that text takes the nth such heading), else the heading with its
+ * scene number, else the heading in its position when the counts agree.
+ */
+export function scenePage(project: Project, index: number, found: FoundHeading[]): number | undefined {
+  const scene = project.scenes[index];
+  if (!scene) return undefined;
+  const key = headingKey(scene.heading);
+  if (key !== "||") {
+    const nth = project.scenes.slice(0, index).filter((s) => headingKey(s.heading) === key).length;
+    const hits = found.filter((h) => headingKey(h.heading) === key);
+    const hit = hits[nth] ?? hits[0];
+    if (hit) return hit.page;
+  }
+  const used = usableHeadings(found);
+  const numbered = used.find((h) => h.number === index + 1);
+  if (numbered) return numbered.page;
+  if (used.length === project.scenes.length) return used[index]?.page;
+  return undefined;
+}
+
 const isBlank = (scene: Scene) => !scene.heading.indicator.trim() && !scene.heading.location.trim() && !scene.heading.time.trim();
 
 export type ScenePlan = {

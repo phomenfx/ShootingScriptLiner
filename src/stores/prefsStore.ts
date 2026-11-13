@@ -2,6 +2,7 @@
  * Preferences saved in this browser: theme, panel sizes, zoom, shortcuts.
  * Never part of a project file.
  */
+import { DEFAULT_SHOT_LIST_PDF, type ShotListPdfOptions } from "../model/shotListPdf";
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import {
@@ -59,6 +60,14 @@ type PrefsValues = {
   hiddenTableColumns: string[];
   /** Shot list table column order, by column id (empty: the built-in order). */
   tableColumnOrder: string[];
+  /** Shot list table rows grouped by scene or by shoot date. */
+  tableGroupBy: "scene" | "date";
+  /** Shot list table column widths the user dragged, in rem, by column id. */
+  tableColumnWidths: Record<string, number>;
+  /** Shot list table zoom, 1 = 100%. */
+  tableZoom: number;
+  /** Export shot list PDF choices. */
+  shotListPdf: ShotListPdfOptions;
   /** Keep unsaved work in this browser between visits. */
   autosave: boolean;
 };
@@ -84,6 +93,11 @@ type PrefsState = PrefsValues & {
   setTableColumnHidden: (column: string, hidden: boolean) => void;
   showAllTableColumns: () => void;
   setTableColumnOrder: (order: string[]) => void;
+  setTableGroupBy: (by: "scene" | "date") => void;
+  /** A width in rem, or null for the column's normal width. */
+  setTableColumnWidth: (column: string, width: number | null) => void;
+  setTableZoom: (zoom: number) => void;
+  setShotListPdf: (options: ShotListPdfOptions) => void;
   setAutosave: (on: boolean) => void;
 };
 
@@ -150,6 +164,13 @@ function viewportWidth(): number | undefined {
     : undefined;
 }
 
+/** Table zoom runs from 50% to 200%. */
+export const TABLE_ZOOM_MIN = 0.5;
+export const TABLE_ZOOM_MAX = 2;
+export function clampTableZoom(zoom: number): number {
+  return Math.min(TABLE_ZOOM_MAX, Math.max(TABLE_ZOOM_MIN, Math.round(zoom * 10) / 10));
+}
+
 export const usePrefsStore = create<PrefsState>()(
   persist(
     (set, get) => ({
@@ -166,6 +187,10 @@ export const usePrefsStore = create<PrefsState>()(
       foldedGroups: {},
       hiddenTableColumns: [],
       tableColumnOrder: [],
+      tableGroupBy: "scene",
+      tableColumnWidths: {},
+      tableZoom: 1,
+      shotListPdf: DEFAULT_SHOT_LIST_PDF,
       autosave: true,
       ...readOldKeys(),
 
@@ -223,6 +248,16 @@ export const usePrefsStore = create<PrefsState>()(
       showAllTableColumns: () => set({ hiddenTableColumns: [] }),
       setAutosave: (autosave) => set({ autosave }),
       setTableColumnOrder: (tableColumnOrder) => set({ tableColumnOrder }),
+      setTableGroupBy: (tableGroupBy) => set({ tableGroupBy }),
+      setTableColumnWidth: (column, width) =>
+        set((s) => {
+          const tableColumnWidths = { ...s.tableColumnWidths };
+          if (width === null) delete tableColumnWidths[column];
+          else tableColumnWidths[column] = width;
+          return { tableColumnWidths };
+        }),
+      setTableZoom: (zoom) => set({ tableZoom: clampTableZoom(zoom) }),
+      setShotListPdf: (shotListPdf) => set({ shotListPdf }),
       setTableColumnHidden: (column, hidden) =>
         set((s) => ({
           hiddenTableColumns: hidden ? [...new Set([...s.hiddenTableColumns, column])] : s.hiddenTableColumns.filter((c) => c !== column),
@@ -241,6 +276,10 @@ export const usePrefsStore = create<PrefsState>()(
           // Tools added later (Shape) get their default key.
           hiddenTableColumns: Array.isArray(s.hiddenTableColumns) ? s.hiddenTableColumns : [],
           tableColumnOrder: Array.isArray(s.tableColumnOrder) ? s.tableColumnOrder : [],
+          tableGroupBy: s.tableGroupBy === "date" ? "date" : "scene",
+          tableColumnWidths: s.tableColumnWidths && typeof s.tableColumnWidths === "object" ? s.tableColumnWidths : {},
+          tableZoom: typeof s.tableZoom === "number" ? clampTableZoom(s.tableZoom) : 1,
+          shotListPdf: { ...DEFAULT_SHOT_LIST_PDF, ...(s.shotListPdf && typeof s.shotListPdf === "object" ? s.shotListPdf : {}) },
           autosave: s.autosave !== false,
           toolKeybinds: sanitizeToolKeybinds({ ...DEFAULT_TOOL_KEYBINDS, ...s.toolKeybinds }),
           panels: {
@@ -266,6 +305,10 @@ export const usePrefsStore = create<PrefsState>()(
         foldedGroups,
         hiddenTableColumns,
         tableColumnOrder,
+        tableGroupBy,
+        tableColumnWidths,
+        tableZoom,
+        shotListPdf,
         autosave,
       }): PrefsValues => ({
         colorTheme,
@@ -281,6 +324,10 @@ export const usePrefsStore = create<PrefsState>()(
         foldedGroups,
         hiddenTableColumns,
         tableColumnOrder,
+        tableGroupBy,
+        tableColumnWidths,
+        tableZoom,
+        shotListPdf,
         autosave,
       }),
     }

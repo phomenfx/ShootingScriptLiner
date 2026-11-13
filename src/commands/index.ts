@@ -19,7 +19,11 @@ import { clearAutosave, readAutosave, startAutosave, type Autosave } from "../io
 import { addScene, addShot, updateScene, updateShot } from "../model/edits";
 import { CLONE_NUDGE_PT, addMarks, cloneMark, deleteMarks, deleteScene, deleteShot, findShot, setScript, unlinkMark, updateMark, updateSettings } from "../model/edits";
 import { insertOutline, outlineClipOf, type OutlineAnchor, type OutlineClip } from "../model/outlineClipboard";
-import { findHeadings, planScenes } from "../model/sceneDetect";
+import { markAsDefaults } from "../model/markDefaults";
+import type { ShotListPdfOptions } from "../model/shotListPdf";
+import { orderColumns, TABLE_COLUMNS, type TableColumn } from "../model/shotTable";
+import { formatExcelDate } from "../lib/dateFormat";
+import { findHeadings, planScenes, scenePage, type FoundHeading } from "../model/sceneDetect";
 import type { Mark, Project, ScriptInfo } from "../model/types";
 import {
   applyWithoutUndo,
@@ -407,6 +411,52 @@ export function requestExportLinedPdf(): void {
   session().setPdfExportOpen(true);
 }
 
+/* ---------- shot list PDF ---------- */
+
+/** Every table column, in the table's order (for the export dialog). */
+export function shotListPdfColumnChoices(): TableColumn[] {
+  return orderColumns(TABLE_COLUMNS, usePrefsStore.getState().tableColumnOrder);
+}
+
+/** The columns that print: the chosen ones, or the table's shown ones, in the table's order. */
+export function shotListPdfColumns(options: ShotListPdfOptions): TableColumn[] {
+  const prefs = usePrefsStore.getState();
+  return shotListPdfColumnChoices().filter((c) =>
+    c.id === "shot" || (options.columns ? options.columns.includes(c.id) : !prefs.hiddenTableColumns.includes(c.id))
+  );
+}
+
+function shotListPdfExtra() {
+  const format = project().settings.captions.dateFormat;
+  return {
+    formatDate: (iso: string) => formatExcelDate(iso, format),
+    printedOn: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }),
+  };
+}
+
+/** Page count, scale and left-out columns for the dialog. */
+export async function shotListPdfSummary(options: ShotListPdfOptions): Promise<{ pages: number; dropped: string[]; scale: number }> {
+  const { shotListLayout } = await import("../lib/shotListPdfBytes");
+  const { layout } = await shotListLayout(project(), options, shotListPdfColumns(options), usePrefsStore.getState().tableColumnWidths, shotListPdfExtra());
+  return { pages: layout.pages.length, dropped: layout.dropped, scale: layout.scale };
+}
+
+/** Opens the Export shot list PDF dialog. */
+export function requestExportShotListPdf(): void {
+  session().setShotListPdfOpen(true);
+}
+
+export async function exportShotListPdf(): Promise<void> {
+  try {
+    const options = usePrefsStore.getState().shotListPdf;
+    const { buildShotListPdfBytes } = await import("../lib/shotListPdfBytes");
+    const bytes = await buildShotListPdfBytes(project(), options, shotListPdfColumns(options), usePrefsStore.getState().tableColumnWidths, shotListPdfExtra());
+    downloadBlob(new Blob([bytes], { type: "application/pdf" }), `${projectFileStem(project())}-shot-list.pdf`);
+  } catch (error) {
+    notify(errorText(error, "Could not export the shot list PDF."));
+  }
+}
+
 export async function exportShotListCsv(): Promise<void> {
   const csv = rowsToCsv(buildShotListRows(project()));
   downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${projectFileStem(project())}-shot-list.csv`);
@@ -436,6 +486,60 @@ export function jumpToShot(shotId: string): boolean {
   session().setActivePage(mark.page);
   session().select("shot", shotId);
   return true;
+}
+
+/** Headings read from the script text, kept while the same script stays open. */
+let headingCache: { key: string; found: FoundHeading[] } | null = null;
+
+async function scriptHeadings(): Promise<FoundHeading[]> {
+  const file = await scriptFileForExport();
+  if (!file) return [];
+  const key = `${file.name}:${file.size}`;
+  if (headingCache?.key === key) return headingCache.found;
+  try {
+    const { readScriptLines } = await import("../io/scriptText");
+    const found = findHeadings(await readScriptLines(file));
+    headingCache = { key, found };
+    return found;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Shows the page a scene starts on: its heading found in the script text, or
+ * else the first page with one of its shots' marks.
+ */
+export async function jumpToScene(sceneId: string): Promise<boolean> {
+  const p = project();
+  const index = p.scenes.findIndex((s) => s.id === sceneId);
+  const scene = p.scenes[index];
+  if (!scene) return false;
+  let page = scenePage(p, index, await scriptHeadings());
+  if (!page) {
+    const shotIds = new Set(scene.shots.map((s) => s.id));
+    const pages = p.marks.filter((m) => m.kind !== "image" && m.shotId && shotIds.has(m.shotId)).map((m) => m.page);
+    if (pages.length) page = Math.min(...pages);
+  }
+  session().select("scene", sceneId);
+  if (!page) {
+    notify(`Scene ${index + 1} wasn't found in the script text and has no marks yet.`);
+    return false;
+  }
+  session().setViewerPage(page);
+  session().setActivePage(page);
+  return true;
+}
+
+/** The selected line, note or shape's style becomes the default for new marks of its kind. */
+export function setSelectionAsDefault(): void {
+  const mark = selectedMarks()[0];
+  if (!mark || mark.kind === "image") return;
+  breakUndoGroup();
+  useProjectStore.getState().apply(updateSettings((s) => markAsDefaults(s, mark)));
+  breakUndoGroup();
+  const what = mark.kind === "line" ? "lines" : mark.kind === "text" ? "notes" : mark.kind === "shape" && mark.shape === "highlight" ? "highlights" : "shapes";
+  notify(`New ${what} will start with this style (Settings > Mark defaults).`);
 }
 
 export function deleteSelection(): void {

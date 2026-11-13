@@ -1,3 +1,4 @@
+import { DATA_REVISION } from "../model/defaults";
 import type { Project } from "../model/types";
 
 /**
@@ -7,6 +8,7 @@ import type { Project } from "../model/types";
 export function serializeProject(project: Project, now: Date = new Date()): string {
   const out: Project = {
     version: 2,
+    dataRevision: DATA_REVISION,
     savedAt: now.toISOString(),
     appVersion: __APP_VERSION__,
     name: project.name,

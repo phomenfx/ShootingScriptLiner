@@ -6,6 +6,7 @@
  * Unknown fields are ignored. Unknown choice keys are kept as they are.
  * Version 1 files go through `migrateV1` first.
  */
+import { DATA_REVISION } from "../model/defaults";
 import {
   DEFAULT_NOTE_COLOR,
   completeCaptionFields,
@@ -147,7 +148,7 @@ function readMarkOwn(value: unknown): MarkOwn | undefined {
   for (const key of ["type", "angle", "subject", "additionalInfo", "notes", "setup", "indicator", "location", "time", "fps", "sync", "date"] as const) {
     if (typeof value[key] === "string") own[key] = value[key];
   }
-  for (const key of ["cast", "tags", "movement", "audio"] as const) {
+  for (const key of ["cast", "tags", "movement", "system", "audio"] as const) {
     const list = stringList(value[key]);
     if (list) own[key] = list;
   }
@@ -192,7 +193,7 @@ function readOwn(raw: unknown): ShotOwn | undefined {
     const value = optString(raw[key]);
     if (value !== undefined) own[key] = value;
   }
-  for (const key of ["movement", "audio"] as const) {
+  for (const key of ["movement", "system", "audio"] as const) {
     const value = stringList(raw[key]);
     if (value !== undefined) own[key] = value;
   }
@@ -246,6 +247,7 @@ function readScene(raw: unknown, settings: ProjectSettings, notices: string[], n
     },
     defaults: {
       movement: stringList(defaults.movement) ?? [],
+      system: stringList(defaults.system) ?? [],
       cameras: readCameras(defaults.cameras) ?? [],
       audio: stringList(defaults.audio) ?? [],
     },
@@ -594,8 +596,45 @@ function describeMark(raw: unknown, index: number): string {
   return `${names[kind] ?? "Mark"} ${index + 1}${page}`;
 }
 
-export function readV2(raw: unknown): ReadResult {
-  if (!isRecord(raw) || raw.version !== 2) throw new ProjectReadError("Not a version 2 project");
+/**
+ * Saves from before data revision 1 kept System/Movement in "movement". That
+ * data is System now; the new Movement field starts empty, printed just before it.
+ */
+function splitSystemFromMovement(raw: Record<string, unknown>): Record<string, unknown> {
+  const out = structuredClone(raw);
+  const move = (o: unknown) => {
+    if (!isRecord(o) || !("movement" in o)) return;
+    o.system = o.movement;
+    delete o.movement;
+  };
+  for (const scene of Array.isArray(out.scenes) ? out.scenes : []) {
+    if (!isRecord(scene)) continue;
+    move(scene.defaults);
+    for (const shot of Array.isArray(scene.shots) ? scene.shots : []) {
+      if (!isRecord(shot)) continue;
+      move(shot.own);
+      move(shot.print);
+    }
+  }
+  for (const mark of Array.isArray(out.marks) ? out.marks : []) if (isRecord(mark)) move(mark.own);
+  const settings = isRecord(out.settings) ? out.settings : undefined;
+  const captions = settings && isRecord(settings.captions) ? settings.captions : undefined;
+  if (captions && Array.isArray(captions.fields)) {
+    captions.fields = captions.fields.flatMap((f: unknown) =>
+      isRecord(f) && f.id === "movement" ? [{ id: "movement", print: false }, { ...f, id: "system" }] : [f]
+    );
+  }
+  if (settings && isRecord(settings.importMapping)) {
+    for (const [header, field] of Object.entries(settings.importMapping)) {
+      if (field === "movement") settings.importMapping[header] = "system";
+    }
+  }
+  return out;
+}
+
+export function readV2(input: unknown): ReadResult {
+  if (!isRecord(input) || input.version !== 2) throw new ProjectReadError("Not a version 2 project");
+  const raw = typeof input.dataRevision === "number" && input.dataRevision >= 1 ? input : splitSystemFromMovement(input);
   const notices: string[] = [];
   const settings = readSettings(raw.settings);
 
@@ -640,6 +679,7 @@ export function readV2(raw: unknown): ReadResult {
 
   const project: Project = {
     version: 2,
+    dataRevision: DATA_REVISION,
     name: nonEmpty(raw.name) ?? "Untitled",
     settings,
     scenes,

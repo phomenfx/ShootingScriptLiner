@@ -742,6 +742,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       { label: "Copy", shortcut: "Ctrl+C", onSelect: commands.copy },
       ...pasteItems,
       { label: "Duplicate", shortcut: "Ctrl+D", onSelect: commands.duplicateSelection },
+      ...(mark && mark.kind !== "image" ? [{ label: "Set as default style", onSelect: commands.setSelectionAsDefault }] : []),
       ...(isLine
         ? [
             "separator" as const,
@@ -756,6 +757,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
             // The same as the shot's eye in the Scenes list: all its lines, notes and shapes hide.
             { label: `Hide shot ${linkedShot.label}`, shortcut: "Ctrl+H", onSelect: commands.hideSelectedShot },
             { label: `Hide scene ${linkedShot.sceneNumber}`, shortcut: "Ctrl+Shift+H", onSelect: commands.hideSelectedScene },
+            { label: `Go to start of scene ${linkedShot.sceneNumber}`, onSelect: () => void commands.jumpToScene(found!.scene.id) },
           ]
         : []),
       "separator",

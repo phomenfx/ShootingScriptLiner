@@ -185,7 +185,7 @@ export function legacyShot(shot: V2.Shot, scene: V2.Scene, order: number): Shot 
       subject: shot.subject,
       slug: shot.additionalInfo,
       notes: shot.notes,
-      cameraSupport: own.movement ? joined(own.movement) : "",
+      cameraSupport: own.system ? joined(own.system) : "",
       lens: lens === cameraLenses(scene.defaults.cameras) ? "" : lens,
       audioSource: own.audio ? joined(own.audio) : "",
       indicator: own.indicator,
@@ -227,7 +227,7 @@ export function legacyScene(scene: V2.Scene, order: number, project?: V2.Project
       indicator,
       location,
       timeOfDay: time,
-      cameraSupport: joined(scene.defaults.movement),
+      cameraSupport: joined(scene.defaults.system ?? []),
       lens: cameraLenses(scene.defaults.cameras),
       audioSource: joined(scene.defaults.audio),
       camera: cameraNames(scene.defaults.cameras),
@@ -400,7 +400,7 @@ export function applyLegacyScenePatch(scene: V2.Scene, patch: ScenePatch): V2.Sc
   if ("indicator" in patch) next.heading.indicator = patch.indicator ?? "";
   if ("location" in patch) next.heading.location = patch.location ?? "";
   if ("timeOfDay" in patch) next.heading.time = patch.timeOfDay ?? "";
-  if ("cameraSupport" in patch) next.defaults.movement = list(patch.cameraSupport);
+  if ("cameraSupport" in patch) next.defaults.system = list(patch.cameraSupport);
   if ("audioSource" in patch) next.defaults.audio = list(patch.audioSource);
   if ("camera" in patch || "lens" in patch) {
     const camera = "camera" in patch ? patch.camera : cameraNames(scene.defaults.cameras);
@@ -443,7 +443,7 @@ export function applyLegacyShotPatch(shot: V2.Shot, scene: V2.Scene, patch: Shot
   if ("indicator" in patch) setOwn("indicator", text(patch.indicator));
   if ("location" in patch) setOwn("location", text(patch.location));
   if ("timeOfDay" in patch) setOwn("time", text(patch.timeOfDay));
-  if ("cameraSupport" in patch) setOwn("movement", text(patch.cameraSupport) ? list(patch.cameraSupport) : undefined);
+  if ("cameraSupport" in patch) setOwn("system", text(patch.cameraSupport) ? list(patch.cameraSupport) : undefined);
   if ("audioSource" in patch) setOwn("audio", text(patch.audioSource) ? list(patch.audioSource) : undefined);
   if ("fps" in patch) setOwn("fps", text(patch.fps));
   if ("sync" in patch) setOwn("sync", syncKeyFromV1(patch.sync) || undefined);

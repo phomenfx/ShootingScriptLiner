@@ -71,15 +71,7 @@ export function ShapeInspector({ project, shape }: { project: Project; shape: Sh
       })
     );
 
-  const useAsDefault = () =>
-    step(
-      edits.updateSettings((s) => {
-        const shapeDefaults: typeof s.markDefaults.shape = { shape: shape.shape, stroke: { ...stroke } };
-        if (shape.fill) shapeDefaults.fill = { opacityPct: shape.fill.opacityPct };
-        if (shape.outline) shapeDefaults.outline = { ...shape.outline };
-        return { ...s, markDefaults: { ...s.markDefaults, shape: shapeDefaults } };
-      })
-    );
+  const useAsDefault = commands.setSelectionAsDefault;
 
   return (
     <>
@@ -305,8 +297,8 @@ export function ShapeInspector({ project, shape }: { project: Project; shape: Sh
         </Group>
       </div>
       <Footer>
-        <FooterButton title="New shapes will start with this one's style" onClick={useAsDefault}>
-          Use as default
+        <FooterButton title="New shapes start with this style (Settings > Mark defaults)" onClick={useAsDefault}>
+          Set as default
         </FooterButton>
         <FooterButton onClick={commands.duplicateSelection}>Duplicate</FooterButton>
         <FooterButton danger onClick={commands.deleteSelection}>

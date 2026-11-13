@@ -209,6 +209,7 @@ export const TABLE_COLUMNS: TableColumn[] = [
     write: (_p, shot, text) => setField("estimatedMinutes", parseMinutes(text))(shot.id),
   },
   inheritedColumn("movement", "Movement", 7, (v) => joined(v), (t) => splitList(t), true),
+  inheritedColumn("system", "System", 7, (v) => joined(v), (t) => splitList(t), true),
   { ...inheritedColumn("cameras", "Camera", 5, (v) => joined(cameraNames(v ?? [])), (t, _p, cur) => camerasFromNames(t, cur)), id: "camera" },
   {
     ...inheritedColumn(
@@ -285,6 +286,28 @@ export function moveColumn(order: string[], id: string, target: string, after: b
   if (at < 0) return order;
   without.splice(after ? at + 1 : at, 0, id);
   return without;
+}
+
+/* ---------- grouping by date ---------- */
+
+export type DateGroup = {
+  /** YYYY-MM-DD, or "" for shots with no date. */
+  date: string;
+  items: { scene: Scene; sceneIndex: number; shot: Shot }[];
+};
+
+/** Shown shots grouped by their shoot date (their own, or their scene's), earliest first, undated last. */
+export function groupByDate(rows: TableScene[]): DateGroup[] {
+  const groups = new Map<string, DateGroup>();
+  for (const { scene, sceneIndex, shots } of rows) {
+    for (const shot of shots) {
+      const date = effectiveShot(scene, shot).date?.trim() ?? "";
+      let group = groups.get(date);
+      if (!group) groups.set(date, (group = { date, items: [] }));
+      group.items.push({ scene, sceneIndex, shot });
+    }
+  }
+  return [...groups.values()].sort((a, b) => (!a.date ? 1 : !b.date ? -1 : a.date.localeCompare(b.date)));
 }
 
 /* ---------- filters ---------- */

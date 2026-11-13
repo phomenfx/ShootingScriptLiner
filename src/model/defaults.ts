@@ -102,9 +102,13 @@ export function defaultSettings(): ProjectSettings {
   };
 }
 
+/** See Project.dataRevision. */
+export const DATA_REVISION = 1;
+
 export function createProject(): Project {
   return {
     version: 2,
+    dataRevision: DATA_REVISION,
     name: "Untitled",
     settings: defaultSettings(),
     scenes: [],
@@ -122,7 +126,7 @@ export function createScene(heading?: Partial<SceneHeading>): Scene {
       location: heading?.location ?? "",
       time: heading?.time ?? "",
     },
-    defaults: { movement: [], cameras: [], audio: [] },
+    defaults: { movement: [], system: [], cameras: [], audio: [] },
     shots: [],
   };
 }

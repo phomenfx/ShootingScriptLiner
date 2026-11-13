@@ -28,7 +28,7 @@ export const LINE_LABEL_FIELD_LABELS: Record<LineLabelFieldId, string> = {
   shotType: "Shot type",
   subject: "Subject",
   additionalInfo: "Additional info",
-  cameraSupport: "System/Movement",
+  cameraSupport: "System",
   lens: "Lens",
   audio: "Audio",
   location: "Location",

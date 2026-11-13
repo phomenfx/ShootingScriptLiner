@@ -295,6 +295,7 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
   };
 
   const movement = inherit("movement", []);
+  const system = inherit("system", []);
   const cameras = inherit("cameras", []);
   const audio = inherit("audio", []);
   const sync = inherit("sync", "");
@@ -392,9 +393,14 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
         </Group>
 
         <Group name="shot-camera" title="Camera & Sound">
-          <Field label="System/Movement" wide {...print("movement")}>
+          <Field label="Movement" wide {...print("movement")}>
             <Lockable {...lockOf(movement)}>
-              <Chips values={movement.value ?? []} label="Add system or movement" onChange={movement.set} />
+              <Chips values={movement.value ?? []} label="Add movement" onChange={movement.set} />
+            </Lockable>
+          </Field>
+          <Field label="System" wide {...print("system")}>
+            <Lockable {...lockOf(system)}>
+              <Chips values={system.value ?? []} label="Add system" onChange={system.set} />
             </Lockable>
           </Field>
           <div className="pf-field pf-wide">
@@ -524,8 +530,11 @@ export function SceneInspector({ project, scene }: { project: Project; scene: Sc
           </div>
         </Group>
         <Group name="scene-defaults" title="Shot defaults">
-          <Field label="System/Movement" wide hint="Shots in this scene use these values until they set their own.">
-            <Chips values={scene.defaults.movement} label="Add system or movement" onChange={(movement) => defaults({ movement })} />
+          <Field label="Movement" wide hint="Shots in this scene use these values until they set their own.">
+            <Chips values={scene.defaults.movement} label="Add movement" onChange={(movement) => defaults({ movement })} />
+          </Field>
+          <Field label="System" wide>
+            <Chips values={scene.defaults.system ?? []} label="Add system" onChange={(system) => defaults({ system })} />
           </Field>
           <Field label="Camera and lens" wide>
             <CameraRows cameras={scene.defaults.cameras} onChange={(cameras) => defaults({ cameras })} />

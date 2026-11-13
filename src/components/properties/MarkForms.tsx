@@ -169,8 +169,8 @@ function MarkFooter({ onUseAsDefault }: { onUseAsDefault?: () => void }) {
   return (
     <Footer>
       {onUseAsDefault && (
-        <FooterButton title="New marks will start with this one's style" onClick={onUseAsDefault}>
-          Use as default
+        <FooterButton title="New marks of this kind start with this style (Settings > Mark defaults)" onClick={onUseAsDefault}>
+          Set as default
         </FooterButton>
       )}
       <FooterButton onClick={commands.duplicateSelection}>Duplicate</FooterButton>
@@ -201,21 +201,7 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
     apply(edits.updateMark(line.id, (m) => (m.kind === "line" ? recipe(m) : m)));
   const caption = (patch: Partial<LineMark["caption"]>) => update((l) => ({ ...l, caption: { ...l.caption, ...patch } }));
 
-  const useAsDefault = () =>
-    step(
-      edits.updateSettings((s) => {
-        const { show: _s, text: _t, offset: _o, widthPt: _w, minHeightPt: _h, outline: _ol, ...style } = line.caption;
-        return {
-          ...s,
-          markDefaults: {
-            ...s.markDefaults,
-            line: { ...s.markDefaults.line, stroke: { ...line.stroke }, start: { ...line.start }, end: { ...line.end }, caption: style },
-            // Captions and notes share one text style for now.
-            text: { ...s.markDefaults.text, style },
-          },
-        };
-      })
-    );
+  const useAsDefault = commands.setSelectionAsDefault;
 
   return (
     <>
@@ -455,17 +441,7 @@ export function TextInspector({ project, note }: { project: Project; note: TextM
   const update = (recipe: (note: TextMark) => TextMark) =>
     apply(edits.updateMark(note.id, (m) => (m.kind === "text" ? recipe(m) : m)));
 
-  const useAsDefault = () =>
-    step(
-      edits.updateSettings((s) => ({
-        ...s,
-        markDefaults: {
-          ...s.markDefaults,
-          text: { ...s.markDefaults.text, color: note.color ?? s.markDefaults.text.color, style: { ...note.style } },
-          line: { ...s.markDefaults.line, caption: { ...note.style } },
-        },
-      }))
-    );
+  const useAsDefault = commands.setSelectionAsDefault;
 
   return (
     <>

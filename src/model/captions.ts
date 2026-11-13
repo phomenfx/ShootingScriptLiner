@@ -8,7 +8,7 @@ import { CAPTION_FIELDS, choiceLabel } from "./registry";
 import { shotIdLabel } from "./shotList";
 import type { CameraRow, CaptionDivider, CaptionField, MarkOwn, Project, Scene, Shot, ShotOwn } from "./types";
 
-export type EffectiveShot = Required<Pick<ShotOwn, "indicator" | "location" | "time" | "movement" | "cameras" | "audio">> &
+export type EffectiveShot = Required<Pick<ShotOwn, "indicator" | "location" | "time" | "movement" | "system" | "cameras" | "audio">> &
   Pick<ShotOwn, "fps" | "sync" | "date">;
 
 /** Every inheritable value as the shot uses it: its override when unlocked, else the scene's. */
@@ -20,6 +20,7 @@ export function effectiveShot(scene: Scene, shot: Shot): EffectiveShot {
     location: own.location ?? scene.heading.location,
     time: own.time ?? scene.heading.time,
     movement: own.movement ?? d.movement,
+    system: own.system ?? d.system ?? [],
     cameras: own.cameras ?? d.cameras,
     audio: own.audio ?? d.audio,
     fps: own.fps ?? d.fps,
@@ -108,6 +109,8 @@ export function captionFieldText(project: Project, found: FoundShot, fieldId: st
       return list((own?.tags ?? shot.tags)?.map((tag) => choiceLabel("tags", tag, lists)));
     case "movement":
       return list(own?.movement ?? e.movement);
+    case "system":
+      return list(own?.system ?? e.system);
     case "lens":
     case "camera": {
       const rows = (own?.cameras ?? e.cameras).filter((_, index) => cameraRowPrints(project, shot, fieldId, index));

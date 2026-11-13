@@ -179,7 +179,9 @@ export function ScenePanel() {
       { label: "Paste", shortcut: "Ctrl+V", disabled: !hasClip, onSelect: () => commands.paste() },
       { label: `Duplicate ${what}`, shortcut: "Ctrl+D", onSelect: commands.duplicateSelection },
       "separator",
-      ...(shotId ? [{ label: "Show on script", onSelect: () => void commands.jumpToShot(shotId) }] : []),
+      shotId
+        ? { label: "Show on script", onSelect: () => void commands.jumpToShot(shotId) }
+        : { label: "Go to scene on script", onSelect: () => void commands.jumpToScene(sceneId!) },
       {
         label: visible ? `Hide ${what} on the script` : `Show ${what} on the script`,
         shortcut: visible ? (shotId ? "Ctrl+H" : "Ctrl+Shift+H") : undefined,

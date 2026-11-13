@@ -4,7 +4,7 @@
  * take blocks pasted from a spreadsheet.
  */
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
-import { ArrowDown, ChevronDown, ChevronRight, Circle, Columns3, Plus, RotateCcw, Search, Star, Check, X } from "lucide-react";
+import { ArrowDown, CalendarDays, ChevronDown, Minus, ChevronRight, Circle, Columns3, Plus, RotateCcw, Search, Star, Check, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import * as commands from "../../commands";
 import { openContextMenu, type ContextMenuItem } from "../ContextMenu";
@@ -18,6 +18,7 @@ import {
   formatMinutes,
   parseCellBlock,
   pasteBlock,
+  groupByDate,
   moveColumn,
   orderColumns,
   TABLE_COLUMNS,
@@ -25,9 +26,10 @@ import {
   type TableColumn,
   type TableFilter,
 } from "../../model/shotTable";
-import type { Shot } from "../../model/types";
+import { formatExcelDate } from "../../lib/dateFormat";
+import type { Scene, Shot } from "../../model/types";
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
-import { usePrefsStore } from "../../stores/prefsStore";
+import { TABLE_ZOOM_MAX, TABLE_ZOOM_MIN, usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
 
 type Cell = { shotId: string; columnId: string };
@@ -58,6 +60,10 @@ export function ShotTable() {
   const order = usePrefsStore((s) => s.tableColumnOrder);
   const ordered = useMemo(() => orderColumns(TABLE_COLUMNS, order), [order]);
   const columns = useMemo(() => ordered.filter((c) => c.id === "shot" || !hidden.includes(c.id)), [ordered, hidden]);
+  const widths = usePrefsStore((s) => s.tableColumnWidths);
+  const zoom = usePrefsStore((s) => s.tableZoom);
+  const widthOf = (c: TableColumn) => widths[c.id] ?? c.width;
+  const setZoom = (z: number) => usePrefsStore.getState().setTableZoom(z);
   // Header being dragged, and where it would land.
   const [dragCol, setDragCol] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<{ id: string; after: boolean } | null>(null);
@@ -69,14 +75,34 @@ export function ShotTable() {
     [project, search, filters, columns, hiddenRows]
   );
   const hiddenCount = hiddenRows.length + hidden.length;
+  const groupBy = usePrefsStore((s) => s.tableGroupBy);
+  const dateGroups = useMemo(() => (groupBy === "date" ? groupByDate(rows) : []), [groupBy, rows]);
+  const [foldedDates, setFoldedDates] = useState<Record<string, boolean>>({});
 
   const searching = search.trim() !== "";
   // Shots in the order they show, for keyboard moves and pasting.
-  const shownShots = rows.flatMap((r) => (searching || !collapsed[r.scene.id] ? r.shots : []));
+  const shownShots =
+    groupBy === "date"
+      ? dateGroups.flatMap((g) => (searching || !foldedDates[g.date] ? g.items.map((i) => i.shot) : []))
+      : rows.flatMap((r) => (searching || !collapsed[r.scene.id] ? r.shots : []));
   const shownIds = shownShots.map((s) => s.id);
   // A selected line or note highlights its shot's row.
   const selectedMark = selection?.kind === "mark" ? edits.findMark(project, selection.ids[0]) : undefined;
   const selectedShotId = selection?.kind === "shot" ? selection.ids[0] : selectedMark ? edits.markShotId(selectedMark) : undefined;
+
+  // Ctrl+scroll zooms the table instead of the page.
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const z = usePrefsStore.getState().tableZoom;
+      usePrefsStore.getState().setTableZoom(z + (e.deltaY < 0 ? 0.1 : -0.1));
+    };
+    grid.addEventListener("wheel", onWheel, { passive: false });
+    return () => grid.removeEventListener("wheel", onWheel);
+  }, []);
 
   // Selecting a shot elsewhere moves the active cell to its row.
   useEffect(() => {
@@ -128,6 +154,9 @@ export function ShotTable() {
   const headerMenu = (e: React.MouseEvent, column: TableColumn) => {
     const at = columns.indexOf(column);
     openContextMenu(e, [
+      { label: "Normal width", disabled: widths[column.id] === undefined, onSelect: () => usePrefsStore.getState().setTableColumnWidth(column.id, null) },
+      { label: "Reset all column widths", disabled: Object.keys(widths).length === 0, onSelect: () => Object.keys(widths).forEach((id) => usePrefsStore.getState().setTableColumnWidth(id, null)) },
+      "separator",
       { label: "Move left", disabled: column.id === "shot" || at <= 1, onSelect: () => shiftColumn(column, -1) },
       { label: "Move right", disabled: column.id === "shot" || at >= columns.length - 1, onSelect: () => shiftColumn(column, 1) },
       { label: "Reset column order", disabled: order.length === 0, onSelect: () => usePrefsStore.getState().setTableColumnOrder([]) },
@@ -188,6 +217,7 @@ export function ShotTable() {
         },
       },
       "separator",
+      { label: "Go to scene on script", onSelect: () => void commands.jumpToScene(sceneId) },
       { label: "Hide scene rows", onSelect: () => session().hideTableRow(sceneId) },
       { label: "Hide scene on the script", shortcut: "Ctrl+Shift+H", onSelect: commands.hideSelectedScene },
       SHOW_ALL,
@@ -247,6 +277,11 @@ export function ShotTable() {
       e.stopPropagation();
       e.preventDefault();
     };
+    if ((e.ctrlKey || e.metaKey) && ["=", "+", "-", "0"].includes(e.key)) {
+      own();
+      setZoom(e.key === "0" ? 1 : zoom + (e.key === "-" ? -0.1 : 0.1));
+      return;
+    }
     if (e.ctrlKey || e.metaKey) {
       // Let the browser fire copy and paste on the table, not the app's shot copy.
       if (["c", "v", "x"].includes(e.key.toLowerCase())) e.stopPropagation();
@@ -339,7 +374,55 @@ export function ShotTable() {
   const allShots = project.scenes.flatMap((s) => s.shots);
   const totalMinutes = allShots.reduce((n, s) => n + (s.estimatedMinutes ?? 0), 0);
   const totalLength = sceneLength(project, allShots.map((s) => s.id));
-  const width = columns.reduce((n, c) => n + c.width, 0);
+  const width = columns.reduce((n, c) => n + widthOf(c), 0);
+
+  /** Dragging a header's right edge sets that column's width; a double-click puts it back. */
+  const startResize = (e: React.PointerEvent<HTMLElement>, c: TableColumn) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const startX = e.clientX;
+    const start = widthOf(c);
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.max(2, Math.round((start + (ev.clientX - startX) / (rem * zoom)) * 8) / 8);
+      usePrefsStore.getState().setTableColumnWidth(c.id, next);
+    };
+    const onUp = () => {
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
+    };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+  };
+
+  const shotRow = (scene: Scene, shot: Shot) => (
+    <tr key={shot.id} className={`table-shot${shot.id === selectedShotId ? " selected" : ""}${shot.status === "cut" ? " is-cut" : ""}`}>
+      {columns.map((column) => (
+        <TableCell
+          key={column.id}
+          column={column}
+          shot={shot}
+          text={column.read(project, scene, shot)}
+          active={active?.shotId === shot.id && active.columnId === column.id}
+          editing={editing?.cell.shotId === shot.id && editing.cell.columnId === column.id ? editing.text : null}
+          onClick={() => {
+            activate({ shotId: shot.id, columnId: column.id });
+            if (column.cycles) cycle(shot, column.cycles);
+          }}
+          onDoubleClick={() => (column.id === "shot" ? commands.jumpToShot(shot.id) : startEdit({ shotId: shot.id, columnId: column.id }))}
+          onContextMenu={(e) => cellMenu(e, shot, column)}
+          onEditText={(text) => setEditing((e) => (e ? { ...e, text } : e))}
+          onEditKey={onEditorKey}
+          onEditBlur={commit}
+          color={shot.color}
+        />
+      ))}
+    </tr>
+  );
 
   return (
     <div
@@ -386,6 +469,13 @@ export function ShotTable() {
           </Dropdown.Portal>
         </Dropdown.Root>
         <span className="shot-table-spacer" />
+        <label className="table-group" title="Group rows by scene or by shoot date">
+          <CalendarDays size={14} strokeWidth={1.75} aria-hidden="true" />
+          <select aria-label="Group rows by" value={groupBy} onChange={(e) => usePrefsStore.getState().setTableGroupBy(e.target.value as "scene" | "date")}>
+            <option value="scene">By scene</option>
+            <option value="date">By date</option>
+          </select>
+        </label>
         <Dropdown.Root modal={false}>
           <Dropdown.Trigger className="tool-btn">
             <Columns3 size={14} strokeWidth={1.75} /> Columns · {columns.length}
@@ -413,6 +503,9 @@ export function ShotTable() {
         <button type="button" className="tool-btn" onClick={() => void commands.exportShotListCsv()}>
           Export CSV
         </button>
+        <button type="button" className="tool-btn" onClick={commands.requestExportShotListPdf}>
+          Export PDF…
+        </button>
         <button type="button" className="tool-btn" onClick={addScene}>
           <Plus size={13} strokeWidth={2} /> Scene
         </button>
@@ -431,10 +524,10 @@ export function ShotTable() {
         onPaste={onPaste}
         onCopy={onCopy}
       >
-        <table style={{ width: `${width}rem` }}>
+        <table style={{ width: `${width}rem`, zoom }}>
           <colgroup>
             {columns.map((c) => (
-              <col key={c.id} style={{ width: `${c.width}rem` }} />
+              <col key={c.id} style={{ width: `${widthOf(c)}rem` }} />
             ))}
           </colgroup>
           <thead>
@@ -456,12 +549,51 @@ export function ShotTable() {
                   {...headerDrop(c)}
                 >
                   {c.label}
+                  <span
+                    className="th-resize"
+                    title="Drag to resize · double-click for the normal width"
+                    draggable={false}
+                    onPointerDown={(e) => startResize(e, c)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      usePrefsStore.getState().setTableColumnWidth(c.id, null);
+                    }}
+                  />
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ scene, sceneIndex, shots }) => {
+            {groupBy === "date" &&
+              dateGroups.map((g) => {
+                const folded = !searching && !!foldedDates[g.date];
+                const ids = g.items.map((i) => i.shot.id);
+                const length = sceneLength(project, ids);
+                const minutes = g.items.reduce((n, i) => n + (i.shot.estimatedMinutes ?? 0), 0);
+                const Fold = folded ? ChevronRight : ChevronDown;
+                const label = g.date ? formatExcelDate(g.date, project.settings.captions.dateFormat) || g.date : "No date";
+                return [
+                  <tr key={`date:${g.date}`} className="table-scene table-date">
+                    <th className="pin" scope="row">
+                      <button type="button" className="table-fold" aria-label={folded ? `Expand ${label}` : `Collapse ${label}`} onClick={() => setFoldedDates({ ...foldedDates, [g.date]: !folded })}>
+                        <Fold size={13} strokeWidth={1.75} />
+                      </button>
+                    </th>
+                    <td colSpan={columns.length - 1}>
+                      <span className="table-slug">{label}</span>
+                      <span className="table-scene-meta">
+                        {g.items.length} {g.items.length === 1 ? "shot" : "shots"}
+                        {minutes ? ` · Est. ${formatMinutes(minutes)}` : ""}
+                        {length.lineCount ? ` · ${formatEighths(length.eighths)} pgs` : ""}
+                      </span>
+                    </td>
+                  </tr>,
+                  ...(folded ? [] : g.items.map((i) => shotRow(i.scene, i.shot))),
+                ];
+              })}
+            {groupBy === "scene" && rows.map(({ scene, sceneIndex, shots }) => {
               if (searching && shots.length === 0) return null;
               const folded = !searching && !!collapsed[scene.id];
               const length = sceneLength(project, scene.shots.map((s) => s.id));
@@ -490,30 +622,7 @@ export function ShotTable() {
                 </tr>,
                 ...(folded
                   ? []
-                  : shots.map((shot) => (
-                      <tr key={shot.id} className={`table-shot${shot.id === selectedShotId ? " selected" : ""}${shot.status === "cut" ? " is-cut" : ""}`}>
-                        {columns.map((column) => (
-                          <TableCell
-                            key={column.id}
-                            column={column}
-                            shot={shot}
-                            text={column.read(project, scene, shot)}
-                            active={active?.shotId === shot.id && active.columnId === column.id}
-                            editing={editing?.cell.shotId === shot.id && editing.cell.columnId === column.id ? editing.text : null}
-                            onClick={() => {
-                              activate({ shotId: shot.id, columnId: column.id });
-                              if (column.cycles) cycle(shot, column.cycles);
-                            }}
-                            onDoubleClick={() => (column.id === "shot" ? commands.jumpToShot(shot.id) : startEdit({ shotId: shot.id, columnId: column.id }))}
-                            onContextMenu={(e) => cellMenu(e, shot, column)}
-                            onEditText={(text) => setEditing((e) => (e ? { ...e, text } : e))}
-                            onEditKey={onEditorKey}
-                            onEditBlur={commit}
-                            color={shot.color}
-                          />
-                        ))}
-                      </tr>
-                    ))),
+                  : shots.map((shot) => shotRow(scene, shot))),
               ];
             })}
           </tbody>
@@ -533,6 +642,17 @@ export function ShotTable() {
               </button>
             </>
           )}
+        </span>
+        <span className="table-zoom">
+          <button type="button" className="table-zoom-btn" aria-label="Zoom out" title="Zoom out (Ctrl+scroll)" disabled={zoom <= TABLE_ZOOM_MIN} onClick={() => setZoom(zoom - 0.1)}>
+            <Minus size={12} strokeWidth={2} />
+          </button>
+          <button type="button" className="table-zoom-value" title="Reset zoom to 100%" onClick={() => setZoom(1)}>
+            {Math.round(zoom * 100)}%
+          </button>
+          <button type="button" className="table-zoom-btn" aria-label="Zoom in" title="Zoom in (Ctrl+scroll)" disabled={zoom >= TABLE_ZOOM_MAX} onClick={() => setZoom(zoom + 0.1)}>
+            <Plus size={12} strokeWidth={2} />
+          </button>
         </span>
         <span>
           {totalMinutes ? `Est. ${formatMinutes(totalMinutes)}` : ""}

@@ -29,6 +29,7 @@ export type ImportField =
   | "setup"
   | "estimatedMinutes"
   | "movement"
+  | "system"
   | "camera"
   | "lens"
   | "audio"
@@ -55,7 +56,8 @@ export const IMPORT_FIELDS: { id: ImportField; label: string; names: string[] }[
   { id: "tags", label: "Tags", names: ["tags", "tag", "labels"] },
   { id: "setup", label: "Setup", names: ["setup", "set up", "set-up", "setup #"] },
   { id: "estimatedMinutes", label: "Est. time", names: ["est. minutes", "est. time", "estimated time", "est time", "minutes", "duration", "time estimate"] },
-  { id: "movement", label: "System/Movement", names: ["system/movement", "movement", "camera movement", "rig", "support", "system"] },
+  { id: "movement", label: "Movement", names: ["movement", "camera movement", "move", "moves"] },
+  { id: "system", label: "System", names: ["system", "system/movement", "camera system", "rig", "support", "camera support"] },
   { id: "camera", label: "Camera", names: ["camera", "cam", "cameras"] },
   { id: "lens", label: "Lens", names: ["lens", "lenses", "focal length", "mm"] },
   { id: "audio", label: "Audio", names: ["audio", "sound", "mic", "mics"] },
@@ -74,6 +76,27 @@ export function matchHeader(header: string): ImportField {
   if (!h) return "skip";
   const exact = IMPORT_FIELDS.find((f) => f.names.includes(h) || norm(f.label) === h);
   return exact?.id ?? "skip";
+}
+
+/** Each header's field: the one chosen last time for that header name, else the best match. */
+export function guessMapping(header: string[], remembered: Record<string, string> = {}): ImportField[] {
+  return header.map((h) => {
+    const saved = remembered[norm(h)];
+    return saved && IMPORT_FIELDS.some((f) => f.id === saved) ? (saved as ImportField) : matchHeader(h);
+  });
+}
+
+/** The remembered mapping after an import: only choices that differ from the best match are kept. */
+export function rememberMapping(remembered: Record<string, string> = {}, header: string[], mapping: ImportField[]): Record<string, string> {
+  const next = { ...remembered };
+  header.forEach((h, i) => {
+    const key = norm(h);
+    const field = mapping[i];
+    if (!key || !field) return;
+    if (field === matchHeader(h)) delete next[key];
+    else next[key] = field;
+  });
+  return next;
 }
 
 /** Rows from CSV (commas) or spreadsheet cells (tabs), whichever the text uses. */
@@ -135,6 +158,7 @@ export type ImportPlan = {
 const HEADING_FIELDS = ["indicator", "location", "time"] as const;
 const INHERITED: Partial<Record<ImportField, keyof ShotOwn>> = {
   movement: "movement",
+  system: "system",
   camera: "cameras",
   lens: "cameras",
   audio: "audio",
