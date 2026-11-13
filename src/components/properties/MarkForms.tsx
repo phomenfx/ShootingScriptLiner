@@ -1,3 +1,4 @@
+import { recolor } from "../../model/recolor";
 import { AlignCenter, AlignLeft, AlignRight, ChevronDown, ChevronUp, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import * as commands from "../../commands";
@@ -260,7 +261,7 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
               label="Line color"
               color={line.color ?? linked?.shot.color ?? "#FF0000"}
               follows={linked ? line.color === undefined : undefined}
-              onChange={(color) => update((l) => ({ ...l, color }))}
+              onChange={(color) => apply((p) => recolor(p, { kind: "mark", ids: [line.id] }, color))}
               onFollowChange={(follows) =>
                 update((l) => {
                   if (!follows) return { ...l, color: linked?.shot.color ?? "#FF0000" };
@@ -478,7 +479,7 @@ export function TextInspector({ project, note }: { project: Project; note: TextM
               label="Text color"
               color={note.color ?? linked?.shot.color ?? "#111111"}
               follows={linked ? note.color === undefined : undefined}
-              onChange={(color) => update((n) => ({ ...n, color }))}
+              onChange={(color) => apply((p) => recolor(p, { kind: "mark", ids: [note.id] }, color))}
               onFollowChange={(follows) =>
                 update((n) => {
                   if (!follows) return { ...n, color: linked?.shot.color ?? "#111111" };

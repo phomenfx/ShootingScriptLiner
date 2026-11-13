@@ -3,6 +3,7 @@
  * shots in the same order, under foldable scene rows. Cells edit in place and
  * take blocks pasted from a spreadsheet.
  */
+import { sceneNumber } from "../../model/numbering";
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import { ArrowDown, CalendarDays, ChevronDown, Minus, ChevronRight, Circle, Columns3, Plus, RotateCcw, Search, Star, Check, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -602,10 +603,10 @@ export function ShotTable() {
               return [
                 <tr key={scene.id} onContextMenu={(e) => sceneMenu(e, scene.id)} className={`table-scene${selection?.kind === "scene" && selection.ids[0] === scene.id ? " selected" : ""}`}>
                   <th className="pin" scope="row">
-                    <button type="button" className="table-fold" aria-label={folded ? `Expand scene ${sceneIndex + 1}` : `Collapse scene ${sceneIndex + 1}`} onClick={() => session().setSceneCollapsed(scene.id, !folded)}>
+                    <button type="button" className="table-fold" aria-label={folded ? `Expand scene ${sceneNumber(project, sceneIndex)}` : `Collapse scene ${sceneNumber(project, sceneIndex)}`} onClick={() => session().setSceneCollapsed(scene.id, !folded)}>
                       <Fold size={13} strokeWidth={1.75} />
                     </button>
-                    {sceneIndex + 1}
+                    {sceneNumber(project, sceneIndex)}
                   </th>
                   <td colSpan={columns.length - 1} onClick={() => session().select("scene", scene.id)}>
                     <span className="table-slug">

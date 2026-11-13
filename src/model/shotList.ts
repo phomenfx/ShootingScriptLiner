@@ -3,29 +3,13 @@
  * shot IDs, status and priority cycling, searching, and line counts.
  */
 import { builtInEntries, choiceEntries, choiceLabel } from "./registry";
+import { sceneNumber, shotNumber } from "./numbering";
 import type { Project, Scene, Shot } from "./types";
 
-/** Excel-style letters: 0 → A, 25 → Z, 26 → AA. */
-export function indexToLetters(index: number): string {
-  let n = index;
-  let result = "";
-  while (n >= 0) {
-    result = String.fromCharCode((n % 26) + 65) + result;
-    n = Math.floor(n / 26) - 1;
-  }
-  return result;
-}
+export { indexToLetters } from "./numbering";
 
-/** A shot's ID from where it sits: 1A, 1B… or 1.1, 1.2… Never stored, so it ripples by itself. */
-export function shotIdLabel(
-  sceneIndex: number,
-  shotIndex: number,
-  style: Project["settings"]["general"]["shotIdStyle"]
-): string {
-  return style === "letter"
-    ? `${sceneIndex + 1}${indexToLetters(shotIndex)}`
-    : `${sceneIndex + 1}.${shotIndex + 1}`;
-}
+/** A shot's number: typed, or counted on from the one before (1A, 1B… or 1.1, 1.2…). */
+export const shotIdLabel = (project: Project, sceneIndex: number, shotIndex: number): string => shotNumber(project, sceneIndex, shotIndex);
 
 /** The next entry of a choice list after `key`, wrapping around. Unknown keys start over. */
 function nextChoice(field: "status" | "priority", key: string, lists: Project["settings"]["lists"]): string {
@@ -71,7 +55,7 @@ function shotMatches(shot: Shot, id: string, needle: string, project: Project): 
 }
 
 export type ListedShot = { shot: Shot; shotIndex: number; id: string };
-export type ListedScene = { scene: Scene; sceneIndex: number; shots: ListedShot[] };
+export type ListedScene = { scene: Scene; sceneIndex: number; number: string; shots: ListedShot[] };
 
 /**
  * Scenes and shots in order, each with its position and ID. With a search,
@@ -80,22 +64,21 @@ export type ListedScene = { scene: Scene; sceneIndex: number; shots: ListedShot[
  */
 export function listScenes(project: Project, search = ""): ListedScene[] {
   const needle = search.trim().toLowerCase();
-  const style = project.settings.general.shotIdStyle;
   const result: ListedScene[] = [];
   project.scenes.forEach((scene, sceneIndex) => {
     const all = scene.shots.map((shot, shotIndex) => ({
       shot,
       shotIndex,
-      id: shotIdLabel(sceneIndex, shotIndex, style),
+      id: shotIdLabel(project, sceneIndex, shotIndex),
     }));
     if (!needle) {
-      result.push({ scene, sceneIndex, shots: all });
+      result.push({ scene, sceneIndex, number: sceneNumber(project, sceneIndex), shots: all });
       return;
     }
     const { indicator, location, time } = scene.heading;
-    const headingHit = matches(`${sceneIndex + 1} ${indicator} ${location} ${time}`, needle);
+    const headingHit = matches(`${sceneNumber(project, sceneIndex)} ${indicator} ${location} ${time}`, needle);
     const shots = headingHit ? all : all.filter((item) => shotMatches(item.shot, item.id, needle, project));
-    if (headingHit || shots.length > 0) result.push({ scene, sceneIndex, shots });
+    if (headingHit || shots.length > 0) result.push({ scene, sceneIndex, number: sceneNumber(project, sceneIndex), shots });
   });
   return result;
 }

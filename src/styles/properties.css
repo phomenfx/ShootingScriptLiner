@@ -753,3 +753,37 @@ textarea.pf-input {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Color bar lock: follow the shot's color, or the mark's own. */
+.color-bar-lock {
+  flex: none;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.color-bar-lock:hover:not(:disabled) {
+  background: var(--color-btn-hover);
+}
+.color-bar-lock.is-locked {
+  color: var(--color-accent);
+}
+.color-bar-lock:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* A button filling a form cell, the height of the inputs beside it. */
+.pf-btn-fill {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

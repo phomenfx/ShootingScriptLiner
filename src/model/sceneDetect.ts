@@ -4,6 +4,7 @@
  * scene number ("2." or "2"), and may end with the number again.
  */
 import { createScene } from "./defaults";
+import { sceneNumber as sceneNumberOf } from "./numbering";
 import type { Project, Scene, SceneHeading } from "./types";
 
 export type FoundHeading = {
@@ -83,7 +84,8 @@ export function scenePage(project: Project, index: number, found: FoundHeading[]
     if (hit) return hit.page;
   }
   const used = usableHeadings(found);
-  const numbered = used.find((h) => h.number === index + 1);
+  const whole = Number(/^\d+/.exec(sceneNumberOf(project, index))?.[0] ?? NaN);
+  const numbered = used.find((h) => h.number === whole);
   if (numbered) return numbered.page;
   if (used.length === project.scenes.length) return used[index]?.page;
   return undefined;

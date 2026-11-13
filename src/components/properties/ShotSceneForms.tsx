@@ -1,7 +1,8 @@
+import { sceneNumber, shotSuffixes } from "../../model/numbering";
 import { Plus, X } from "lucide-react";
 import type { ReactNode } from "react";
 import * as commands from "../../commands";
-import { cameraRowPrints, captionFieldText, printsField, shotCaption, withCameraRowPrint, withPrintField } from "../../model/captions";
+import { cameraRowPrints, captionFieldText, printsField, printsSceneNumber, shotCaption, withCameraRowPrint, withPrintField, withSceneNumberPrint } from "../../model/captions";
 import { createShot } from "../../model/defaults";
 import * as edits from "../../model/edits";
 import { describeLength, formatEighths, formatPageRange, sceneLength, shotLength } from "../../model/pageLength";
@@ -10,7 +11,7 @@ import type {CameraRow, LineMark, MarkOwn, Project, Scene, Shot, ShotOwn, TextMa
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
 import { usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
-import { Chips, ColorField, Field, Footer, FooterButton, Group, Lockable, LockButton, NumberInput, Select, TextInput } from "./parts";
+import { Chips, ColorField, CommitInput, Field, Footer, FooterButton, Group, Lockable, LockButton, NumberInput, Select, TextInput } from "./parts";
 
 const INDICATORS = ["INT.", "EXT.", "INT./EXT."];
 const TIMES = ["DAY", "NIGHT", "DAWN", "DUSK", "MORNING", "EVENING", "LATER", "CONTINUOUS"];
@@ -114,12 +115,18 @@ type ShotInspectorProps = {
    * a lock: locked follows the shot, unlocked is that one mark's own value.
    */
   mark?: LineMark | TextMark;
+  /** The selected mark whose Shot tab this is (any kind): a shot number another shot has relinks it. */
+  markId?: string;
 };
 
 type MarkField = "type" | "angle" | "subject" | "cast" | "tags" | "additionalInfo" | "setup" | "notes";
 
-export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProps) {
-  const { scene, shot, sceneIndex } = found;
+export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspectorProps) {
+  const { scene, shot, sceneIndex, shotIndex } = found;
+  const style = project.settings.general.shotIdStyle;
+  const sceneNo = sceneNumber(project, sceneIndex);
+  const shotNo = shotSuffixes(scene, style)[shotIndex] ?? "";
+  const linkId = asTab ? (markId ?? mark?.id) : undefined;
   const lists = project.settings.lists;
   const own = shot.own ?? {};
   const id = captionFieldText(project, found, "shotNumber");
@@ -231,7 +238,7 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
     const locked = own[field] === undefined;
     return {
       locked,
-      what: `scene ${sceneIndex + 1}`,
+      what: `scene ${sceneNumber(project, sceneIndex)}`,
       value: shotValue(field),
       set: (value: NonNullable<ShotOwn[K]>) => writeShot(field, value),
       onToggle: toggle(() => setOwn(field, locked ? structuredClone(sceneValue(field) ?? empty) : undefined)),
@@ -325,13 +332,31 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
       <div className="pf-scroll">
         <div className="pf-shot-top">
           <ColorField color={shot.color} label={`Color of shot ${id}`} onChange={(color) => patch({ color })} />
-          <label className="pf-caption-preview" style={{ color: shot.color }} title="The caption drawn on this shot's lines">
-            <input type="checkbox" checked={print("shotNumber").print} aria-label="Print the shot number in the caption" onChange={(e) => print("shotNumber").onPrintChange(e.target.checked)} />
-            {shotCaption(project, found, mark?.own) || id}
-          </label>
+          <div className="pf-caption-preview" style={{ color: shot.color }} title="Caption preview: how this shot's lines are labeled">
+            {shotCaption(project, found, mark?.own) || <span className="pf-none">No caption</span>}
+          </div>
         </div>
 
         <Group name="shot" title="Shot">
+          <Field
+            label="Scene #"
+            hint="Type another scene's number to move this shot there."
+            print={printsSceneNumber(project, shot)}
+            onPrintChange={(on) => apply(edits.updateShot(shot.id, (current) => withSceneNumberPrint(project, current, on)))}
+          >
+            <CommitInput label="Scene number" value={sceneNo} onCommit={(text) => commands.renumberShot(shot.id, text || sceneNo, shotNo, linkId)} />
+          </Field>
+          <Field
+            label="Shot #"
+            hint={
+              linkId
+                ? "A free number renumbers this shot (gaps are fine). Another shot's number links this mark to that shot. Leave empty to count on from the shot before."
+                : "A free number renumbers this shot (gaps are fine). Another shot's number swaps the two. Leave empty to count on from the shot before."
+            }
+            {...print("shotNumber")}
+          >
+            <CommitInput label="Shot number" value={shot.number === undefined ? "" : shotNo} placeholder={shotNo} onCommit={(text) => commands.renumberShot(shot.id, sceneNo, text, linkId)} />
+          </Field>
           <Field label="Shot type" {...print("type")}>
             {withMarkLock(
               "type",
@@ -378,7 +403,7 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
           </Field>
         </Group>
 
-        <Group name="shot-scene" title="Scene" note={`from scene ${sceneIndex + 1}`}>
+        <Group name="shot-scene" title="Scene" note={`from scene ${sceneNumber(project, sceneIndex)}`}>
           <div className="pf-three pf-wide">
             <Field label="Indicator" {...print("indicator")}>
               {inheritText("indicator", "Indicator", INDICATORS)}
@@ -474,7 +499,7 @@ export function ShotInspector({ project, found, asTab, mark }: ShotInspectorProp
 
 export function SceneInspector({ project, scene }: { project: Project; scene: Scene }) {
   const sceneIndex = project.scenes.indexOf(scene);
-  const number = sceneIndex + 1;
+  const number = sceneNumber(project, sceneIndex);
   const length = sceneLength(project, scene.shots.map((shot) => shot.id));
   const minutes = scene.shots.reduce((sum, shot) => sum + (shot.estimatedMinutes ?? 0), 0);
 
@@ -517,6 +542,18 @@ export function SceneInspector({ project, scene }: { project: Project; scene: Sc
     <>
       <div className="pf-scroll">
         <Group name="scene" title={`Scene ${number}`}>
+          <Field label="Scene #" hint="A free number moves the scene there in order (5A, 12…). Another scene's number swaps the two. Leave empty to count on from the scene before.">
+            <CommitInput label="Scene number" value={scene.number ?? ""} placeholder={number} onCommit={(text) => commands.renumberScene(scene.id, text)} />
+          </Field>
+          {scene.shots.some((s) => s.number !== undefined) ? (
+            <Field label="Shot numbers" hint="Some shots here have typed numbers.">
+              <button type="button" className="pf-btn pf-btn-fill" title="Forget typed shot numbers: shots count 1A, 1B… in list order again" onClick={() => commands.renumberShotsInOrder(scene.id)}>
+                Fix order
+              </button>
+            </Field>
+          ) : (
+            <div />
+          )}
           <div className="pf-three pf-wide">
             <Field label="Indicator">
               <TextInput label="Indicator" value={scene.heading.indicator} placeholder="INT." suggestions={INDICATORS} onChange={(indicator) => heading({ indicator })} />

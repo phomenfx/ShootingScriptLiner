@@ -3,6 +3,7 @@
  * the layout of every page as simple drawing steps (top-left origin, points).
  * Drawing those steps into a PDF lives in lib/shotListPdfBytes.ts.
  */
+import { sceneNumber } from "./numbering";
 import { formatEighths, sceneLength } from "./pageLength";
 import { groupByDate, type TableColumn, type TableScene } from "./shotTable";
 import { formatMinutes } from "./shotTable";
@@ -119,7 +120,7 @@ export function printGroups(project: Project, options: ShotListPdfOptions, forma
   return rows
     .filter((r) => r.shots.length > 0)
     .map((r) => ({
-      title: `Scene ${r.sceneIndex + 1}${slug(r.scene) ? `   ${slug(r.scene)}` : ""}`,
+      title: `Scene ${sceneNumber(project, r.sceneIndex)}${slug(r.scene) ? `   ${slug(r.scene)}` : ""}`,
       meta: meta(r.shots),
       shots: r.shots.map((shot) => ({ scene: r.scene, shot })),
     }));

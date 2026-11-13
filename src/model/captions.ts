@@ -5,6 +5,7 @@
 import { formatExcelDate } from "../lib/dateFormat";
 import type { FoundShot } from "./edits";
 import { CAPTION_FIELDS, choiceLabel } from "./registry";
+import { joinShotNumber, sceneNumber, shotSuffixes } from "./numbering";
 import { shotIdLabel } from "./shotList";
 import type { CameraRow, CaptionDivider, CaptionField, MarkOwn, Project, Scene, Shot, ShotOwn } from "./types";
 
@@ -43,6 +44,33 @@ export function printsField(project: Project, shot: Shot, fieldId: string): bool
   if (typeof own === "boolean") return own;
   const field = project.settings.captions.fields.find((f) => f.id === fieldId);
   return field?.print ?? CAPTION_FIELDS.find((f) => f.id === fieldId)?.print ?? false;
+}
+
+/** Whether the caption's number includes the scene part. Follows the Shot # checkbox unless set. */
+export function printsSceneNumber(project: Project, shot: Shot): boolean {
+  const own = shot.print?.sceneNumber;
+  return typeof own === "boolean" ? own : printsField(project, shot, "shotNumber");
+}
+
+export function withSceneNumberPrint(project: Project, shot: Shot, print: boolean): Shot {
+  const next = { ...shot.print };
+  if (print === printsField(project, shot, "shotNumber")) delete next.sceneNumber;
+  else next.sceneNumber = print;
+  if (Object.keys(next).length === 0) {
+    const { print: _removed, ...rest } = shot;
+    return rest;
+  }
+  return { ...shot, print: next };
+}
+
+/** The number as the caption prints it: 1A, or just A, or just 1. */
+function captionNumber(project: Project, found: FoundShot): string {
+  const style = project.settings.general.shotIdStyle;
+  const withShot = printsField(project, found.shot, "shotNumber");
+  const withScene = printsSceneNumber(project, found.shot);
+  const scene = withScene ? sceneNumber(project, found.sceneIndex) : "";
+  const suffix = withShot ? (shotSuffixes(found.scene, style)[found.shotIndex] ?? "") : "";
+  return joinShotNumber(scene, suffix, style);
 }
 
 /**
@@ -94,7 +122,7 @@ export function captionFieldText(project: Project, found: FoundShot, fieldId: st
   const text = (markValue: string | undefined, shotValue: string | undefined) => (markValue !== undefined ? markValue : shotValue)?.trim() ?? "";
   switch (fieldId) {
     case "shotNumber":
-      return shotIdLabel(sceneIndex, shotIndex, project.settings.general.shotIdStyle);
+      return shotIdLabel(project, sceneIndex, shotIndex);
     case "type":
       return text(own?.type, shot.type);
     case "angle":
@@ -269,8 +297,9 @@ export function shotCaption(project: Project, found: FoundShot, own?: MarkOwn): 
   for (const field of project.settings.captions.fields) {
     // Camera and lens print row by row, so their rows decide.
     const byRow = field.id === "camera" || field.id === "lens";
-    if (!byRow && !printsField(project, found.shot, field.id)) continue;
-    const text = captionFieldText(project, found, field.id, own);
+    const isNumber = field.id === "shotNumber";
+    if (!byRow && !isNumber && !printsField(project, found.shot, field.id)) continue;
+    const text = isNumber ? captionNumber(project, found) : captionFieldText(project, found, field.id, own);
     if (!text) continue;
     if (!started) {
       const kind = field.divider ?? defaultDivider(field.id);

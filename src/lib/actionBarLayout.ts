@@ -1,7 +1,7 @@
 export type Bounds = { left: number; top: number; right: number; bottom: number };
 
 /** Room the bar needs, including its move handle. */
-export const ACTION_BAR_WIDTH = 176;
+export const ACTION_BAR_WIDTH = 270;
 export const ACTION_BAR_HEIGHT = 32;
 
 /** Places the action bar to the right of a mark, flipping inside the page when it would hang off. */

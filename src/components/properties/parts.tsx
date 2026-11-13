@@ -144,6 +144,35 @@ export function TextInput({ value, label, placeholder, disabled, suggestions, mu
   );
 }
 
+/**
+ * A text box that changes nothing until Enter or leaving it, for values whose
+ * change moves things around (scene and shot numbers). Escape puts it back.
+ */
+export function CommitInput({ value, label, placeholder, onCommit }: { value: string; label: string; placeholder?: string; onCommit: (value: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft !== null && draft.trim() !== value) onCommit(draft.trim());
+    setDraft(null);
+  };
+  return (
+    <input
+      className="pf-input"
+      aria-label={label}
+      value={draft ?? value}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        else if (e.key === "Escape") {
+          setDraft(null);
+          e.stopPropagation();
+        }
+      }}
+    />
+  );
+}
+
 type NumberInputProps = {
   value: number | undefined;
   label: string;
@@ -355,7 +384,8 @@ export function Lockable({ locked, what, onToggle, children }: { locked: boolean
 
 /**
  * A color that is either the mark's own or follows its shot. Following shows
- * "Shot" with a lock; its own opens the system color picker.
+ * "Shot" with a lock. Either way the picker opens; while following, it
+ * recolors the shot, like other locked fields edit what they follow.
  */
 export function ColorField({
   color,
@@ -373,7 +403,7 @@ export function ColorField({
 }) {
   return (
     <div className={`pf-color ${follows ? "is-locked" : ""}`}>
-      <input type="color" aria-label={label} value={color} disabled={follows} onChange={(e) => onChange(e.target.value)} />
+      <input type="color" aria-label={label} value={color} title={follows ? "Changes the shot's color" : undefined} onChange={(e) => onChange(e.target.value)} />
       <span>{follows ? "Shot" : color.toUpperCase()}</span>
       {follows !== undefined && onFollowChange && (
         <LockButton locked={follows} what="the shot's color" onToggle={() => onFollowChange(!follows)} />

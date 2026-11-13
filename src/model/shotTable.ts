@@ -6,6 +6,7 @@ import { cameraNames, effectiveShot } from "./captions";
 import * as edits from "./edits";
 import { formatEighths, formatPageRange, shotLength } from "./pageLength";
 import { choiceEntries, choiceLabel, keyForText } from "./registry";
+import { sceneNumber } from "./numbering";
 import { shotIdLabel } from "./shotList";
 import type { CameraRow, ListEntry, Project, Scene, Shot, ShotOwn } from "./types";
 
@@ -154,7 +155,7 @@ export const TABLE_COLUMNS: TableColumn[] = [
     readOnly: true,
     read: (project, scene, shot) => {
       const sceneIndex = project.scenes.indexOf(scene);
-      return { text: shotIdLabel(sceneIndex, scene.shots.indexOf(shot), project.settings.general.shotIdStyle) };
+      return { text: shotIdLabel(project, sceneIndex, scene.shots.indexOf(shot)) };
     },
   },
   {
@@ -332,7 +333,7 @@ export type TableScene = { scene: Scene; sceneIndex: number; shots: Shot[]; hidd
 export function tableRows(project: Project, search: string, filters: TableFilter[], columns: TableColumn[]): TableScene[] {
   const needle = search.trim().toLowerCase();
   return project.scenes.map((scene, sceneIndex) => {
-    const heading = `${sceneIndex + 1} ${scene.heading.indicator} ${scene.heading.location} ${scene.heading.time}`.toLowerCase();
+    const heading = `${sceneNumber(project, sceneIndex)} ${scene.heading.indicator} ${scene.heading.location} ${scene.heading.time}`.toLowerCase();
     const filtered = scene.shots.filter((shot) => passesFilters(shot, filters));
     const shots = needle && !heading.includes(needle)
       ? filtered.filter((shot) => columns.some((c) => c.read(project, scene, shot).text.toLowerCase().includes(needle)))

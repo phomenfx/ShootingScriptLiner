@@ -19,9 +19,14 @@ function sample(): Project {
 
 describe("shotList", () => {
   it("builds shot IDs from position in either style", () => {
-    expect(shotIdLabel(0, 0, "letter")).toBe("1A");
-    expect(shotIdLabel(1, 27, "letter")).toBe("2AB");
-    expect(shotIdLabel(1, 2, "decimal")).toBe("2.3");
+    const p = createProject();
+    p.scenes = [createScene(), createScene()];
+    p.scenes[1]!.shots = Array.from({ length: 28 }, (_, i) => shot(`s${i}`));
+    p.scenes[0]!.shots = [shot("a")];
+    expect(shotIdLabel(p, 0, 0)).toBe("1A");
+    expect(shotIdLabel(p, 1, 27)).toBe("2AB");
+    p.settings.general.shotIdStyle = "decimal";
+    expect(shotIdLabel(p, 1, 2)).toBe("2.3");
   });
 
   it("cycles status and priority, and starts over from an unknown key", () => {

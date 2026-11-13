@@ -115,7 +115,7 @@ export function ScenePanel() {
     session().setActivePage(mark.page);
   };
 
-  const deleteScene = async (scene: Scene, number: number) => {
+  const deleteScene = async (scene: Scene, number: string) => {
     const counts = lineCountsByShot(project);
     const lines = scene.shots.reduce((sum, shot) => sum + (counts.get(shot.id) ?? 0), 0);
     if (lines > 0 && usePrefsStore.getState().confirmDeletes) {
@@ -266,7 +266,7 @@ export function ScenePanel() {
           onDragStart={({ active }) => {
             const found = listed.find((l) => l.scene.id === active.id);
             const shot = listed.flatMap((l) => l.shots).find((item) => item.shot.id === active.id);
-            setDragLabel(found ? `Scene ${found.sceneIndex + 1}` : shot ? `Shot ${shot.id}` : null);
+            setDragLabel(found ? `Scene ${found.number}` : shot ? `Shot ${shot.id}` : null);
           }}
           onDragEnd={onDragEnd}
           onDragCancel={() => setDragLabel(null)}
@@ -286,7 +286,7 @@ export function ScenePanel() {
                   step(edits.updateScene(l.scene.id, (scene) => ({ ...scene, heading: { ...scene.heading, ...patch } })))
                 }
                 onToggleVisible={() => step(edits.updateScene(l.scene.id, (scene) => ({ ...scene, visible: !scene.visible })))}
-                onDelete={() => void deleteScene(l.scene, l.sceneIndex + 1)}
+                onDelete={() => void deleteScene(l.scene, l.number)}
               >
                 {l.shots.map((item) => (
                   <ShotRow

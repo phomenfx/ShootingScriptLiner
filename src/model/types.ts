@@ -97,6 +97,8 @@ export type MarkOwn = {
 
 export type Shot = {
   id: string;
+  /** Typed number within its scene (C, or 3). Without one it counts on from the shot before. */
+  number?: string;
   color: string;
   visible: boolean;
   type?: string;
@@ -119,6 +121,8 @@ export type Shot = {
 
 export type Scene = {
   id: string;
+  /** Typed scene number (12, 5A). Without one it counts on from the scene before. */
+  number?: string;
   visible: boolean;
   heading: SceneHeading;
   defaults: SceneDefaults;

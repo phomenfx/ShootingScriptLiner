@@ -1,14 +1,16 @@
 /*
  * The color bar above Properties. Clicking a swatch sets the default color for
  * new shots and marks, and recolors whatever is selected, as one undo step.
+ * A mark locked to its shot's color recolors the shot.
  */
-import { Pipette } from "lucide-react";
+import { Lock, LockOpen, Pipette } from "lucide-react";
 import * as edits from "../../model/edits";
-import type { Project } from "../../model/types";
+import { recolor } from "../../model/recolor";
+import type { ImageMark, Mark, Project } from "../../model/types";
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
 import { useSessionStore } from "../../stores/sessionStore";
 
-const SWATCHES = [
+export const SWATCHES = [
   "#E53935",
   "#FB8C00",
   "#FDD835",
@@ -24,21 +26,12 @@ const SWATCHES = [
 ];
 
 /** The default color, and the selection recolored to match. */
-function applyColor(color: string, dragging = false): void {
+export function applyColor(color: string, dragging = false): void {
   const selection = useSessionStore.getState().selection;
-  const ids = new Set(selection?.ids ?? []);
   const edit: edits.Edit = (project: Project) => {
-    let next = edits.updateSettings((s) => ({ ...s, general: { ...s.general, newShotColor: color } }))(project);
-    if (selection?.kind === "shot") {
-      for (const id of ids) next = edits.updateShot(id, (shot) => ({ ...shot, color }))(next);
-    } else if (selection?.kind === "scene") {
-      // A scene has no color of its own; its shots take it.
-      next = { ...next, scenes: next.scenes.map((scene) => (ids.has(scene.id) ? { ...scene, shots: scene.shots.map((shot) => ({ ...shot, color })) } : scene)) };
-    } else if (selection?.kind === "mark") {
-      // A line, note or shape gets its own color, even when it follows a shot.
-      for (const id of ids) next = edits.updateMark(id, (mark) => (mark.kind === "image" ? mark : { ...mark, color }))(next);
-    }
-    return next;
+    const next = edits.updateSettings((s) => ({ ...s, general: { ...s.general, newShotColor: color } }))(project);
+    // Marks locked to their shot recolor the shot, like any other locked field.
+    return selection ? recolor(next, selection, color) : next;
   };
   // While dragging in the picker, the changes merge into one undo step.
   if (!dragging) breakUndoGroup();
@@ -46,13 +39,59 @@ function applyColor(color: string, dragging = false): void {
   if (!dragging) breakUndoGroup();
 }
 
+/** Selected lines, notes and shapes that have a shot whose color they could follow. */
+function linkedMarks(project: Project, selection: ReturnType<typeof useSessionStore.getState>["selection"]) {
+  if (selection?.kind !== "mark") return [];
+  const ids = new Set(selection.ids);
+  return project.marks.filter((m): m is Exclude<Mark, ImageMark> => ids.has(m.id) && m.kind !== "image" && !!edits.findShot(project, m.shotId));
+}
+
+/** Locks the selected marks to their shot's color, or gives each its own (starting from the shot's). */
+function setFollowsShot(follow: boolean): void {
+  breakUndoGroup();
+  useProjectStore.getState().apply((project) => {
+    let next = project;
+    for (const mark of linkedMarks(project, useSessionStore.getState().selection)) {
+      const shotColor = edits.findShot(project, mark.shotId)!.shot.color;
+      next = edits.updateMark(mark.id, (m) => {
+        if (m.kind === "image") return m;
+        if (!follow) return m.color === undefined ? { ...m, color: shotColor } : m;
+        const { color: _gone, ...rest } = m;
+        return rest as typeof m;
+      })(next);
+    }
+    return next;
+  });
+  breakUndoGroup();
+}
+
 export function ColorBar() {
   const current = useProjectStore((s) => s.project.settings.general.newShotColor);
+  const project = useProjectStore((s) => s.project);
   const selection = useSessionStore((s) => s.selection);
+  const linked = linkedMarks(project, selection);
+  const follows = linked.length > 0 && linked.every((m) => m.color === undefined);
+  const lockTitle =
+    linked.length === 0
+      ? "Select a line, note or shape linked to a shot to lock its color to the shot"
+      : follows
+        ? "Follows the shot's color (swatches recolor the shot). Click to give it its own color."
+        : "Has its own color. Click to follow the shot's color again.";
   const target = selection?.kind === "shot" ? "the selected shot" : selection?.kind === "scene" ? "the scene's shots" : selection?.kind === "mark" ? "the selection" : null;
   const hint = (color: string) => `${color}: default for new shots and marks${target ? `, and recolors ${target}` : ""}`;
   return (
     <div className="color-bar" role="toolbar" aria-label="Color">
+      <button
+        type="button"
+        className={`color-bar-lock${follows ? " is-locked" : ""}`}
+        disabled={linked.length === 0}
+        aria-pressed={follows}
+        title={lockTitle}
+        aria-label={lockTitle}
+        onClick={() => setFollowsShot(!follows)}
+      >
+        {follows ? <Lock size={13} strokeWidth={1.75} /> : <LockOpen size={13} strokeWidth={1.75} />}
+      </button>
       <label className="color-bar-current" title={hint(current)}>
         <span className="color-bar-chip" style={{ background: current }} />
         <Pipette size={13} strokeWidth={1.75} aria-hidden="true" />

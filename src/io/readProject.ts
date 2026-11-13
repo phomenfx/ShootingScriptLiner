@@ -210,6 +210,7 @@ function readShot(raw: unknown, settings: ProjectSettings): Shot {
     visible: bool(raw.visible, true),
     status: nonEmpty(raw.status) ?? "planned",
     priority: nonEmpty(raw.priority) ?? "nice",
+    ...(nonEmpty(raw.number) !== undefined ? { number: nonEmpty(raw.number)! } : {}),
   };
   for (const key of ["type", "angle", "subject", "additionalInfo", "setup", "notes"] as const) {
     const value = nonEmpty(raw[key]);
@@ -253,6 +254,8 @@ function readScene(raw: unknown, settings: ProjectSettings, notices: string[], n
     },
     shots: [],
   };
+  const sceneNumber = nonEmpty(raw.number);
+  if (sceneNumber !== undefined) scene.number = sceneNumber;
   for (const key of ["fps", "sync", "date"] as const) {
     const value = nonEmpty(defaults[key]);
     if (value !== undefined) scene.defaults[key] = value;

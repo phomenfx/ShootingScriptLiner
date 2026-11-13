@@ -79,7 +79,7 @@ function PropertiesBody() {
               </button>
             </div>
           )}
-          {showShot && linked ? <ShotInspector project={project} found={linked} asTab mark={mark.kind === "line" || mark.kind === "text" ? mark : undefined} /> : own}
+          {showShot && linked ? <ShotInspector project={project} found={linked} asTab markId={mark.id} mark={mark.kind === "line" || mark.kind === "text" ? mark : undefined} /> : own}
         </div>
       );
     }

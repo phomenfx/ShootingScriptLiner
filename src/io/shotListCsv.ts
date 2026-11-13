@@ -9,6 +9,7 @@
 import { cameraNames, effectiveShot } from "../model/captions";
 import { formatEighths, formatPageRange, shotLength } from "../model/pageLength";
 import { choiceLabel } from "../model/registry";
+import { sceneNumber as sceneNumberOf } from "../model/numbering";
 import { listScenes } from "../model/shotList";
 import type { CameraRow, Project } from "../model/types";
 
@@ -63,7 +64,7 @@ export function buildShotListRows(project: Project): ShotListRow[] {
   const lists = project.settings.lists;
   const rows: ShotListRow[] = [];
   for (const { scene, sceneIndex, shots } of listScenes(project)) {
-    const sceneNumber = String(sceneIndex + 1);
+    const sceneNumber = sceneNumberOf(project, sceneIndex);
     const style = project.settings.general.shotIdStyle;
 
     if (shots.length === 0) {

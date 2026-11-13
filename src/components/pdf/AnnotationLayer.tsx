@@ -29,6 +29,7 @@ import * as commands from "../../commands";
 import { legacyEnding, toLegacyProject } from "../../legacy/legacyView";
 import { addLine, addLineJoined, addText, applyMarginContinuationTrim, replaceLine, selectMark, updateText } from "../../drawing/marks";
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
+import { sceneNumber } from "../../model/numbering";
 import { shotIdLabel } from "../../model/shotList";
 import { usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -731,8 +732,8 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     const linkedShot = found
       ? {
           id: found.shot.id,
-          label: shotIdLabel(found.sceneIndex, found.shotIndex, v2Project.settings.general.shotIdStyle),
-          sceneNumber: found.sceneIndex + 1,
+          label: shotIdLabel(v2Project, found.sceneIndex, found.shotIndex),
+          sceneNumber: sceneNumber(v2Project, found.sceneIndex),
         }
       : null;
     const isLine = mark?.kind === "line";

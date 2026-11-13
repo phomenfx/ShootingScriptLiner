@@ -7,6 +7,7 @@ import { createScene, createShot } from "./defaults";
 import * as edits from "./edits";
 import { parseSceneHeading } from "./sceneDetect";
 import { parseCellBlock, TABLE_COLUMNS } from "./shotTable";
+import { findSceneByNumber, sceneNumber } from "./numbering";
 import { shotIdLabel } from "./shotList";
 import type { Project, SceneHeading, Shot, ShotOwn } from "./types";
 
@@ -168,9 +169,9 @@ const INHERITED: Partial<Record<ImportField, keyof ShotOwn>> = {
 };
 
 /** The part of a shot ID after the scene number: "1A" → "A", "1.2" → "2", "B" → "B". */
-function shotKey(text: string, sceneNumber: number): string {
+function shotKey(text: string, sceneNumber: string): string {
   const t = text.trim().toUpperCase();
-  const prefix = String(sceneNumber);
+  const prefix = sceneNumber.toUpperCase();
   if (t.startsWith(`${prefix}.`)) return t.slice(prefix.length + 1);
   if (t.startsWith(prefix) && /[A-Z]/.test(t.slice(prefix.length))) return t.slice(prefix.length);
   return t;
@@ -204,7 +205,10 @@ export function planImport(project: Project, rows: string[][], mapping: ImportFi
     const sceneText = sceneCol >= 0 ? (row[sceneCol] ?? "").trim() : "";
     if (sceneText) {
       const number = /^\d+/.exec(sceneText);
-      if (number) sceneIndex = Number(number[0]) - 1;
+      // A scene's own number first (12, 5A), then by position.
+      const byNumber = findSceneByNumber(next, sceneText);
+      if (byNumber >= 0) sceneIndex = byNumber;
+      else if (number) sceneIndex = Number(number[0]) - 1;
       else {
         const parsed = parseSceneHeading(sceneText)?.heading;
         const wanted = norm(sceneText);
@@ -231,12 +235,11 @@ export function planImport(project: Project, rows: string[][], mapping: ImportFi
     }
 
     // Which shot: the same ID in this scene when updating, else a new one.
-    const style = next.settings.general.shotIdStyle;
-    const key = shotCol >= 0 ? shotKey(row[shotCol] ?? "", sceneIndex + 1) : "";
+    const key = shotCol >= 0 ? shotKey(row[shotCol] ?? "", sceneNumber(next, sceneIndex)) : "";
     let shot: Shot | undefined;
     if (mode === "update" && key) {
       const current = next.scenes[sceneIndex]!;
-      const index = current.shots.findIndex((_, i) => shotKey(shotIdLabel(sceneIndex, i, style), sceneIndex + 1) === key);
+      const index = current.shots.findIndex((_, i) => shotKey(shotIdLabel(next, sceneIndex, i), sceneNumber(next, sceneIndex)) === key);
       if (index >= 0) shot = current.shots[index];
     }
     const rowHasShotData = mapping.some((f, i) => f !== "skip" && f !== "scene" && !HEADING_FIELDS.includes(f as never) && (row[i] ?? "").trim());

@@ -347,8 +347,7 @@ export function SceneBlock({
   onDelete,
   children,
 }: SceneBlockProps) {
-  const { scene, sceneIndex, shots } = listed;
-  const number = sceneIndex + 1;
+  const { scene, shots, number } = listed;
   const { editing, setEditing, end } = useRowEditing(3);
   const sortable = useSortable({ id: scene.id, data: { type: "scene" as const }, disabled: dragDisabled });
   const drop = useDroppable({ id: `scene-drop-${scene.id}`, data: { type: "scene-drop" as const, sceneId: scene.id } });

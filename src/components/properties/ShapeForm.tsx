@@ -1,3 +1,4 @@
+import { recolor } from "../../model/recolor";
 import { X } from "lucide-react";
 import * as commands from "../../commands";
 import { isFillable, SHAPE_KINDS } from "../../lib/shapeGeometry";
@@ -161,7 +162,7 @@ export function ShapeInspector({ project, shape }: { project: Project; shape: Sh
               label="Shape color"
               color={shape.color ?? linked?.shot.color ?? project.settings.general.newShotColor}
               follows={linked ? shape.color === undefined : undefined}
-              onChange={(color) => update((s) => ({ ...s, color }))}
+              onChange={(color) => apply((p) => recolor(p, { kind: "mark", ids: [shape.id] }, color))}
               onFollowChange={(follows) =>
                 update((s) => {
                   if (!follows) return { ...s, color: linked?.shot.color ?? project.settings.general.newShotColor };

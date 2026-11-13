@@ -20,6 +20,7 @@ import { addScene, addShot, updateScene, updateShot } from "../model/edits";
 import { CLONE_NUDGE_PT, addMarks, cloneMark, deleteMarks, deleteScene, deleteShot, findShot, setScript, unlinkMark, updateMark, updateSettings } from "../model/edits";
 import { insertOutline, outlineClipOf, type OutlineAnchor, type OutlineClip } from "../model/outlineClipboard";
 import { markAsDefaults } from "../model/markDefaults";
+import * as numbering from "../model/numbering";
 import type { ShotListPdfOptions } from "../model/shotListPdf";
 import { orderColumns, TABLE_COLUMNS, type TableColumn } from "../model/shotTable";
 import { formatExcelDate } from "../lib/dateFormat";
@@ -578,6 +579,40 @@ export function rejoinSelection(): void {
 }
 
 /** Links the mark to a shot, or unlinks it when `shotId` is empty. Linking follows the shot. */
+/* ---------- scene and shot numbers ---------- */
+
+/**
+ * Gives a shot a scene and number, as one undo step. From a line's Shot tab
+ * (`markId`), a number another shot has links the line to that shot; from the
+ * shot's own form, the two shots swap.
+ */
+export function renumberShot(shotId: string, sceneText: string, numberText: string, markId?: string): void {
+  const result = numbering.renumberShot(project(), shotId, sceneText, numberText, !markId);
+  if (result.kind === "error") return notify(result.message);
+  if (result.kind === "taken") return linkMarkToShot(markId!, result.shotId);
+  if (result.project === project()) return;
+  breakUndoGroup();
+  useProjectStore.getState().apply(() => result.project);
+  breakUndoGroup();
+}
+
+/** Gives a scene a number, as one undo step. A number another scene has swaps the two. */
+export function renumberScene(sceneId: string, text: string): void {
+  const result = numbering.renumberScene(project(), sceneId, text);
+  if (result.kind === "error") return notify(result.message);
+  if (result.project === project()) return;
+  breakUndoGroup();
+  useProjectStore.getState().apply(() => result.project);
+  breakUndoGroup();
+}
+
+/** Forgets typed shot numbers in a scene: its shots count 1A, 1B… in list order again. */
+export function renumberShotsInOrder(sceneId: string): void {
+  breakUndoGroup();
+  useProjectStore.getState().apply((p) => numbering.clearShotNumbers(p, sceneId));
+  breakUndoGroup();
+}
+
 export function linkMarkToShot(markId: string, shotId: string): void {
   linkMarksToShot([markId], shotId);
 }
