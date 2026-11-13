@@ -152,7 +152,8 @@ export function TextInput({ value, label, placeholder, disabled, suggestions, mu
 export function CommitInput({ value, label, placeholder, auto, onCommit }: { value: string; label: string; placeholder?: string; auto?: boolean; onCommit: (value: string) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
-    if (draft !== null && draft.trim() !== value) onCommit(draft.trim());
+    // A counted number typed as it is still commits, so it can be fixed in place.
+    if (draft !== null && (draft.trim() !== value || (auto && draft.trim() !== ""))) onCommit(draft.trim());
     setDraft(null);
   };
   return (

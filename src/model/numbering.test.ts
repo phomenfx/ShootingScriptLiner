@@ -63,3 +63,13 @@ describe("switching letters and numbers", () => {
     expect(labels(next)).toEqual(["b=1.2", "a=1.4"]);
   });
 });
+
+describe("fixing a counted number in place", () => {
+  it("keeps a shot's or scene's current number when it is typed", async () => {
+    const { renumberScene } = await import("./numbering");
+    const p = done(renumberShot(project(["a", "b"]), "b", "", "B", true));
+    expect(p.scenes[0]!.shots[1]!.number).toBe("B");
+    const s = renumberScene(project(["a"]), "scene1", "1");
+    expect(s.kind === "done" && s.project.scenes[0]!.number).toBe("1");
+  });
+});

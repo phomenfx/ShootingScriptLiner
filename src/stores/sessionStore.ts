@@ -1,3 +1,4 @@
+import type { ProjectSettings } from "../model/types";
 /**
  * What is going on in this window right now: selection, tool, page, open
  * dialogs, clipboard, the loaded script PDF. None of it is saved.
@@ -108,7 +109,15 @@ type SessionState = {
   setOutlineClipboard: (clip: OutlineClip | null) => void;
   setSettingsOpen: (open: boolean, section?: string) => void;
   setConfirm: (confirm: ConfirmRequest | null) => void;
+  /**
+   * The open project's export choices. Kept here, outside undo, and written into
+   * the project file when it is saved (and read back when it is opened).
+   */
+  exportChoices: NonNullable<ProjectSettings["exportChoices"]>;
+  setExportChoices: (choices: NonNullable<ProjectSettings["exportChoices"]>) => void;
   addNotices: (notices: string[]) => void;
+  /** A short confirmation that clears itself after a few seconds (warnings and errors stay until dismissed). */
+  flashNotice: (notice: string) => void;
   dismissNotice: (index: number) => void;
   setViewerPage: (page: number) => void;
   setActivePage: (page: number) => void;
@@ -154,6 +163,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   settingsSection: null,
   confirm: null,
   notices: [],
+  exportChoices: {},
+  setExportChoices: (exportChoices) => set({ exportChoices }),
   viewerPage: 1,
   activePage: 1,
   pdfPageCount: 0,
@@ -203,6 +214,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   addNotices: (notices) =>
     set((s) => (notices.length === 0 ? s : { notices: [...s.notices, ...notices] })),
   dismissNotice: (index) => set((s) => ({ notices: s.notices.filter((_, i) => i !== index) })),
+  flashNotice: (notice) => {
+    set((s) => ({ notices: [...s.notices.filter((n) => n !== notice), notice] }));
+    setTimeout(() => set((s) => ({ notices: s.notices.filter((n) => n !== notice) })), 6000);
+  },
   setViewerPage: (page) =>
     set((s) => {
       const viewerPage = clampPage(page, s.pdfPageCount);
@@ -233,6 +248,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       clipboard: null,
       outlineClipboard: null,
       notices: [],
+      exportChoices: {},
       viewerPage: 1,
       activePage: 1,
       pdfPageCount: 0,

@@ -1,4 +1,5 @@
-import { Copy, GripVertical, Lock, LockOpen, Menu as MenuIcon, Merge, Scissors, Trash2, X } from "lucide-react";
+import { shellMode } from "../../lib/panelLayout";
+import { Copy, GripVertical, Lock, LockOpen, Menu as MenuIcon, Merge, Scissors, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as commands from "../../commands";
 import { shiftActionBar } from "../../lib/actionBarLayout";
@@ -12,7 +13,8 @@ import { useSessionStore } from "../../stores/sessionStore";
 import { Menu, type MenuEntry } from "../topbar/Menu";
 
 type Props = {
-  markId: string;
+  /** The selected marks (one or several). */
+  markIds: string[];
   shotId?: string;
   isLine: boolean;
   /** Automatic spot, before the user's drag. */
@@ -23,8 +25,13 @@ type Props = {
 };
 
 /** Color, a menu with copy, paste and link to shot, then duplicate, rejoin, split, lock and delete beside the selected mark. */
-export function ScriptActionBar({ markId, shotId, isLine, anchorLeft, anchorTop, pageWidth, pageHeight }: Props) {
+export function ScriptActionBar({ markIds, shotId, isLine, anchorLeft, anchorTop, pageWidth, pageHeight }: Props) {
   const project = useProjectStore((s) => s.project);
+  const markId = markIds[0]!;
+  const several = markIds.length > 1;
+  // On the narrowest windows Properties slides over the script, so it opens from here.
+  const narrow = typeof window !== "undefined" && shellMode(window.innerWidth) === "narrow";
+  const allLocked = markIds.every((id) => project.marks.find((m) => m.id === id)?.locked);
   const offset = useSessionStore((s) => s.actionBarOffset);
   const setOffset = useSessionStore((s) => s.setActionBarOffset);
   const mark = project.marks.find((m) => m.id === markId);
@@ -77,14 +84,14 @@ export function ScriptActionBar({ markId, shotId, isLine, anchorLeft, anchorTop,
       kind: "radio",
       label: "Not linked",
       checked: !shotId,
-      onSelect: () => commands.linkMarkToShot(markId, ""),
+      onSelect: () => commands.linkMarksToShot(markIds, ""),
     },
     ...shots.map(
       (shot): MenuEntry => ({
         kind: "radio",
         label: shot.label,
         checked: shot.id === shotId,
-        onSelect: () => commands.linkMarkToShot(markId, shot.id),
+        onSelect: () => commands.linkMarksToShot(markIds, shot.id),
       })
     ),
   ];
@@ -188,16 +195,21 @@ export function ScriptActionBar({ markId, shotId, isLine, anchorLeft, anchorTop,
       )}
       <button
         type="button"
-        className={`script-iconbtn${mark?.locked ? " on" : ""}`}
-        title={mark?.locked ? "Locked in place (Ctrl+L to unlock)" : "Lock in place (Ctrl+L)"}
-        aria-pressed={!!mark?.locked}
+        className={`script-iconbtn${allLocked ? " on" : ""}`}
+        title={allLocked ? "Locked in place (Ctrl+L to unlock)" : several ? "Lock all in place (Ctrl+L)" : "Lock in place (Ctrl+L)"}
+        aria-pressed={allLocked}
         onClick={() => commands.toggleLockSelection()}
       >
-        {mark?.locked ? <Lock size={14} strokeWidth={1.75} /> : <LockOpen size={14} strokeWidth={1.75} />}
+        {allLocked ? <Lock size={14} strokeWidth={1.75} /> : <LockOpen size={14} strokeWidth={1.75} />}
       </button>
       <button type="button" className="script-iconbtn" title="Delete" onClick={() => commands.deleteSelection()}>
         <Trash2 size={14} strokeWidth={1.75} />
       </button>
+      {narrow && (
+        <button type="button" className="script-iconbtn" title="Properties" aria-label="Show Properties" onClick={() => useSessionStore.getState().setCompactPanel("properties")}>
+          <SlidersHorizontal size={14} strokeWidth={1.75} />
+        </button>
+      )}
       <button type="button" className="script-iconbtn" title="Close" onClick={() => commands.deselect()}>
         <X size={14} strokeWidth={1.75} />
       </button>

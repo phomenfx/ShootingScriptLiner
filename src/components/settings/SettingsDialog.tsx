@@ -608,7 +608,7 @@ export function SettingsDialog() {
                 className="dialog-btn"
                 onClick={() => {
                   prefs.setSuggestionDefaults(defaultsFromProject(project, prefs.suggestionDefaults));
-                  useSessionStore.getState().addNotices(["Saved these lists (all but Cast) as your defaults."]);
+                  useSessionStore.getState().flashNotice("Saved these lists (all but Cast) as your defaults.");
                 }}
               >
                 Save as my defaults

@@ -2,7 +2,6 @@
  * Works out which script PDF a project belongs to: its page sizes (the
  * coordinate system for every mark) and a fingerprint of the file.
  */
-import { PDFDocument } from "pdf-lib";
 import type { ScriptInfo, ScriptPage } from "../model/types";
 
 async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
@@ -14,7 +13,7 @@ async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
 export async function describeScript(bytes: ArrayBuffer, fileName: string): Promise<ScriptInfo> {
   const [fingerprint, doc] = await Promise.all([
     sha256Hex(bytes),
-    PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false }),
+    import("pdf-lib").then(({ PDFDocument }) => PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false })),
   ]);
   const pages: ScriptPage[] = doc.getPages().map((page) => {
     const box = page.getCropBox();

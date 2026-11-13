@@ -53,6 +53,7 @@ export function readRestorePoints(): Autosave[] {
 }
 
 export function clearRestorePoints(): void {
+  newestKnown = null;
   try {
     storage()?.removeItem(RESTORE_POINTS_KEY);
   } catch {
@@ -65,16 +66,23 @@ export function clearRestorePoints(): void {
  * another project), keeping at most `keep`. Drops the oldest when the
  * browser's storage is full.
  */
+/** The newest restore point's name and time, so most autosaves needn't read them all back. */
+let newestKnown: { name: string; at: number } | null = null;
+
 export function addRestorePoint(entry: Autosave, keep: number, force = false): void {
   if (keep <= 0) return;
+  const at = Date.parse(entry.savedAt);
+  const recent = (n: { name: string; at: number } | null) => !!n && n.name === entry.name && at - n.at >= 0 && at - n.at < RESTORE_POINT_EVERY_MS;
+  if (!force && recent(newestKnown)) return;
   const points = readRestorePoints();
   const newest = points[0];
-  const due = !newest || newest.name !== entry.name || Date.parse(entry.savedAt) - Date.parse(newest.savedAt) >= RESTORE_POINT_EVERY_MS;
-  if (!due && !force) return;
+  newestKnown = newest ? { name: newest.name, at: Date.parse(newest.savedAt) } : null;
+  if (!force && recent(newestKnown)) return;
   let next = [entry, ...points].slice(0, keep);
   while (next.length > 0) {
     try {
       storage()?.setItem(RESTORE_POINTS_KEY, JSON.stringify(next));
+      newestKnown = { name: entry.name, at };
       return;
     } catch {
       next = next.slice(0, -1);

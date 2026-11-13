@@ -359,6 +359,7 @@ export async function openProject(file: File): Promise<void> {
     clearAssets();
     for (const [id, blob] of Object.entries(contents.assets)) putAsset(id, blob);
     replaceProject(opened);
+    session().setExportChoices(opened.settings.exportChoices ?? {});
     syncSnapFromProject();
     session().setScriptPdfFile(pdfFile);
     // A JSON file or a restored autosave: images come from the browser's cache.
@@ -586,20 +587,21 @@ export function requestExportLinedPdf(): void {
 /* ---------- export choices: saved with the project, browser defaults for new ones ---------- */
 
 /** The lined PDF choices: this project's, else my defaults. */
-export function linedPdfOptions(p: Project = project()): PdfExportOptions {
-  return p.settings.exportChoices?.linedPdf ?? usePrefsStore.getState().linedPdf;
+export function linedPdfOptions(): PdfExportOptions {
+  return session().exportChoices.linedPdf ?? usePrefsStore.getState().linedPdf;
 }
 
 /** The shot list PDF choices: this project's, else my defaults. */
-export function shotListPdfOptions(p: Project = project()): ShotListPdfOptions {
-  return p.settings.exportChoices?.shotListPdf ?? usePrefsStore.getState().shotListPdf;
+export function shotListPdfOptions(): ShotListPdfOptions {
+  return session().exportChoices.shotListPdf ?? usePrefsStore.getState().shotListPdf;
 }
 
-/** Saves export choices with the project (one undo step, like other settings). */
+/**
+ * Remembers export choices for this project. They are not an undo step and do
+ * not count as an unsaved change; they go into the file with the next save.
+ */
 export function setExportChoices(patch: NonNullable<ProjectSettings["exportChoices"]>): void {
-  useProjectStore.getState().apply(
-    updateSettings((s) => ({ ...s, exportChoices: { ...s.exportChoices, ...patch } }))
-  );
+  session().setExportChoices({ ...session().exportChoices, ...patch });
 }
 
 /** Makes this project's export choices the starting point for new projects. Scene picks stay with the project. */
@@ -607,7 +609,7 @@ export function saveExportDefaults(kind: "linedPdf" | "shotListPdf"): void {
   const prefs = usePrefsStore.getState();
   if (kind === "linedPdf") prefs.setLinedPdf({ ...linedPdfOptions(), sceneIds: null });
   else prefs.setShotListPdf({ ...shotListPdfOptions(), sceneIds: null });
-  notify("Saved as your defaults: new projects start with these export choices.");
+  session().flashNotice("Saved as your defaults: new projects start with these export choices.");
 }
 
 /* ---------- shot list PDF ---------- */
@@ -738,7 +740,7 @@ export function setSelectionAsDefault(): void {
   useProjectStore.getState().apply(updateSettings((s) => markAsDefaults(s, mark)));
   breakUndoGroup();
   const what = mark.kind === "line" ? "lines" : mark.kind === "text" ? "notes" : mark.kind === "shape" && mark.shape === "highlight" ? "highlights" : "shapes";
-  notify(`New ${what} will start with this style (Settings > Mark defaults).`);
+  session().flashNotice(`New ${what} will start with this style (Settings > Mark defaults).`);
 }
 
 export function deleteSelection(): void {

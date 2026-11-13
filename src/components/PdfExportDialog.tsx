@@ -17,7 +17,8 @@ export function PdfExportDialog() {
   const setOpen = useSessionStore((s) => s.setPdfExportOpen);
   const project = useProjectStore((s) => s.project);
   usePrefsStore((s) => s.linedPdf);
-  const options = commands.linedPdfOptions(project);
+  useSessionStore((s) => s.exportChoices);
+  const options = commands.linedPdfOptions();
   const setOptions = (patch: Partial<PdfExportOptions>) => commands.setExportChoices({ linedPdf: { ...options, ...patch } });
   const lists = project.settings.lists;
 

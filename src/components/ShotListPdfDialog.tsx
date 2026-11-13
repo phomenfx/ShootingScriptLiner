@@ -18,7 +18,8 @@ export function ShotListPdfDialog() {
   const setOpen = useSessionStore((s) => s.setShotListPdfOpen);
   const project = useProjectStore((s) => s.project);
   usePrefsStore((s) => s.shotListPdf);
-  const options = commands.shotListPdfOptions(project);
+  useSessionStore((s) => s.exportChoices);
+  const options = commands.shotListPdfOptions();
   const set = (patch: Partial<ShotListPdfOptions>) => commands.setExportChoices({ shotListPdf: { ...options, ...patch } });
   const order = usePrefsStore((s) => s.tableColumnOrder);
   const hidden = usePrefsStore((s) => s.hiddenTableColumns);

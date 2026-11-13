@@ -17,7 +17,16 @@ export function currentView(): ProjectView {
 }
 
 /** The project with the current view recorded, for saving. */
-export const withCurrentView = (project: Project): Project => ({ ...project, view: currentView() });
+export const withCurrentView = (project: Project): Project => {
+  // Export choices live outside undo; they join the project when it is written out.
+  const exportChoices = useSessionStore.getState().exportChoices;
+  const hasChoices = Object.keys(exportChoices).length > 0;
+  return {
+    ...project,
+    view: currentView(),
+    settings: hasChoices ? { ...project.settings, exportChoices } : project.settings,
+  };
+};
 
 /** Puts the view back after opening a project. */
 export function restoreView(view: ProjectView | undefined): void {

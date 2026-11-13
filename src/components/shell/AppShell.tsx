@@ -49,6 +49,12 @@ export function AppShell({ topBar, notices, properties, script, scenes, scenesAc
   const setCompactPanel = useSessionStore((s) => s.setCompactPanel);
   // The shot list table needs the Scenes panel, so it is the open one.
   const openOne = table ? "scenes" : compactPanel;
+  // Mid-size windows: picking a mark on the script brings its Properties into view.
+  // (Picking shots in the Scenes list keeps the list open.)
+  const selectionKey = useSessionStore((s) => (s.selection?.kind === "mark" ? s.selection.ids.join(",") : ""));
+  useEffect(() => {
+    if (mode === "compact" && selectionKey && !table) setCompactPanel("properties");
+  }, [selectionKey, mode, table, setCompactPanel]);
   const isCollapsed = (panel: SidePanel) => (mode === "wide" ? panels.collapsed[panel] : openOne !== panel);
   const toggle = (panel: SidePanel) => {
     if (mode === "wide") setPanelCollapsed(panel, !panels.collapsed[panel]);

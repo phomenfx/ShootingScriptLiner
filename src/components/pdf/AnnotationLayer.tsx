@@ -1,3 +1,4 @@
+import { shapeOutline } from "../../lib/shapeGeometry";
 import { touchScale } from "../../lib/touch";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -917,26 +918,53 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     }
   };
 
+  // The action bar sits beside whatever is selected: one mark of any kind, or several together.
+  // With marks on several pages it shows on the page of the first one.
   const barLine = lines.find((line) => line.id === selectedId);
   const barNote = placedNotes.find((note) => note.text.id === selectedId);
-  const barBounds = barLine
-    ? (() => {
-        const px = barLine.points.map((point) => normalizedToPx(point, width, height));
-        return {
-          left: Math.min(...px.map((point) => point.x)),
-          top: Math.min(...px.map((point) => point.y)),
-          right: Math.max(...px.map((point) => point.x)),
-          bottom: Math.max(...px.map((point) => point.y)),
-        };
-      })()
-    : barNote
-      ? {
-          left: barNote.frame.left,
-          top: barNote.frame.top,
-          right: barNote.frame.left + barNote.frame.width,
-          bottom: barNote.frame.top + barNote.frame.height,
-        }
-      : null;
+  const firstSelected = selectedIds.length > 0 ? v2Project.marks.find((m) => m.id === selectedIds[0]) : undefined;
+  const barBounds = (() => {
+    if (!firstSelected || firstSelected.page !== pageNum) return null;
+    const boxes: { left: number; top: number; right: number; bottom: number }[] = [];
+    const ptBox = (pts: { x: number; y: number }[]) => ({
+      left: Math.min(...pts.map((p) => p.x)) / ptPerPx,
+      top: Math.min(...pts.map((p) => p.y)) / ptPerPx,
+      right: Math.max(...pts.map((p) => p.x)) / ptPerPx,
+      bottom: Math.max(...pts.map((p) => p.y)) / ptPerPx,
+    });
+    for (const id of selectedIds) {
+      const mark = v2Project.marks.find((m) => m.id === id);
+      if (!mark || mark.page !== pageNum) continue;
+      if (mark.kind === "line") {
+        const line = lines.find((l) => l.id === id);
+        if (!line) continue;
+        const px = line.points.map((point) => normalizedToPx(point, width, height));
+        boxes.push({
+          left: Math.min(...px.map((p) => p.x)),
+          top: Math.min(...px.map((p) => p.y)),
+          right: Math.max(...px.map((p) => p.x)),
+          bottom: Math.max(...px.map((p) => p.y)),
+        });
+      } else if (mark.kind === "text") {
+        const note = placedNotes.find((n) => n.text.id === id);
+        if (note) boxes.push({ left: note.frame.left, top: note.frame.top, right: note.frame.left + note.frame.width, bottom: note.frame.top + note.frame.height });
+      } else if (mark.kind === "shape") {
+        const outline = shapeOutline(mark);
+        boxes.push(ptBox(outline?.points ?? [{ x: mark.x, y: mark.y }, { x: mark.x + mark.widthPt, y: mark.y + mark.heightPt }]));
+      } else {
+        const asset = v2Project.assets.find((a) => a.id === mark.assetId);
+        const h = asset && asset.widthPx > 0 ? mark.widthPt * (asset.heightPx / asset.widthPx) : mark.widthPt;
+        boxes.push(ptBox([{ x: mark.x, y: mark.y }, { x: mark.x + mark.widthPt, y: mark.y + h }]));
+      }
+    }
+    if (boxes.length === 0) return null;
+    return {
+      left: Math.min(...boxes.map((b) => b.left)),
+      top: Math.min(...boxes.map((b) => b.top)),
+      right: Math.max(...boxes.map((b) => b.right)),
+      bottom: Math.max(...boxes.map((b) => b.bottom)),
+    };
+  })();
   const barPos = barBounds && showActionBar ? actionBarPosition(barBounds, width, height) : null;
 
   return (
@@ -1162,11 +1190,11 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         />
       )}
     </svg>
-    {barPos && selectedId && (
+    {barPos && (
       <ScriptActionBar
-        markId={selectedId}
-        shotId={barLine?.shotId ?? barNote?.text.shotId}
-        isLine={Boolean(barLine)}
+        markIds={selectedIds}
+        shotId={barLine?.shotId ?? barNote?.text.shotId ?? (firstSelected && firstSelected.kind !== "image" ? firstSelected.shotId : undefined)}
+        isLine={Boolean(barLine) && selectedIds.length === 1}
         anchorLeft={barPos.left}
         anchorTop={barPos.top}
         pageWidth={width}

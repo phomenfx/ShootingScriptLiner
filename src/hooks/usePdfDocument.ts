@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
-import type { PDFDocumentProxy } from "pdfjs-dist";
-import * as pdfjs from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import type { PDFDocumentProxy, PDFDocumentLoadingTask } from "pdfjs-dist";
 
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
+/** The PDF reader, loaded the first time a script is shown (it is large, so the app starts faster without it). */
+let reader: Promise<typeof import("pdfjs-dist")> | null = null;
+function loadReader() {
+  reader ??= Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")]).then(([pdfjs, worker]) => {
+    pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+    return pdfjs;
+  });
+  return reader;
+}
 
 export function usePdfDocument(file: File | null) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
@@ -19,7 +25,7 @@ export function usePdfDocument(file: File | null) {
     }
 
     let cancelled = false;
-    let task: ReturnType<typeof pdfjs.getDocument> | null = null;
+    let task: PDFDocumentLoadingTask | null = null;
 
     setLoading(true);
     setError(null);
@@ -27,7 +33,7 @@ export function usePdfDocument(file: File | null) {
 
     void (async () => {
       try {
-        const data = await file.arrayBuffer();
+        const [data, pdfjs] = await Promise.all([file.arrayBuffer(), loadReader()]);
         if (cancelled) return;
         task = pdfjs.getDocument({ data });
         const doc = await task.promise;

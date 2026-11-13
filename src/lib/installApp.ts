@@ -26,7 +26,7 @@ export function startInstallSupport(): void {
   // Service workers need https (or localhost); the portable file:// build runs without one.
   const secure = location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1";
   if (import.meta.env.PROD && secure && "serviceWorker" in navigator) {
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }).catch(() => undefined);
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js?build=${__BUILD_ID__}`, { scope: import.meta.env.BASE_URL }).catch(() => undefined);
   }
 }
 

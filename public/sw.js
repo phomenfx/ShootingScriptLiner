@@ -4,7 +4,8 @@
  * when it is there (so updates arrive) and from the cache when it is not.
  * Projects and scripts are never sent anywhere; they stay in the browser.
  */
-const CACHE = "script-liner-v1";
+// One cache per build (the page registers sw.js?build=…); older ones are cleared when it starts.
+const CACHE = `script-liner-${new URL(self.location.href).searchParams.get("build") || "v1"}`;
 const SHELL = ["./", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {

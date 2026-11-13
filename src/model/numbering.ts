@@ -203,7 +203,11 @@ export function renumberShot(project: Project, shotId: string, sceneText: string
     return { kind: "done", project: replaceShot(project, from.sceneIndex, from.shotIndex, rest) };
   }
 
-  if (toScene === from.sceneIndex && suffix === shotSuffixes(project.scenes[toScene]!, style)[from.shotIndex]) return { kind: "done", project };
+  if (toScene === from.sceneIndex && suffix === shotSuffixes(project.scenes[toScene]!, style)[from.shotIndex]) {
+    // Its own number, typed: keep it there (a counted number becomes a fixed one).
+    if (shot.number === suffix) return { kind: "done", project };
+    return { kind: "done", project: replaceShot(project, from.sceneIndex, from.shotIndex, { ...shot, number: suffix }) };
+  }
 
   // Keep the numbers both scenes show now, take the shot out, and put it in its place.
   const scenes = project.scenes.map((scene, i) => (i === from.sceneIndex || i === toScene ? freezeShots(scene, style) : scene));
@@ -258,7 +262,11 @@ export function renumberScene(project: Project, sceneId: string, text: string): 
     const { number: _gone, ...rest } = scene;
     return { kind: "done", project: { ...project, scenes: project.scenes.map((s, i) => (i === index ? rest : s)) } };
   }
-  if (cleanNumber(sceneNumber(project, index)) === wanted) return { kind: "done", project };
+  if (cleanNumber(sceneNumber(project, index)) === wanted) {
+    // Its own number, typed: keep it (a counted number becomes a fixed one).
+    if (scene.number === wanted) return { kind: "done", project };
+    return { kind: "done", project: { ...project, scenes: project.scenes.map((s, i) => (i === index ? { ...s, number: wanted } : s)) } };
+  }
   const frozen = freezeScenes(project);
   const at = findSceneByNumber(project, wanted);
   if (at >= 0) {
