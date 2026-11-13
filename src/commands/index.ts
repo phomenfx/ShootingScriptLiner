@@ -12,6 +12,8 @@ import { compareScript, describeScript, scriptMismatchMessage } from "../io/scri
 import { projectFileStem } from "../io/writeProject";
 import { toLegacyProject } from "../legacy/legacyView";
 import { loadPdfFromCache, savePdfToCache } from "../lib/pdfCache";
+import { assetBlob, clearAssets, imageSize, loadMissingAssets, putAsset } from "../lib/assetStore";
+import { newId } from "../lib/ids";
 import { createProject, createScene, createShot } from "../model/defaults";
 import { clearAutosave, readAutosave, startAutosave, type Autosave } from "../io/autosave";
 import { addScene, addShot, updateScene, updateShot } from "../model/edits";
@@ -146,6 +148,7 @@ export function syncSnapFromProject(): void {
 
 export function newProject(): void {
   session().reset();
+  clearAssets();
   replaceProject(createProject());
   syncSnapFromProject();
 }
@@ -223,6 +226,51 @@ export async function detectScenes(): Promise<void> {
   }
 }
 
+/**
+ * Places a JPG or PNG on a page: centered on `at` (page points), or in the
+ * middle of the page. It starts at most 40% of the page wide.
+ */
+export async function addImage(file: Blob & { name?: string }, page: number = session().activePage, at?: { x: number; y: number }): Promise<void> {
+  const type = file.type === "image/png" ? "image/png" : file.type === "image/jpeg" || file.type === "image/jpg" ? "image/jpeg" : null;
+  if (!type) {
+    notify("Only JPG and PNG images can be placed.");
+    return;
+  }
+  const p = project();
+  const sheet = p.script?.pages[page - 1];
+  if (!sheet) {
+    notify("Import the script PDF first, then add images.");
+    return;
+  }
+  try {
+    const size = await imageSize(file);
+    const id = newId();
+    putAsset(id, file);
+    const widthPt = Math.min(sheet.widthPt * 0.4, size.width * 0.75);
+    const heightPt = widthPt * (size.height / Math.max(1, size.width));
+    const center = at ?? { x: sheet.widthPt / 2, y: sheet.heightPt / 2 };
+    const asset = { id, name: file.name ?? "image", type, widthPx: size.width, heightPx: size.height } as const;
+    const mark = { id: newId(), kind: "image" as const, page, x: center.x - widthPt / 2, y: center.y - heightPt / 2, widthPt, assetId: id };
+    breakUndoGroup();
+    useProjectStore.getState().apply((current) => addMarks([mark])({ ...current, assets: [...current.assets, asset] }));
+    breakUndoGroup();
+    session().select("mark", mark.id);
+  } catch {
+    notify("Could not read this image.");
+  }
+}
+
+/** Whether Ctrl+V has something copied inside the app to paste. */
+export function hasAppClipboard(): boolean {
+  return !!session().clipboard?.length || !!session().outlineClipboard;
+}
+
+/** Image tool: picks a JPG or PNG and places it on the current page. */
+export async function requestAddImage(): Promise<void> {
+  const file = await pickFile(".jpg,.jpeg,.png,image/jpeg,image/png");
+  if (file) await addImage(file);
+}
+
 export async function exportBoth(): Promise<void> {
   await exportLinedPdf();
   await exportShotListCsv();
@@ -255,9 +303,14 @@ export async function openProject(file: File): Promise<void> {
     }
 
     session().reset();
+    clearAssets();
+    for (const [id, blob] of Object.entries(contents.assets)) putAsset(id, blob);
     replaceProject(opened);
     syncSnapFromProject();
     session().setScriptPdfFile(pdfFile);
+    // A JSON file or a restored autosave: images come from the browser's cache.
+    const missing = await loadMissingAssets(opened.assets.map((asset) => asset.id));
+    if (missing.length) notices.push(`${missing.length} image ${missing.length === 1 ? "file is" : "files are"} not in this file or this browser.`);
     notify(...notices);
     if (pdfFile) await cacheScript(opened, pdfFile);
   } catch (error) {
@@ -280,7 +333,7 @@ export async function saveZip(): Promise<void> {
     if (!pdfFile && p.script) {
       notify(`The script "${p.script.fileName}" is not loaded, so this save has no PDF in it. Import the script and save again.`);
     }
-    downloadBlob(await buildProjectZip(p, pdfFile), `${projectFileStem(p)}.zip`);
+    downloadBlob(await buildProjectZip(p, pdfFile, assetBlob), `${projectFileStem(p)}.zip`);
     if (useProjectStore.getState().project === p) markProjectSaved();
     if (pdfFile) await cacheScript(p, pdfFile);
   } catch (error) {

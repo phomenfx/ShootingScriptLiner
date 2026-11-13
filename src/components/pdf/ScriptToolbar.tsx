@@ -1,5 +1,5 @@
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
-import { Brackets, ChevronDown, Circle, Copy, Hexagon, Highlighter, Magnet, MousePointer2, Pencil, Pentagon, Slash, Square, Stamp, Star, Type } from "lucide-react";
+import { Brackets, ChevronDown, Circle, Copy, Hexagon, Highlighter, Magnet, MousePointer2, ImagePlus, Pencil, Pentagon, Slash, Square, Stamp, Star, Type } from "lucide-react";
 import * as commands from "../../commands";
 import { formatToolKeyDisplay } from "../../lib/toolKeybinds";
 import { usePrefsStore } from "../../stores/prefsStore";
@@ -31,6 +31,7 @@ const ICON = { size: 17, strokeWidth: 1.75 } as const;
 const PATH_TOOLS: { id: ScriptTool; Icon: typeof MousePointer2 }[] = [
   { id: "pen", Icon: Pencil },
   { id: "polygon", Icon: Pentagon },
+  { id: "image", Icon: ImagePlus },
 ];
 
 /** Icon tools, matching the script card in the mockup. Image comes later. */

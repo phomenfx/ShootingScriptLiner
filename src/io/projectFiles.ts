@@ -1,9 +1,15 @@
 /** Reading and building project files: a bare `.json`, or a `.zip` with the JSON, the script PDF and `assets/`. */
 import JSZip from "jszip";
 import type { Project } from "../model/types";
+import { assetPath } from "../lib/assetStore";
 import { projectFileStem, serializeProject } from "./writeProject";
 
-export type ProjectFileContents = { json: string; pdfFile: File | null };
+export type ProjectFileContents = {
+  json: string;
+  pdfFile: File | null;
+  /** Image files from `assets/`, by asset id (the file name without its extension). */
+  assets: Record<string, Blob>;
+};
 
 function basename(path: string): string {
   return path.replace(/\\/g, "/").split("/").pop() ?? path;
@@ -22,9 +28,9 @@ export function scriptNameInJson(json: string): string | undefined {
 
 export async function readProjectFile(file: File): Promise<ProjectFileContents> {
   if (!file.name.toLowerCase().endsWith(".zip")) {
-    return { json: await file.text(), pdfFile: null };
+    return { json: await file.text(), pdfFile: null, assets: {} };
   }
-  const zip = await JSZip.loadAsync(file);
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const entries = Object.values(zip.files).filter((e) => !e.dir && !e.name.startsWith("assets/"));
   const jsonEntry = entries.find((e) => e.name.toLowerCase().endsWith(".json"));
   if (!jsonEntry) throw new Error("This ZIP has no project file in it.");
@@ -37,13 +43,29 @@ export async function readProjectFile(file: File): Promise<ProjectFileContents> 
   const pdfFile = pdfEntry
     ? new File([await pdfEntry.async("arraybuffer")], basename(pdfEntry.name), { type: "application/pdf" })
     : null;
-  return { json, pdfFile };
+  const assets: Record<string, Blob> = {};
+  for (const entry of Object.values(zip.files)) {
+    if (entry.dir || !entry.name.startsWith("assets/")) continue;
+    const name = basename(entry.name);
+    const id = name.replace(/\.[^.]+$/, "");
+    const type = /\.png$/i.test(name) ? "image/png" : "image/jpeg";
+    assets[id] = new Blob([await entry.async("arraybuffer")], { type });
+  }
+  return { json, pdfFile, assets };
 }
 
-export async function buildProjectZip(project: Project, pdfFile: File | null): Promise<Blob> {
+export async function buildProjectZip(
+  project: Project,
+  pdfFile: File | null,
+  assetFiles: (id: string) => Blob | undefined = () => undefined
+): Promise<Blob> {
   const zip = new JSZip();
-  zip.file(`${projectFileStem(project)}.json`, serializeProject(project));
+  // Only images some mark still uses are kept.
+  const used = new Set(project.marks.flatMap((mark) => (mark.kind === "image" ? [mark.assetId] : [])));
+  const assets = project.assets.filter((asset) => used.has(asset.id) && assetFiles(asset.id));
+  zip.file(`${projectFileStem(project)}.json`, serializeProject({ ...project, assets }));
   if (pdfFile) zip.file(project.script?.fileName ?? pdfFile.name, pdfFile);
+  for (const asset of assets) zip.file(assetPath(asset.id, asset.type), await assetFiles(asset.id)!.arrayBuffer());
   return zip.generateAsync({ type: "blob" });
 }
 

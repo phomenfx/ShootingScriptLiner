@@ -9,3 +9,17 @@
 @import "./styles/properties.css";
 @import "./styles/dialogs.css";
 @import "./styles/pdf.css";
+
+/* Shot table: dragging a header to move its column. */
+.shot-table-scroll th.th-move {
+  cursor: grab;
+}
+.shot-table-scroll th.th-dragging {
+  opacity: 0.45;
+}
+.shot-table-scroll th.th-drop-before {
+  box-shadow: inset 3px 0 0 var(--accent, #4a9eff);
+}
+.shot-table-scroll th.th-drop-after {
+  box-shadow: inset -3px 0 0 var(--accent, #4a9eff);
+}

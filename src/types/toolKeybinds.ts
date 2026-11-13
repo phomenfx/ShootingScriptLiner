@@ -7,6 +7,7 @@ export type ToolKeybinds = {
   shape: string;
   pen: string;
   polygon: string;
+  image: string;
 };
 
 export const DEFAULT_TOOL_KEYBINDS: ToolKeybinds = {
@@ -16,9 +17,10 @@ export const DEFAULT_TOOL_KEYBINDS: ToolKeybinds = {
   shape: "r",
   pen: "p",
   polygon: "g",
+  image: "i",
 };
 
-export const TOOL_KEYBIND_ORDER: ScriptTool[] = ["select", "line", "text", "shape", "pen", "polygon"];
+export const TOOL_KEYBIND_ORDER: ScriptTool[] = ["select", "line", "text", "shape", "pen", "polygon", "image"];
 
 export const TOOL_KEYBIND_LABELS: Record<ScriptTool, string> = {
   select: "Select",
@@ -27,4 +29,5 @@ export const TOOL_KEYBIND_LABELS: Record<ScriptTool, string> = {
   shape: "Shape",
   pen: "Pen",
   polygon: "Polygon",
+  image: "Image",
 };

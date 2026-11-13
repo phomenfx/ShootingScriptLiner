@@ -164,7 +164,7 @@ export type TextAnnotation = {
 
 export type Annotation = LineAnnotation | TextAnnotation;
 
-export type ScriptTool = "select" | "line" | "text" | "shape" | "pen" | "polygon";
+export type ScriptTool = "select" | "line" | "text" | "shape" | "pen" | "polygon" | "image";
 
 export function isLineAnnotation(a: Annotation): a is LineAnnotation {
   return a.kind === "line";

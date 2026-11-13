@@ -4,6 +4,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { LineInspector, OtherMarkInspector, TextInspector } from "./MarkForms";
 import { ColorBar } from "./ColorBar";
+import { ImageInspector } from "./ImageForm";
 import { MultiMarkInspector } from "./MultiMarkForm";
 import { ShapeInspector } from "./ShapeForm";
 import { SceneInspector, ShotInspector } from "./ShotSceneForms";
@@ -59,6 +60,8 @@ function PropertiesBody() {
           <TextInspector project={project} note={mark} />
         ) : mark.kind === "shape" ? (
           <ShapeInspector project={project} shape={mark} />
+        ) : mark.kind === "image" ? (
+          <ImageInspector project={project} image={mark} />
         ) : (
           <OtherMarkInspector mark={mark} />
         );

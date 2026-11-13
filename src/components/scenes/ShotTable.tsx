@@ -18,6 +18,8 @@ import {
   formatMinutes,
   parseCellBlock,
   pasteBlock,
+  moveColumn,
+  orderColumns,
   TABLE_COLUMNS,
   tableRows,
   type TableColumn,
@@ -53,7 +55,12 @@ export function ShotTable() {
   const [editing, setEditing] = useState<{ cell: Cell; text: string } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const columns = useMemo(() => TABLE_COLUMNS.filter((c) => c.id === "shot" || !hidden.includes(c.id)), [hidden]);
+  const order = usePrefsStore((s) => s.tableColumnOrder);
+  const ordered = useMemo(() => orderColumns(TABLE_COLUMNS, order), [order]);
+  const columns = useMemo(() => ordered.filter((c) => c.id === "shot" || !hidden.includes(c.id)), [ordered, hidden]);
+  // Header being dragged, and where it would land.
+  const [dragCol, setDragCol] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<{ id: string; after: boolean } | null>(null);
   const rows = useMemo(
     () =>
       tableRows(project, search, filters, columns)
@@ -111,8 +118,62 @@ export function ShotTable() {
     ]);
   };
 
-  const headerMenu = (e: React.MouseEvent, column: TableColumn) =>
-    openContextMenu(e, [{ label: `Hide column "${column.label}"`, disabled: column.id === "shot", onSelect: () => hideColumn(column) }, SHOW_ALL]);
+  /** Moves a column before or after another; the order covers hidden columns too. */
+  const placeColumn = (id: string, target: string, after: boolean) =>
+    usePrefsStore.getState().setTableColumnOrder(moveColumn(ordered.slice(1).map((c) => c.id), id, target, after));
+  const shiftColumn = (column: TableColumn, by: -1 | 1) => {
+    const next = columns[columns.indexOf(column) + by];
+    if (next && next.id !== "shot") placeColumn(column.id, next.id, by > 0);
+  };
+  const headerMenu = (e: React.MouseEvent, column: TableColumn) => {
+    const at = columns.indexOf(column);
+    openContextMenu(e, [
+      { label: "Move left", disabled: column.id === "shot" || at <= 1, onSelect: () => shiftColumn(column, -1) },
+      { label: "Move right", disabled: column.id === "shot" || at >= columns.length - 1, onSelect: () => shiftColumn(column, 1) },
+      { label: "Reset column order", disabled: order.length === 0, onSelect: () => usePrefsStore.getState().setTableColumnOrder([]) },
+      "separator",
+      { label: `Hide column "${column.label}"`, disabled: column.id === "shot", onSelect: () => hideColumn(column) },
+      SHOW_ALL,
+    ]);
+  };
+  // Drag a header onto another to move it; the Shot column stays first.
+  const dropSide = (e: React.DragEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return e.clientX > r.left + r.width / 2;
+  };
+  const endDrag = () => {
+    setDragCol(null);
+    setDropAt(null);
+  };
+  const headerDrag = (c: TableColumn) =>
+    c.id === "shot"
+      ? {}
+      : {
+          draggable: true,
+          onDragStart: (e: React.DragEvent<HTMLElement>) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/x-table-column", c.id);
+            setDragCol(c.id);
+          },
+          onDragEnd: endDrag,
+        };
+  const headerDrop = (c: TableColumn) => ({
+    onDragOver: (e: React.DragEvent<HTMLElement>) => {
+      if (!dragCol) return;
+      e.preventDefault();
+      const after = c.id === "shot" ? true : dropSide(e);
+      if (dropAt?.id !== c.id || dropAt.after !== after) setDropAt({ id: c.id, after });
+    },
+    onDrop: (e: React.DragEvent<HTMLElement>) => {
+      if (!dragCol) return;
+      e.preventDefault();
+      if (c.id === "shot") {
+        const first = columns[1];
+        if (first) placeColumn(dragCol, first.id, false);
+      } else placeColumn(dragCol, c.id, dropSide(e));
+      endDrag();
+    },
+  });
 
   const sceneMenu = (e: React.MouseEvent, sceneId: string) => {
     session().select("scene", sceneId);
@@ -331,7 +392,7 @@ export function ShotTable() {
           </Dropdown.Trigger>
           <Dropdown.Portal>
             <Dropdown.Content className="menu" align="end" sideOffset={4}>
-              {TABLE_COLUMNS.filter((c) => c.id !== "shot").map((c) => (
+              {ordered.filter((c) => c.id !== "shot").map((c) => (
                 <Dropdown.CheckboxItem
                   key={c.id}
                   className="menu-item"
@@ -379,7 +440,21 @@ export function ShotTable() {
           <thead>
             <tr>
               {columns.map((c) => (
-                <th key={c.id} scope="col" className={c.id === "shot" ? "pin" : undefined} onContextMenu={(e) => headerMenu(e, c)}>
+                <th
+                  key={c.id}
+                  scope="col"
+                  className={[
+                    c.id === "shot" ? "pin" : "th-move",
+                    dragCol === c.id ? "th-dragging" : "",
+                    dropAt?.id === c.id && dragCol !== c.id ? (dropAt.after ? "th-drop-after" : "th-drop-before") : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  title={c.id === "shot" ? undefined : "Drag to move this column"}
+                  onContextMenu={(e) => headerMenu(e, c)}
+                  {...headerDrag(c)}
+                  {...headerDrop(c)}
+                >
                   {c.label}
                 </th>
               ))}

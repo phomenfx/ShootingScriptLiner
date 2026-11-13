@@ -12,6 +12,7 @@ import {
   pushGraphicsState,
   rgb,
   type PDFFont,
+  type PDFImage,
   type PDFPage,
 } from "pdf-lib";
 import type { Project } from "../types/project";
@@ -43,6 +44,7 @@ import { legacyEnding } from "../legacy/legacyView";
 import { segmentStrands, type StrokeStrand } from "./strokeGeometry";
 import { segmentLook } from "../model/segments";
 import type { LineMark, Project as V2Project, ShapeMark } from "../model/types";
+import { assetBlob } from "./assetStore";
 import { DEFAULT_PDF_OPTIONS, markPrints, pagesToKeep, type PdfExportOptions } from "../model/pdfOptions";
 import { isShapeShown, outlineEdges, shapeColor, shapeFill, shapeHalo, shapeHasStroke, shapeOutline, stampScalePercent, stampTip } from "./shapeGeometry";
 import { drawPdfLineCap } from "./pdfLineCaps";
@@ -183,12 +185,38 @@ export async function buildLinedPdfBytes(
     return font;
   };
 
+  // Each picture is embedded once, however many times it is placed.
+  const embeddedAssets = new Map<string, PDFImage | null>();
+  const embedAsset = async (id: string, type: string): Promise<PDFImage | null> => {
+    if (embeddedAssets.has(id)) return embeddedAssets.get(id)!;
+    const blob = assetBlob(id);
+    let image: PDFImage | null = null;
+    if (blob) {
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      image = type === "image/png" ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+    }
+    embeddedAssets.set(id, image);
+    return image;
+  };
+
   const pageCount = doc.getPageCount();
   for (let i = 0; i < pageCount; i++) {
     const page = doc.getPage(i);
     const pw = page.getWidth();
     const ph = page.getHeight();
     const pageNum = i + 1;
+
+    // Images go under everything else, then shapes, then lines and notes, as on screen.
+    if (source && options.include.shapes) {
+      for (const mark of source.marks) {
+        if (mark.kind !== "image" || mark.page !== pageNum) continue;
+        const asset = source.assets.find((a) => a.id === mark.assetId);
+        const embedded = asset ? await embedAsset(asset.id, asset.type) : null;
+        if (!asset || !embedded) continue;
+        const heightPt = asset.widthPx > 0 ? mark.widthPt * (asset.heightPx / asset.widthPx) : mark.widthPt;
+        page.drawImage(embedded, { x: mark.x, y: ph - mark.y - heightPt, width: mark.widthPt, height: heightPt });
+      }
+    }
 
     // Shapes go under lines and notes, as on screen.
     if (source) {

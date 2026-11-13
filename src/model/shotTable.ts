@@ -259,6 +259,34 @@ export const TABLE_COLUMNS: TableColumn[] = [
 
 export const DEFAULT_HIDDEN_COLUMNS: string[] = [];
 
+/**
+ * Columns in the user's order. The Shot column always stays first; columns the
+ * saved order doesn't name (added later) keep their place after the one before them.
+ */
+export function orderColumns<T extends { id: string }>(columns: T[], order: string[]): T[] {
+  const [first, ...rest] = columns;
+  if (!first) return [];
+  const known = order.filter((id) => rest.some((c) => c.id === id));
+  const result = known.map((id) => rest.find((c) => c.id === id)!);
+  rest.forEach((c, i) => {
+    if (known.includes(c.id)) return;
+    const before = rest[i - 1];
+    const at = before ? result.indexOf(before) + 1 : 0;
+    result.splice(at, 0, c);
+  });
+  return [first, ...result];
+}
+
+/** The order after moving one column to just before (or after) another. */
+export function moveColumn(order: string[], id: string, target: string, after: boolean): string[] {
+  if (id === target) return order;
+  const without = order.filter((c) => c !== id);
+  const at = without.indexOf(target);
+  if (at < 0) return order;
+  without.splice(after ? at + 1 : at, 0, id);
+  return without;
+}
+
 /* ---------- filters ---------- */
 
 export type TableFilter = { field: "status" | "priority"; not: boolean; value: string };

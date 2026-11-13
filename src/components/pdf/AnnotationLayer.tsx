@@ -134,6 +134,18 @@ type PlacedNote = {
   italic: boolean;
 };
 
+/** The system file picker for one JPG or PNG. */
+function pickImageFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".jpg,.jpeg,.png,image/jpeg,image/png";
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
 const NO_IDS: string[] = [];
 
 export function AnnotationLayer({ pageNum, width, height }: Props) {
@@ -146,7 +158,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   // One mark: its handles, action bar and form. Several: they highlight and move together.
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : undefined;
   const cursorClass =
-    activeTool === "line" || activeTool === "shape" || activeTool === "pen" || activeTool === "polygon"
+    activeTool === "line" || activeTool === "shape" || activeTool === "pen" || activeTool === "polygon" || activeTool === "image"
       ? "tool-draw"
       : activeTool === "text"
         ? "tool-text"
@@ -395,6 +407,14 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     }
     if (activeTool === "polygon") {
       shapeGestures.polyClick(pu, e);
+      return;
+    }
+    if (activeTool === "image") {
+      // Image tool: pick a file, place it centered where the page was clicked, then back to Select.
+      const sheet = v2Project.script?.pages[pageNum - 1];
+      const at = sheet ? { x: clamp01(pu.x) * sheet.widthPt, y: clamp01(pu.y) * sheet.heightPt } : undefined;
+      useSessionStore.getState().setActiveTool("select");
+      void pickImageFile().then((file) => file && commands.addImage(file, pageNum, at));
       return;
     }
 
@@ -885,6 +905,18 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       onPointerUp={handlePointerUp}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      // A JPG or PNG dropped on the page is placed where it lands.
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        const file = [...e.dataTransfer.files].find((f) => f.type === "image/png" || f.type === "image/jpeg");
+        if (!file) return;
+        e.preventDefault();
+        const pu = getPointUnclamped(e);
+        const sheet = v2Project.script?.pages[pageNum - 1];
+        void commands.addImage(file, pageNum, sheet ? { x: clamp01(pu.x) * sheet.widthPt, y: clamp01(pu.y) * sheet.heightPt } : undefined);
+      }}
     >
       {shapeGestures.shapesLayer}
       {lines.map((line) => {

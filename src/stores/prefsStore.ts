@@ -57,6 +57,8 @@ type PrefsValues = {
   foldedGroups: Record<string, true>;
   /** Shot list table columns turned off, by column id. */
   hiddenTableColumns: string[];
+  /** Shot list table column order, by column id (empty: the built-in order). */
+  tableColumnOrder: string[];
   /** Keep unsaved work in this browser between visits. */
   autosave: boolean;
 };
@@ -81,6 +83,7 @@ type PrefsState = PrefsValues & {
   setGroupFolded: (group: string, folded: boolean) => void;
   setTableColumnHidden: (column: string, hidden: boolean) => void;
   showAllTableColumns: () => void;
+  setTableColumnOrder: (order: string[]) => void;
   setAutosave: (on: boolean) => void;
 };
 
@@ -162,6 +165,7 @@ export const usePrefsStore = create<PrefsState>()(
       panels: defaultPanelPrefs(),
       foldedGroups: {},
       hiddenTableColumns: [],
+      tableColumnOrder: [],
       autosave: true,
       ...readOldKeys(),
 
@@ -218,6 +222,7 @@ export const usePrefsStore = create<PrefsState>()(
         }),
       showAllTableColumns: () => set({ hiddenTableColumns: [] }),
       setAutosave: (autosave) => set({ autosave }),
+      setTableColumnOrder: (tableColumnOrder) => set({ tableColumnOrder }),
       setTableColumnHidden: (column, hidden) =>
         set((s) => ({
           hiddenTableColumns: hidden ? [...new Set([...s.hiddenTableColumns, column])] : s.hiddenTableColumns.filter((c) => c !== column),
@@ -235,6 +240,7 @@ export const usePrefsStore = create<PrefsState>()(
           ...s,
           // Tools added later (Shape) get their default key.
           hiddenTableColumns: Array.isArray(s.hiddenTableColumns) ? s.hiddenTableColumns : [],
+          tableColumnOrder: Array.isArray(s.tableColumnOrder) ? s.tableColumnOrder : [],
           autosave: s.autosave !== false,
           toolKeybinds: sanitizeToolKeybinds({ ...DEFAULT_TOOL_KEYBINDS, ...s.toolKeybinds }),
           panels: {
@@ -259,6 +265,7 @@ export const usePrefsStore = create<PrefsState>()(
         panels,
         foldedGroups,
         hiddenTableColumns,
+        tableColumnOrder,
         autosave,
       }): PrefsValues => ({
         colorTheme,
@@ -273,6 +280,7 @@ export const usePrefsStore = create<PrefsState>()(
         panels,
         foldedGroups,
         hiddenTableColumns,
+        tableColumnOrder,
         autosave,
       }),
     }

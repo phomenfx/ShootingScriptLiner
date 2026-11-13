@@ -67,6 +67,8 @@ export function useGlobalShortcuts() {
         return;
       }
       const outside = OUTSIDE_FIELDS[key];
+      // Ctrl+V with nothing copied inside the app: let the browser paste, so a copied picture arrives.
+      if (key === "v" && !e.shiftKey && !commands.hasAppClipboard()) return;
       if (outside && !typing) {
         e.preventDefault();
         outside(e.shiftKey);
@@ -77,10 +79,20 @@ export function useGlobalShortcuts() {
       if (isProjectUnsaved(useProjectStore.getState())) e.preventDefault();
     };
 
+    // A picture pasted from another app goes on the current page.
+    const onPaste = (e: ClipboardEvent) => {
+      if (isTyping(e.target)) return;
+      const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type === "image/png" || f.type === "image/jpeg");
+      if (!file) return;
+      e.preventDefault();
+      void commands.addImage(file);
+    };
+    window.addEventListener("paste", onPaste);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("paste", onPaste);
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, []);

@@ -28,10 +28,11 @@ import {
 } from "../../lib/shapeGeometry";
 import { segmentStrands } from "../../lib/strokeGeometry";
 import * as edits from "../../model/edits";
-import type { Project, ShapeMark } from "../../model/types";
+import type { ImageMark, Project, ShapeMark } from "../../model/types";
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
 import { usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
+import { useAssetStore } from "../../lib/assetStore";
 import type { LineCap } from "../../types/annotations";
 
 type Pt = { x: number; y: number };
@@ -40,7 +41,9 @@ type ShapeDrag =
   | { type: "draw"; start: Pt }
   | { type: "move"; origin: ShapeMark; start: Pt }
   | { type: "resize"; origin: ShapeMark; handle: Extract<ShapeHandle, { kind: "resize" }> }
-  | { type: "rotate"; origin: ShapeMark };
+  | { type: "rotate"; origin: ShapeMark }
+  | { type: "image-move"; origin: ImageMark; start: Pt }
+  | { type: "image-resize"; origin: ImageMark; handle: Extract<ShapeHandle, { kind: "resize" }> };
 
 const HANDLE_PX = 5;
 const ROTATE_GAP_PX = 22;
@@ -150,6 +153,17 @@ export function useShapeGestures({
   const k = width / widthPt;
   const shapes = project.marks.filter((m): m is ShapeMark => m.kind === "shape" && m.page === pageNum && isShapeShown(project, m));
   const selected = shapes.find((shape) => shape.id === selectedId) ?? null;
+
+  /* Images: an unrotated box whose height follows the picture's proportions. */
+  const urls = useAssetStore((s) => s.urls);
+  const images = project.marks.filter((m): m is ImageMark => m.kind === "image" && m.page === pageNum);
+  const imageBox = (img: ImageMark): ShapeMark => {
+    const asset = project.assets.find((a) => a.id === img.assetId);
+    const heightPt = asset && asset.widthPx > 0 ? img.widthPt * (asset.heightPx / asset.widthPx) : img.widthPt;
+    return { id: img.id, kind: "shape", page: img.page, shape: "rectangle", x: img.x, y: img.y, widthPt: img.widthPt, heightPt, rotation: 0 };
+  };
+  const selectedImage = images.find((img) => img.id === selectedId) ?? null;
+  const replaceImage = (img: ImageMark) => useProjectStore.getState().apply(edits.replaceMark(img));
 
   const dragRef = useRef<ShapeDrag | null>(null);
   const [preview, setPreview] = useState<ShapeMark | null>(null);
@@ -275,6 +289,19 @@ export function useShapeGestures({
 
   /** Select tool, before lines and notes: grabs a handle of the selected shape. */
   const grabHandle = (n: Pt, e: ReactPointerEvent): boolean => {
+    if (!selected && selectedImage) {
+      // Images resize from their corners only, keeping their proportions.
+      const p = toPt(n);
+      const reach = (HANDLE_PX + 3) / k;
+      const hit = shapeHandles(imageBox(selectedImage), 0).find(
+        (h) => h.handle.kind === "resize" && h.handle.sx !== 0 && h.handle.sy !== 0 && Math.hypot(h.at.x - p.x, h.at.y - p.y) <= reach
+      );
+      if (!hit || hit.handle.kind !== "resize") return false;
+      breakUndoGroup();
+      dragRef.current = { type: "image-resize", origin: selectedImage, handle: hit.handle };
+      capture(e);
+      return true;
+    }
     if (!selected) return false;
     const p = toPt(n);
     const reach = (HANDLE_PX + 3) / k;
@@ -290,7 +317,16 @@ export function useShapeGestures({
   const grabShape = (n: Pt, e: ReactPointerEvent): boolean => {
     const p = toPt(n);
     const hit = [...shapes].reverse().find((shape) => hitsShape(shape, p, clickPx / k));
-    if (!hit) return false;
+    if (!hit) {
+      // Images sit under shapes, so they are tried last.
+      const img = [...images].reverse().find((image) => hitsShape(imageBox(image), p, 0));
+      if (!img) return false;
+      useSessionStore.getState().select("mark", img.id);
+      breakUndoGroup();
+      dragRef.current = { type: "image-move", origin: img, start: p };
+      capture(e);
+      return true;
+    }
     useSessionStore.getState().select("mark", hit.id);
     breakUndoGroup();
     dragRef.current = { type: "move", origin: hit, start: p };
@@ -300,7 +336,7 @@ export function useShapeGestures({
 
   /** Shapes whose box touches a box given in page points. */
   const shapesInBox = (a: Pt, b: Pt): string[] =>
-    shapes
+    [...shapes, ...images.map(imageBox)]
       .filter((shape) => {
         const corners = shapeHandles(shape, 0).filter((h) => h.handle.kind === "resize").map((h) => h.at);
         const xs = corners.map((c) => c.x);
@@ -310,9 +346,13 @@ export function useShapeGestures({
       .map((shape) => shape.id);
 
   /** The top shape under a normalized page point, if any. */
-  const shapeAt = (n: Pt): ShapeMark | null => {
+  const shapeAt = (n: Pt): { id: string } | null => {
     const p = toPt(n);
-    return [...shapes].reverse().find((shape) => hitsShape(shape, p, clickPx / k)) ?? null;
+    return (
+      [...shapes].reverse().find((shape) => hitsShape(shape, p, clickPx / k)) ??
+      [...images].reverse().find((image) => hitsShape(imageBox(image), p, 0)) ??
+      null
+    );
   };
 
   /** Returns true when a shape gesture used the event. */
@@ -343,6 +383,11 @@ export function useShapeGestures({
     const p = toPt(n);
     if (drag.type === "draw") {
       setPreview(newShape(project, pageNum, boxFrom(drag.start, p, e.shiftKey), shapeKind, linkedShotId));
+    } else if (drag.type === "image-move") {
+      replaceImage({ ...drag.origin, x: drag.origin.x + p.x - drag.start.x, y: drag.origin.y + p.y - drag.start.y });
+    } else if (drag.type === "image-resize") {
+      const box = resizeShape(imageBox(drag.origin), drag.handle, p, true);
+      replaceImage({ ...drag.origin, x: box.x, y: box.y, widthPt: box.widthPt });
     } else if (drag.type === "move") {
       replace({ ...drag.origin, x: drag.origin.x + p.x - drag.start.x, y: drag.origin.y + p.y - drag.start.y });
     } else if (drag.type === "resize") {
@@ -416,6 +461,16 @@ export function useShapeGestures({
   ) : null;
   const shapesLayer: ReactNode = (
     <g className="shape-layer">
+      {images.map((img) => {
+        const box = imageBox(img);
+        const url = urls[img.assetId];
+        return url ? (
+          <image key={img.id} href={url} x={box.x * k} y={box.y * k} width={box.widthPt * k} height={box.heightPt * k} preserveAspectRatio="none" />
+        ) : (
+          // The picture file is missing: keep its place visible.
+          <rect key={img.id} x={box.x * k} y={box.y * k} width={box.widthPt * k} height={box.heightPt * k} fill="#9e9e9e" fillOpacity={0.25} stroke="#9e9e9e" strokeDasharray="4 3" />
+        );
+      })}
       {shapes.filter((shape) => !isHighlight(shape)).map((shape) => (
         <ShapeGraphic key={shape.id} project={project} shape={shape} k={k} />
       ))}
@@ -443,7 +498,7 @@ export function useShapeGestures({
       </svg>
     ) : null;
 
-  const multi = selectedIds.length > 1 ? shapes.filter((shape) => selectedIds.includes(shape.id)) : [];
+  const multi = selectedIds.length > 1 ? [...shapes, ...images.map(imageBox)].filter((shape) => selectedIds.includes(shape.id)) : [];
   const multiLayer: ReactNode = multi.length ? (
     <g className="shape-multi" pointerEvents="none">
       {multi.map((shape) => {
@@ -458,6 +513,21 @@ export function useShapeGestures({
       })}
     </g>
   ) : null;
+
+  const imageHandles: ReactNode = selectedImage
+    ? (() => {
+        const box = imageBox(selectedImage);
+        const corners = shapeHandles(box, 0).filter((h) => h.handle.kind === "resize" && h.handle.sx !== 0 && h.handle.sy !== 0);
+        return (
+          <g className="shape-handles" pointerEvents="none">
+            <rect x={box.x * k} y={box.y * k} width={box.widthPt * k} height={box.heightPt * k} fill="none" stroke="#4a9eff" strokeWidth={1} strokeDasharray="4 3" />
+            {corners.map((h, i) => (
+              <rect key={i} x={h.at.x * k - HANDLE_PX} y={h.at.y * k - HANDLE_PX} width={HANDLE_PX * 2} height={HANDLE_PX * 2} fill="#ffffff" stroke="#4a9eff" strokeWidth={1.5} />
+            ))}
+          </g>
+        );
+      })()
+    : null;
 
   const handlesLayer: ReactNode = selected ? (
     <g className="shape-handles" pointerEvents="none">
@@ -493,5 +563,5 @@ export function useShapeGestures({
     </g>
   ) : null;
 
-  return { startDraw, startPen, polyClick, finishPoly, grabHandle, grabShape, shapeAt, shapesInBox, move, up, shapesLayer, highlightLayer, handlesLayer: multiLayer ?? handlesLayer };
+  return { startDraw, startPen, polyClick, finishPoly, grabHandle, grabShape, shapeAt, shapesInBox, move, up, shapesLayer, highlightLayer, handlesLayer: multiLayer ?? handlesLayer ?? imageHandles };
 }

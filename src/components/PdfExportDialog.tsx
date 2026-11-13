@@ -100,7 +100,7 @@ export function PdfExportDialog() {
                     ["lines", "Lines"],
                     ["captions", "Captions"],
                     ["notes", "Notes"],
-                    ["shapes", "Shapes"],
+                    ["shapes", "Shapes and images"],
                     ["unlinked", "Marks not linked to a shot"],
                   ] as const
                 ).map(([key, label]) => (
