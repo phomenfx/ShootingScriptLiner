@@ -1,3 +1,5 @@
+import { openRepo } from "../../lib/about";
+import { installApp, useCanInstall } from "../../lib/installApp";
 import { ChevronDown, FolderOpen, Menu as MenuIcon, Monitor, Moon, Save, Settings, Sun, Upload } from "lucide-react";
 import { useStore } from "zustand";
 import * as commands from "../../commands";
@@ -37,6 +39,7 @@ export function TopBar() {
   ];
 
   const hasScript = useProjectStore((s) => !!s.project.script);
+  const canInstall = useCanInstall();
   const fileEntries: MenuEntry[] = [
     { label: "New project", onSelect: () => void commands.requestNewProject() },
     { label: "Open…", shortcut: "Ctrl+O", onSelect: () => void commands.requestOpenProject() },
@@ -53,6 +56,10 @@ export function TopBar() {
     SEPARATOR,
     { label: "Project settings…", shortcut: "Ctrl+,", onSelect: () => openSettings(true) },
     { label: "Keyboard shortcuts", shortcut: "?", onSelect: () => openSettings(true, "shortcuts") },
+    SEPARATOR,
+    { label: "About Shooting Script Liner…", onSelect: () => openSettings(true, "about") },
+    { label: "View source on GitHub", hint: "Free and open source under the MIT license", onSelect: openRepo },
+    ...(canInstall ? [SEPARATOR, { label: "Install app…", hint: "Add it to your desktop or home screen; it then opens in its own window and works offline.", onSelect: () => void installApp() }] : []),
   ];
 
   const findEntry: MenuEntry = { label: "Find on script…", shortcut: "Ctrl+F", onSelect: commands.openFind };
@@ -149,10 +156,15 @@ export function TopBar() {
     SEPARATOR,
     { label: "Settings…", shortcut: "Ctrl+,", onSelect: () => openSettings(true) },
     { label: "Keyboard shortcuts", shortcut: "?", onSelect: () => openSettings(true, "shortcuts") },
+    SEPARATOR,
+    { label: "About Shooting Script Liner…", onSelect: () => openSettings(true, "about") },
+    { label: "View source on GitHub", hint: "Free and open source under the MIT license", onSelect: openRepo },
+    ...(canInstall ? [SEPARATOR, { label: "Install app…", hint: "Add it to your desktop or home screen; it then opens in its own window and works offline.", onSelect: () => void installApp() }] : []),
   ];
 
   return (
     <header className="topbar">
+      <img className="topbar-logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={22} height={22} />
       <span className="topbar-brand">Shooting Script Liner</span>
       <nav className="topbar-menus" aria-label="Main menu">
         <Menu trigger="File" entries={fileEntries} />

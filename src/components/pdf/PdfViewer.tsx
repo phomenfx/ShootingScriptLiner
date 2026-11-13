@@ -1,3 +1,4 @@
+import { useTouchGestures } from "../../hooks/useTouchGestures";
 import { FindBar } from "./FindBar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
@@ -29,6 +30,8 @@ type Props = {
 };
 
 export function PdfViewer({ file }: Props) {
+  const viewerRef = useRef<HTMLDivElement>(null);
+  useTouchGestures(viewerRef);
   const [dropping, setDropping] = useState(false);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const viewerPage = useSessionStore((s) => s.viewerPage);
@@ -163,7 +166,7 @@ export function PdfViewer({ file }: Props) {
   };
 
   return (
-    <div className="pdf-viewer">
+    <div className="pdf-viewer" ref={viewerRef}>
       <ScriptToolbar />
       <FindBar />
       {loadError && <p className="pdf-error">{loadError}</p>}

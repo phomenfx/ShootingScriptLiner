@@ -63,3 +63,53 @@ body {
   font-size: 18px;
   line-height: 1;
 }
+
+/*
+ * Touch screens: bigger buttons and fields so a finger can hit them. Mouse
+ * users see the normal sizes.
+ */
+@media (pointer: coarse) {
+  .script-iconbtn,
+  .script-tool,
+  .panel-icon-btn,
+  .pf-icon-btn,
+  .pf-lock {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+  .pf-input,
+  .pf-btn,
+  .dialog-btn,
+  .tool-btn,
+  .topbar-btn,
+  .pf-segmented button,
+  select {
+    min-height: 2.5rem;
+  }
+  .pf-chips {
+    min-height: 2.5rem;
+  }
+  .menu-item {
+    min-height: 2.75rem;
+  }
+  .color-bar-swatch,
+  .script-swatches .color-bar-swatch {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+  .script-swatches {
+    grid-template-columns: repeat(6, 1.75rem);
+  }
+  .tag-picker-option {
+    line-height: 2rem;
+    padding: 0 0.75rem;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .panel-resizer {
+    width: 16px;
+  }
+}

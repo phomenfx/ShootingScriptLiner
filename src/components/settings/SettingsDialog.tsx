@@ -1,3 +1,4 @@
+import { APP_VERSION, LICENSE_URL, REPO_URL } from "../../lib/about";
 import { defaultsFromProject, SUGGESTION_FIELDS, suggestionsFor } from "../../model/suggestions";
 import { fromPoints, lengthStep, toPoints, type LengthUnit } from "../../lib/units";
 import { clearRevisionTags, REVISION_COLORS, revisionColor } from "../../model/revisions";
@@ -10,6 +11,7 @@ import {
   FileText,
   Film,
   Gauge,
+  Info,
   Keyboard,
   List,
   ListPlus,
@@ -984,6 +986,17 @@ export function SettingsDialog() {
       icon: <MousePointer2 {...icon} />,
       rows: [
         {
+          label: "Fingers on the script",
+          hint: "With a touch screen. Auto: fingers draw until you use a pen, then they scroll and the pen draws. Two fingers always pinch to zoom and scroll; holding a finger still opens the right-click menu.",
+          control: (
+            <select value={prefs.touchFingers} onChange={(e) => prefs.setTouchFingers(e.target.value as "auto" | "draw" | "pan")}>
+              <option value="auto">Auto (scroll once a pen is used)</option>
+              <option value="draw">Draw and select</option>
+              <option value="pan">Scroll (tap to select)</option>
+            </select>
+          ),
+        },
+        {
           label: "Click distance",
           hint: "How close a click has to be to a line, shape or pen stroke to select it.",
           control: (
@@ -1045,6 +1058,57 @@ export function SettingsDialog() {
                 </div>
               ))}
             </dl>
+          ),
+        },
+      ],
+    },
+    {
+      id: "about",
+      group: "Preferences",
+      title: "About",
+      icon: <Info {...icon} />,
+      rows: [
+        {
+          label: "Shooting Script Liner",
+          control: (
+            <span className="set-about">
+              <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={40} height={40} />
+              <span>Version {APP_VERSION}</span>
+            </span>
+          ),
+        },
+        {
+          label: "License",
+          hint: "Use it, share it and change it freely, as the MIT license says.",
+          control: (
+            <span>
+              Free and open source under the{" "}
+              <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer">
+                MIT license
+              </a>
+              .
+            </span>
+          ),
+        },
+        {
+          label: "Source code",
+          hint: "Report problems, suggest features or read the code.",
+          control: (
+            <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
+              github.com/phomenfx/ShootingScriptLiner
+            </a>
+          ),
+        },
+        {
+          label: "Icons",
+          control: (
+            <span>
+              From{" "}
+              <a href="https://lucide.dev" target="_blank" rel="noopener noreferrer">
+                Lucide
+              </a>{" "}
+              (ISC license), including the app icon.
+            </span>
           ),
         },
       ],

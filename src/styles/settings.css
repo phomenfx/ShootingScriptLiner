@@ -442,3 +442,13 @@
     gap: 0.25rem;
   }
 }
+
+/* About: the app icon and version. */
+.set-about {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.set-about img {
+  border-radius: 9px;
+}

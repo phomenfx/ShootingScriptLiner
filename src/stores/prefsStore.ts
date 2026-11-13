@@ -81,6 +81,8 @@ type PrefsValues = {
   restorePoints: number;
   /** Where the action bar's preset swatches open. */
   actionBarSwatches: "above" | "below";
+  /** One finger on the script: draws, scrolls, or scrolls once a pen has been used. */
+  touchFingers: "auto" | "draw" | "pan";
   /** Unit lengths are shown in (stored in points either way). */
   lengthUnit: LengthUnit;
   /** My default suggestion lists (never Cast): projects without their own use these. */
@@ -118,6 +120,7 @@ type PrefsState = PrefsValues & {
   setAutosaveSeconds: (seconds: number) => void;
   setRestorePoints: (count: number) => void;
   setActionBarSwatches: (where: "above" | "below") => void;
+  setTouchFingers: (mode: "auto" | "draw" | "pan") => void;
   setLengthUnit: (unit: LengthUnit) => void;
   setSuggestionDefaults: (lists: SuggestionLists) => void;
 };
@@ -217,6 +220,7 @@ export const usePrefsStore = create<PrefsState>()(
       autosaveSeconds: 3,
       restorePoints: 5,
       // On a Mac the system color picker opens over the top, so the swatches start below.
+      touchFingers: "auto",
       actionBarSwatches: typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || navigator.userAgent) ? "below" : "above",
       lengthUnit: "pt",
       suggestionDefaults: {},
@@ -278,6 +282,7 @@ export const usePrefsStore = create<PrefsState>()(
       setAutosaveSeconds: (autosaveSeconds) => set({ autosaveSeconds }),
       setRestorePoints: (restorePoints) => set({ restorePoints }),
       setActionBarSwatches: (actionBarSwatches) => set({ actionBarSwatches }),
+      setTouchFingers: (touchFingers) => set({ touchFingers }),
       setLengthUnit: (lengthUnit) => set({ lengthUnit }),
       setSuggestionDefaults: (suggestionDefaults) => set({ suggestionDefaults }),
       setTableColumnOrder: (tableColumnOrder) => set({ tableColumnOrder }),
@@ -319,6 +324,7 @@ export const usePrefsStore = create<PrefsState>()(
           autosaveSeconds: typeof s.autosaveSeconds === "number" && s.autosaveSeconds > 0 ? s.autosaveSeconds : 3,
           restorePoints: typeof s.restorePoints === "number" && s.restorePoints >= 0 ? s.restorePoints : 5,
           ...(s.actionBarSwatches === "above" || s.actionBarSwatches === "below" ? { actionBarSwatches: s.actionBarSwatches } : {}),
+          touchFingers: s.touchFingers === "draw" || s.touchFingers === "pan" ? s.touchFingers : "auto",
           lengthUnit: isLengthUnit(s.lengthUnit) ? s.lengthUnit : "pt",
           suggestionDefaults: s.suggestionDefaults && typeof s.suggestionDefaults === "object" ? (s.suggestionDefaults as SuggestionLists) : {},
           toolKeybinds: sanitizeToolKeybinds({ ...DEFAULT_TOOL_KEYBINDS, ...s.toolKeybinds }),
@@ -354,6 +360,7 @@ export const usePrefsStore = create<PrefsState>()(
         autosaveSeconds,
         restorePoints,
         actionBarSwatches,
+        touchFingers,
         lengthUnit,
         suggestionDefaults,
       }): PrefsValues => ({
@@ -379,6 +386,7 @@ export const usePrefsStore = create<PrefsState>()(
         autosaveSeconds,
         restorePoints,
         actionBarSwatches,
+        touchFingers,
         lengthUnit,
         suggestionDefaults,
       }),

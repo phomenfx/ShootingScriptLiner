@@ -1,3 +1,4 @@
+import { touchScale } from "./touch";
 import type { TextAlign } from "../types/annotations";
 
 export const LINE_HEIGHT_EM = 1.2;
@@ -315,7 +316,8 @@ export function hitBoxHandle(
   radius = 6
 ): BoxHandle | null {
   let best: BoxHandle | null = null;
-  let bestDist = radius * radius;
+  const r = radius * touchScale();
+  let bestDist = r * r;
   for (const handle of BOX_HANDLES) {
     const point = boxHandlePoint(frame, handle);
     const dist = (px - point.x) ** 2 + (py - point.y) ** 2;

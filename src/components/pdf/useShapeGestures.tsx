@@ -3,6 +3,7 @@
  * resize and rotate handles. The page layer calls into this before and after
  * its own line and note handling, so lines and notes stay on top.
  */
+import { touchScale } from "../../lib/touch";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { newId } from "../../lib/ids";
 import { renderLineCap } from "../../lib/lineCaps";
@@ -49,7 +50,8 @@ type ShapeDrag =
   | { type: "image-move"; origin: ImageMark; start: Pt }
   | { type: "image-resize"; origin: ImageMark; handle: Extract<ShapeHandle, { kind: "resize" }> };
 
-const HANDLE_PX = 5;
+/** Handle size in screen pixels: bigger on touch screens. */
+const HANDLE_PX = 5 * touchScale();
 const ROTATE_GAP_PX = 22;
 const DEFAULT_BOX = { widthPt: 96, heightPt: 60 };
 const HIGHLIGHT_COLOR = "#FFE14D";
@@ -594,5 +596,13 @@ export function useShapeGestures({
     </g>
   ) : null;
 
-  return { startDraw, startPen, polyClick, finishPoly, grabHandle, grabShape, shapeAt, shapesInBox, move, up, shapesLayer, highlightLayer, handlesLayer: multiLayer ?? handlesLayer ?? imageHandles };
+  /** Drops a gesture in progress without finishing it (a pinch took over). The caller puts the project back. */
+  const cancel = () => {
+    penRef.current = null;
+    dragRef.current = null;
+    setDraft(null);
+    setPreview(null);
+  };
+
+  return { startDraw, startPen, polyClick, finishPoly, grabHandle, grabShape, shapeAt, shapesInBox, move, up, cancel, shapesLayer, highlightLayer, handlesLayer: multiLayer ?? handlesLayer ?? imageHandles };
 }

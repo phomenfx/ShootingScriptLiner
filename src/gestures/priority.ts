@@ -3,6 +3,7 @@
  * Order: Alt-clone, selected handles, selected label origin, selected label
  * handles, note body, label body, a hit mark, the line under the pointer, clear.
  */
+import { touchScale } from "../lib/touch";
 import { alignmentPoint, hitBoxHandle, pointInFrame, type BoxHandle, type TextFrame } from "../lib/textBox";
 import type { LineAnnotation, TextAlign, TextAnnotation } from "../types/annotations";
 import { type LineHandle } from "./lineDrag";
@@ -32,12 +33,13 @@ export type SelectTarget =
   | { type: "clear" };
 
 function hitHandle(px: number, py: number, hx: number, hy: number, radius = 10): boolean {
-  return (px - hx) ** 2 + (py - hy) ** 2 <= radius * radius;
+  const r = radius * touchScale();
+  return (px - hx) ** 2 + (py - hy) ** 2 <= r * r;
 }
 
 function hitOrigin(px: number, py: number, frame: TextFrame, align: TextAlign): boolean {
   const point = alignmentPoint(frame, align, true);
-  return (px - point.x) ** 2 + (py - point.y) ** 2 <= 64;
+  return (px - point.x) ** 2 + (py - point.y) ** 2 <= (8 * touchScale()) ** 2;
 }
 
 export function pickSelectTarget(input: {

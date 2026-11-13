@@ -524,3 +524,12 @@
 .menu-item[data-state="open"] {
   background: var(--color-btn-hover);
 }
+
+/* The app icon before the name (it stays when the name is hidden on narrow windows). */
+.topbar-logo {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-right: 0.5rem;
+  border-radius: 5px;
+}

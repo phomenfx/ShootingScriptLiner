@@ -1,3 +1,4 @@
+import { useLongPress } from "./hooks/useTouchGestures";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ContextMenuHost } from "./components/ContextMenu";
 import { ImportDialog } from "./components/ImportDialog";
@@ -17,6 +18,7 @@ import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 
 function App() {
   useGlobalShortcuts();
+  useLongPress();
   useEffect(() => commands.startAutosaveAndOfferRestore(), []);
 
   return (

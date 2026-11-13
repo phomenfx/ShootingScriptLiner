@@ -21,6 +21,17 @@ export const MAX_PANEL_WIDTH_RATIO = 0.4;
 /** Width of a collapsed panel's strip. */
 export const COLLAPSED_PANEL_WIDTH_PX = 34;
 
+/** Below this window width only one side panel is open at a time. */
+export const COMPACT_BELOW_PX = 1100;
+/** Below this the open panel slides over the script instead of pushing it aside. */
+export const OVERLAY_BELOW_PX = 760;
+
+export type ShellMode = "wide" | "compact" | "narrow";
+
+export function shellMode(windowWidth: number): ShellMode {
+  return windowWidth >= COMPACT_BELOW_PX ? "wide" : windowWidth >= OVERLAY_BELOW_PX ? "compact" : "narrow";
+}
+
 export function defaultPanelPrefs(): PanelPrefs {
   return {
     widthPx: { ...DEFAULT_PANEL_WIDTH_PX },

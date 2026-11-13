@@ -58,6 +58,12 @@ type SessionState = {
   /** Find on script (Ctrl+F). */
   find: { open: boolean; query: string; matches: FindMatch[]; index: number; busy: boolean };
   setFind: (patch: Partial<SessionState["find"]>) => void;
+  /** On a narrow window, the one side panel that is open (null: none). */
+  compactPanel: "properties" | "scenes" | null;
+  setCompactPanel: (panel: "properties" | "scenes" | null) => void;
+  /** A pen has been used here: fingers scroll instead of drawing (Auto setting). */
+  stylusSeen: boolean;
+  setStylusSeen: (seen: boolean) => void;
   restorePointsOpen: boolean;
   setRestorePointsOpen: (open: boolean) => void;
   settingsOpen: boolean;
@@ -138,6 +144,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   outlineClipboard: null,
   find: { open: false, query: "", matches: [], index: 0, busy: false },
   setFind: (patch) => set((s) => ({ find: { ...s.find, ...patch } })),
+  compactPanel: "properties",
+  setCompactPanel: (compactPanel) => set({ compactPanel }),
+  stylusSeen: false,
+  setStylusSeen: (stylusSeen) => set({ stylusSeen }),
   restorePointsOpen: false,
   setRestorePointsOpen: (restorePointsOpen) => set({ restorePointsOpen }),
   settingsOpen: false,

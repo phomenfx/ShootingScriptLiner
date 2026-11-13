@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { startInstallSupport } from "./lib/installApp";
 import App from "./App";
 import { applyColorTheme, applyUiScale } from "./lib/appPreferences";
 import { usePrefsStore } from "./stores/prefsStore";
@@ -25,6 +26,8 @@ void loadBundledFonts().then(() => {
     );
   }
 });
+
+startInstallSupport();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

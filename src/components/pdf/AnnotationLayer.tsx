@@ -1,3 +1,4 @@
+import { touchScale } from "../../lib/touch";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   annotationsForPage,
@@ -198,6 +199,8 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     };
   }, []);
 
+  /** The project when the current gesture began, so a cancelled one can be put back. */
+  const downProjectRef = useRef<typeof v2Project | null>(null);
   const dragRef = useRef<DragMode>(null);
   const [drag, setDragState] = useState<DragMode>(null);
   const setDrag = (next: DragMode) => {
@@ -358,7 +361,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
 
   const smoothLineIds = new Set(v2Project.marks.filter((m) => m.kind === "line" && m.smooth).map((m) => m.id));
   const findSegmentAt = (p: NormalizedPoint): { line: LineAnnotation; index: number } | null => {
-    const threshold = lineHitTolerancePx / Math.max(width, height);
+    const threshold = (lineHitTolerancePx * touchScale()) / Math.max(width, height);
     for (const line of [...lines].reverse()) {
       // A smooth line is hit along its curve, not the straight chord.
       const smooth = smoothLineIds.has(line.id) && line.points.length > 2;
@@ -404,6 +407,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
   const lockedIds = new Set(v2Project.marks.filter((mark) => mark.locked).map((mark) => mark.id));
   const handlePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    downProjectRef.current = useProjectStore.getState().project;
     e.preventDefault();
     window.getSelection()?.removeAllRanges();
     setActivePage(pageNum);
@@ -820,6 +824,22 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     if (hit) useSessionStore.getState().setActiveTool("select");
   };
 
+  /** A gesture cut short (two fingers became a pinch): nothing is added, and anything moved goes back. */
+  const handlePointerCancel = () => {
+    groupRef.current = null;
+    marqueeRef.current = null;
+    setMarquee(null);
+    setDrag(null);
+    setPreviewEnd(null);
+    shapeGestures.cancel();
+    const before = downProjectRef.current;
+    downProjectRef.current = null;
+    if (before && useProjectStore.getState().project !== before) {
+      useProjectStore.getState().apply(() => before);
+    }
+    breakUndoGroup();
+  };
+
   const handlePointerUp = (e: React.PointerEvent) => {
     if (groupRef.current) {
       groupRef.current = null;
@@ -933,6 +953,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
       // A JPG or PNG dropped on the page is placed where it lands.
@@ -1086,7 +1107,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         return (
           <g key={`${line.id}-handles`}>
             {pts.map((point, index) => (
-              <circle key={`v${index}`} className="line-handle" cx={point.x} cy={point.y} r={6} />
+              <circle key={`v${index}`} className="line-handle" cx={point.x} cy={point.y} r={6 * touchScale()} />
             ))}
             {pts.slice(0, -1).map((point, index) => {
               const next = pts[index + 1]!;
@@ -1096,7 +1117,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
                   className="line-handle line-handle-center"
                   cx={(point.x + next.x) / 2}
                   cy={(point.y + next.y) / 2}
-                  r={6}
+                  r={6 * touchScale()}
                 />
               );
             })}

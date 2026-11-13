@@ -216,3 +216,33 @@ body.panel-resizing iframe {
   grid-column: 2 / 4;
   z-index: 2;
 }
+
+/* Narrow windows: the open side panel slides over the script. */
+.shell-script {
+  position: relative;
+}
+.shell-side.is-overlay {
+  z-index: 30;
+}
+.shell-side.is-overlay > .panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--overlay-width, 300px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.shell-side-left.is-overlay > .panel {
+  left: 0;
+}
+.shell-side-right.is-overlay > .panel {
+  right: 0;
+}
+.shell-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  padding: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: default;
+}

@@ -89,6 +89,8 @@ Vitest
 
 MIT — see [LICENSE](LICENSE).
 
+Icons, including the app icon (made from `file-pen-line`), are from [Lucide](https://lucide.dev) under the ISC license — see [public/ICONS-LICENSE.txt](public/ICONS-LICENSE.txt).
+
 ## AI Disclosure
 
 AI was used in the development of this project to assist with  refactoring, debugging, and documentation.  I'm a filmmaker, not a programmer; I created this tool because this kept becoming a slow portion of my preproduction workflow and, as far as I could find, no other tool filled this niche.  If that affects whether you trust or use the tool, I completely understand.  As a creative, I am not a fan of AI either, but it made this project possible to be made.  All creative decisions (features, UX, shot/outliner behavior, and base functionality) are mine.
