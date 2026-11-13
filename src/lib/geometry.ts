@@ -33,7 +33,11 @@ export function endingGeometry(ending: LineEnding, widthPt: number): EndingGeome
   const s = endingSizePt(ending.scalePercent);
   const strokePt = Math.max(0.75, Math.max(0, widthPt) * 0.8);
   const filled = ending.filled && capSupportsFill(ending.cap);
-  const shaftInsetPt = ending.cap === "arrow" ? s : ending.cap === "doubleArrow" ? (filled ? s * 1.6 : s * 0.6) : 0;
+  // A filled arrow covers the end of the line, so the line stops at its base. An open
+  // arrow is only two strokes, so the line runs on to its tip (less half its width,
+  // so the rounded end stays inside the point).
+  const openTip = Math.min(s, Math.max(0, widthPt) / 2);
+  const shaftInsetPt = ending.cap === "arrow" ? (filled ? s : openTip) : ending.cap === "doubleArrow" ? (filled ? s * 1.6 : s * 0.6) : 0;
 
   switch (ending.cap) {
     case "arrow":

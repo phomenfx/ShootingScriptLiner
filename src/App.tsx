@@ -3,6 +3,7 @@ import { ContextMenuHost } from "./components/ContextMenu";
 import { ImportDialog } from "./components/ImportDialog";
 import { PdfExportDialog } from "./components/PdfExportDialog";
 import { ShotListPdfDialog } from "./components/ShotListPdfDialog";
+import { RestorePointsDialog } from "./components/RestorePointsDialog";
 import { NoticeArea } from "./components/NoticeArea";
 import { ScenePanel, ScenesViewSwitch } from "./components/scenes/ScenePanel";
 import { ScriptPane } from "./components/pdf/ScriptPane";
@@ -32,6 +33,7 @@ function App() {
       <ImportDialog />
       <PdfExportDialog />
       <ShotListPdfDialog />
+      <RestorePointsDialog />
       <ConfirmDialog />
       <ContextMenuHost />
     </>

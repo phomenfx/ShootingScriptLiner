@@ -377,7 +377,7 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
                 : apply(edits.updateShot(shot.id, (current) => withSceneNumberPrint(project, current, on)))
             }
           >
-            <CommitInput label="Scene number" value={sceneNo} onCommit={(text) => commands.renumberShot(shot.id, text || sceneNo, shotNo, linkId)} />
+            <CommitInput label="Scene number" value={sceneNo} auto={scene.number === undefined} onCommit={(text) => commands.renumberShot(shot.id, text || sceneNo, shotNo, linkId)} />
           </Field>
           <Field
             label="Shot #"
@@ -388,7 +388,7 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
             }
             {...print("shotNumber")}
           >
-            <CommitInput label="Shot number" value={shot.number === undefined ? "" : shotNo} placeholder={shotNo} onCommit={(text) => commands.renumberShot(shot.id, sceneNo, text, linkId)} />
+            <CommitInput label="Shot number" value={shotNo} auto={shot.number === undefined} onCommit={(text) => commands.renumberShot(shot.id, sceneNo, text, linkId)} />
           </Field>
           <Field label="Shot type" {...print("type")}>
             {withMarkLock(
@@ -585,7 +585,7 @@ export function SceneInspector({ project, scene }: { project: Project; scene: Sc
       <div className="pf-scroll">
         <Group name="scene" title={`Scene ${number}`}>
           <Field label="Scene #" hint="A free number moves the scene there in order (5A, 12…). Another scene's number swaps the two. Leave empty to count on from the scene before.">
-            <CommitInput label="Scene number" value={scene.number ?? ""} placeholder={number} onCommit={(text) => commands.renumberScene(scene.id, text)} />
+            <CommitInput label="Scene number" value={number} auto={scene.number === undefined} onCommit={(text) => commands.renumberScene(scene.id, text)} />
           </Field>
           {scene.shots.some((s) => s.number !== undefined) ? (
             <Field label="Shot numbers" hint="Some shots here have typed numbers.">

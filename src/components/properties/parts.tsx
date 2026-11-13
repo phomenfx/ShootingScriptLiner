@@ -149,7 +149,7 @@ export function TextInput({ value, label, placeholder, disabled, suggestions, mu
  * A text box that changes nothing until Enter or leaving it, for values whose
  * change moves things around (scene and shot numbers). Escape puts it back.
  */
-export function CommitInput({ value, label, placeholder, onCommit }: { value: string; label: string; placeholder?: string; onCommit: (value: string) => void }) {
+export function CommitInput({ value, label, placeholder, auto, onCommit }: { value: string; label: string; placeholder?: string; auto?: boolean; onCommit: (value: string) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
     if (draft !== null && draft.trim() !== value) onCommit(draft.trim());
@@ -157,8 +157,9 @@ export function CommitInput({ value, label, placeholder, onCommit }: { value: st
   };
   return (
     <input
-      className="pf-input"
+      className={`pf-input${auto && draft === null ? " pf-input-auto" : ""}`}
       aria-label={label}
+      title={auto ? "Counted from its place in the list. Type a number to set one." : undefined}
       value={draft ?? value}
       placeholder={placeholder}
       onChange={(e) => setDraft(e.target.value)}

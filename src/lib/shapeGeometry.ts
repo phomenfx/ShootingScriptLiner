@@ -4,6 +4,7 @@
  */
 import type { Project, ShapeMark } from "../model/types";
 import type { Point } from "./geometry";
+import { polylineStrands, segmentStrands, smoothPath, type PatternTune, type StrokeStrand } from "./strokeGeometry";
 
 /** Shapes offered by the Shape tool. Older files may still hold a "bracket", which keeps drawing. */
 export const SHAPE_KINDS = ["rectangle", "ellipse", "highlight", "polygon", "star", "stamp"] as const;
@@ -22,6 +23,8 @@ export type ShapeOutline = {
   /** Page points after rotation. */
   points: Point[];
   closed: boolean;
+  /** A curve (ellipse, smoothed path): stroked as one continuous path, not edge by edge. */
+  curved?: boolean;
 };
 
 export function shapeCenter(shape: Pick<ShapeMark, "x" | "y" | "widthPt" | "heightPt">): Point {
@@ -50,12 +53,14 @@ export function shapeOutline(shape: ShapeMark): ShapeOutline | null {
   const h = shape.heightPt / 2;
   let local: Point[];
   let closed = true;
+  let curved = false;
   switch (shape.shape) {
     case "ellipse":
       local = Array.from({ length: ELLIPSE_STEPS }, (_, i) => {
         const a = (i / ELLIPSE_STEPS) * Math.PI * 2;
         return { x: Math.cos(a) * w, y: Math.sin(a) * h };
       });
+      curved = true;
       break;
     case "polygon": {
       const sides = Math.max(3, Math.min(64, Math.round(shape.sides ?? 6)));
@@ -92,6 +97,12 @@ export function shapeOutline(shape: ShapeMark): ShapeOutline | null {
       if (!path || path.points.length < 2) return null;
       local = path.points.map((p) => ({ x: (p.x - 0.5) * shape.widthPt, y: (p.y - 0.5) * shape.heightPt }));
       closed = path.closed && path.points.length >= 3;
+      if (path.smooth && path.points.length >= 3) {
+        // The curve through the points; a closed one ends where it began, so drop the repeat.
+        const curve = smoothPath(local, closed);
+        local = closed ? curve.slice(0, -1) : curve;
+        curved = true;
+      }
       break;
     }
     default:
@@ -103,7 +114,7 @@ export function shapeOutline(shape: ShapeMark): ShapeOutline | null {
       ];
   }
   const center = shapeCenter(shape);
-  return { points: local.map((p) => rotateAround(center, p, shape.rotation)), closed };
+  return { points: local.map((p) => rotateAround(center, p, shape.rotation)), closed, curved };
 }
 
 /**
@@ -159,6 +170,15 @@ export function pathBox(points: Point[]): { x: number; y: number; widthPt: numbe
     h = MIN_SHAPE_PT;
   }
   return { x: minX, y: minY, widthPt: w, heightPt: h, path: points.map((p) => ({ x: (p.x - minX) / w, y: (p.y - minY) / h })) };
+}
+
+/** The stroke of an outline: a curve as one path, so patterns run smoothly round it; corners edge by edge. */
+export function outlineStrands(outline: ShapeOutline, stroke: { pattern: string; widthPt: number } & PatternTune): StrokeStrand[] {
+  if (outline.curved) {
+    const path = outline.closed ? [...outline.points, outline.points[0]!] : outline.points;
+    return polylineStrands(path, stroke.pattern, stroke.widthPt, stroke);
+  }
+  return outlineEdges(outline).flatMap(([a, b]) => segmentStrands(a, b, stroke.pattern, stroke.widthPt, stroke));
 }
 
 /** The edges to stroke, each from one outline point to the next. */
@@ -283,4 +303,49 @@ export function rotationToward(shape: ShapeMark, page: Point, snapDegrees?: numb
   let degrees = (Math.atan2(page.y - c.y, page.x - c.x) * 180) / Math.PI + 90;
   if (snapDegrees && snapDegrees > 0) degrees = Math.round(degrees / snapDegrees) * snapDegrees;
   return ((degrees % 360) + 360) % 360;
+}
+
+/* ---------- corners of Pen and Polygon paths ---------- */
+
+/** Paths with more points than this (long freehand strokes) show no corner handles. */
+export const MAX_CORNER_HANDLES = 40;
+
+/** Where each path point sits on the page. */
+export function pathCorners(shape: ShapeMark): Point[] {
+  if (!shape.path) return [];
+  const center = shapeCenter(shape);
+  return shape.path.points.map((p) => rotateAround(center, { x: (p.x - 0.5) * shape.widthPt, y: (p.y - 0.5) * shape.heightPt }, shape.rotation));
+}
+
+/** The shape with one corner moved to a page point (the box is refitted afterwards). */
+export function moveCorner(shape: ShapeMark, index: number, page: Point): ShapeMark {
+  if (!shape.path) return shape;
+  const local = toLocal(shapeCenter(shape), page, shape.rotation);
+  const points = shape.path.points.map((p, i) =>
+    i === index ? { x: local.x / Math.max(shape.widthPt, 1e-6) + 0.5, y: local.y / Math.max(shape.heightPt, 1e-6) + 0.5 } : p
+  );
+  return { ...shape, path: { ...shape.path, points } };
+}
+
+/** Fits the box to the path's points again, keeping rotation and where every point sits on the page. */
+export function refitPath(shape: ShapeMark): ShapeMark {
+  if (!shape.path || shape.path.points.length < 2) return shape;
+  const local = shape.path.points.map((p) => ({ x: (p.x - 0.5) * shape.widthPt, y: (p.y - 0.5) * shape.heightPt }));
+  const xs = local.map((p) => p.x);
+  const ys = local.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const w = Math.max(MIN_SHAPE_PT, Math.max(...xs) - minX);
+  const h = Math.max(MIN_SHAPE_PT, Math.max(...ys) - minY);
+  const center = rotateAround(shapeCenter(shape), { x: minX + (Math.max(...xs) - minX) / 2, y: minY + (Math.max(...ys) - minY) / 2 }, shape.rotation);
+  const midX = minX + (Math.max(...xs) - minX) / 2;
+  const midY = minY + (Math.max(...ys) - minY) / 2;
+  return {
+    ...shape,
+    x: center.x - w / 2,
+    y: center.y - h / 2,
+    widthPt: w,
+    heightPt: h,
+    path: { ...shape.path, points: local.map((p) => ({ x: (p.x - midX) / w + 0.5, y: (p.y - midY) / h + 0.5 })) },
+  };
 }

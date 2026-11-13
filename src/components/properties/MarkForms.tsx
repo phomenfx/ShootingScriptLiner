@@ -362,6 +362,25 @@ export function LineInspector({ project, line }: { project: Project; line: LineM
               </Field>
             )
           )}
+          {line.points.length > 2 && (
+            <Field label="Bends" wide>
+              <Segmented
+                label="Bends"
+                value={line.smooth ? "smooth" : "corners"}
+                options={[
+                  { value: "corners", label: "Corners" },
+                  { value: "smooth", label: "Smooth curve" },
+                ]}
+                onChange={(v) =>
+                  update((l) => {
+                    if (v === "smooth") return { ...l, smooth: true };
+                    const { smooth: _off, ...rest } = l;
+                    return rest;
+                  })
+                }
+              />
+            </Field>
+          )}
           <div className="pf-wide pf-link">
             <FooterButton onClick={() => commands.splitSelection()}>Split</FooterButton>
             <FooterButton onClick={() => commands.rejoinSelection()} disabled={line.points.length < 3}>

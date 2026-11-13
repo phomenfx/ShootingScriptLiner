@@ -468,6 +468,23 @@ export function SettingsDialog() {
             </span>
           ),
         },
+        {
+          label: "Restore points",
+          hint: "Earlier copies of your work, about every 5 minutes, kept in this browser even after you save. Open one if you need to go back.",
+          control: (
+            <span className="set-inline">
+              <select aria-label="Restore points to keep" value={prefs.restorePoints} onChange={(e) => prefs.setRestorePoints(Number(e.target.value))}>
+                <option value={0}>Keep none</option>
+                <option value={3}>Keep 3</option>
+                <option value={5}>Keep 5</option>
+                <option value={10}>Keep 10</option>
+              </select>
+              <button type="button" className="dialog-btn" onClick={() => useSessionStore.getState().setRestorePointsOpen(true)}>
+                Restore an earlier copy…
+              </button>
+            </span>
+          ),
+        },
       ],
     },
     {

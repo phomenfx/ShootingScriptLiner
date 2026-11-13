@@ -240,6 +240,8 @@ export type LineMark = MarkBase & {
   end: Ending;
   /** Drawn at every split point, pointing the way the line runs. Missing means none. */
   mid?: Ending;
+  /** Bends are smooth curves through the points instead of corners. */
+  smooth?: boolean;
   outline?: Outline;
   caption: Caption;
   contCaption?: ContCaption;
@@ -288,7 +290,8 @@ export type ShapeMark = MarkBase & {
    * Pen and polygon shapes: corners as fractions of the box (0–1, before
    * rotation), so moving, resizing and rotating the box carries them along.
    */
-  path?: { points: Point[]; closed: boolean };
+  /** Pen and Polygon shapes. `smooth` draws a curve through the points instead of straight edges. */
+  path?: { points: Point[]; closed: boolean; smooth?: boolean };
   color?: string;
   stroke?: Stroke;
   fill?: { color?: string; opacityPct: number };

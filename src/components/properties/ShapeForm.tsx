@@ -102,6 +102,25 @@ export function ShapeInspector({ project, shape }: { project: Project; shape: Sh
               />
             </Field>
           )}
+          {shape.shape === "path" && shape.path && shape.path.points.length >= 3 && (
+            <Field label="Edges" wide>
+              <Segmented
+                label="Path edges"
+                value={shape.path.smooth ? "smooth" : "straight"}
+                options={[
+                  { value: "straight", label: "Straight" },
+                  { value: "smooth", label: "Smooth curve" },
+                ]}
+                onChange={(v) =>
+                  update((s) => {
+                    if (!s.path) return s;
+                    const { smooth: _off, ...path } = s.path;
+                    return { ...s, path: v === "smooth" ? { ...path, smooth: true } : path };
+                  })
+                }
+              />
+            </Field>
+          )}
           {shape.shape !== "path" && (
           <div className="pf-wide pf-shape-kinds" role="radiogroup" aria-label="Shape">
             {SHAPE_KINDS.map((kind) => {

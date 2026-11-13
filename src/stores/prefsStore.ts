@@ -77,6 +77,8 @@ type PrefsValues = {
   autosave: boolean;
   /** How often unsaved work is copied to the browser, in seconds. */
   autosaveSeconds: number;
+  /** How many earlier copies autosave keeps (0 keeps none). */
+  restorePoints: number;
   /** Unit lengths are shown in (stored in points either way). */
   lengthUnit: LengthUnit;
   /** My default suggestion lists (never Cast): projects without their own use these. */
@@ -112,6 +114,7 @@ type PrefsState = PrefsValues & {
   setLinedPdf: (options: PdfExportOptions) => void;
   setAutosave: (on: boolean) => void;
   setAutosaveSeconds: (seconds: number) => void;
+  setRestorePoints: (count: number) => void;
   setLengthUnit: (unit: LengthUnit) => void;
   setSuggestionDefaults: (lists: SuggestionLists) => void;
 };
@@ -209,6 +212,7 @@ export const usePrefsStore = create<PrefsState>()(
       linedPdf: DEFAULT_PDF_OPTIONS,
       autosave: true,
       autosaveSeconds: 3,
+      restorePoints: 5,
       lengthUnit: "pt",
       suggestionDefaults: {},
       ...readOldKeys(),
@@ -267,6 +271,7 @@ export const usePrefsStore = create<PrefsState>()(
       showAllTableColumns: () => set({ hiddenTableColumns: [] }),
       setAutosave: (autosave) => set({ autosave }),
       setAutosaveSeconds: (autosaveSeconds) => set({ autosaveSeconds }),
+      setRestorePoints: (restorePoints) => set({ restorePoints }),
       setLengthUnit: (lengthUnit) => set({ lengthUnit }),
       setSuggestionDefaults: (suggestionDefaults) => set({ suggestionDefaults }),
       setTableColumnOrder: (tableColumnOrder) => set({ tableColumnOrder }),
@@ -306,6 +311,7 @@ export const usePrefsStore = create<PrefsState>()(
           linedPdf: { ...DEFAULT_PDF_OPTIONS, ...(s.linedPdf && typeof s.linedPdf === "object" ? s.linedPdf : {}) },
           autosave: s.autosave !== false,
           autosaveSeconds: typeof s.autosaveSeconds === "number" && s.autosaveSeconds > 0 ? s.autosaveSeconds : 3,
+          restorePoints: typeof s.restorePoints === "number" && s.restorePoints >= 0 ? s.restorePoints : 5,
           lengthUnit: isLengthUnit(s.lengthUnit) ? s.lengthUnit : "pt",
           suggestionDefaults: s.suggestionDefaults && typeof s.suggestionDefaults === "object" ? (s.suggestionDefaults as SuggestionLists) : {},
           toolKeybinds: sanitizeToolKeybinds({ ...DEFAULT_TOOL_KEYBINDS, ...s.toolKeybinds }),
@@ -339,6 +345,7 @@ export const usePrefsStore = create<PrefsState>()(
         linedPdf,
         autosave,
         autosaveSeconds,
+        restorePoints,
         lengthUnit,
         suggestionDefaults,
       }): PrefsValues => ({
@@ -362,6 +369,7 @@ export const usePrefsStore = create<PrefsState>()(
         linedPdf,
         autosave,
         autosaveSeconds,
+        restorePoints,
         lengthUnit,
         suggestionDefaults,
       }),

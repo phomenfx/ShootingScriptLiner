@@ -44,7 +44,7 @@ import {
   viewerScalePxPerPt,
 } from "../../lib/labelLayout";
 import { endingGeometry, shaftEnds } from "../../lib/geometry";
-import { segmentStrands } from "../../lib/strokeGeometry";
+import { polylineStrands, segmentStrands, smoothSpan, trimPolyline } from "../../lib/strokeGeometry";
 import { segmentLook } from "../../model/segments";
 import { actionBarPosition } from "../../lib/actionBarLayout";
 import { lineAngleRad, renderLineCap } from "../../lib/lineCaps";
@@ -356,13 +356,24 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
     };
   });
 
+  const smoothLineIds = new Set(v2Project.marks.filter((m) => m.kind === "line" && m.smooth).map((m) => m.id));
   const findSegmentAt = (p: NormalizedPoint): { line: LineAnnotation; index: number } | null => {
     const threshold = lineHitTolerancePx / Math.max(width, height);
     for (const line of [...lines].reverse()) {
+      // A smooth line is hit along its curve, not the straight chord.
+      const smooth = smoothLineIds.has(line.id) && line.points.length > 2;
       for (let index = 0; index < line.points.length - 1; index += 1) {
         const a = line.points[index];
         const b = line.points[index + 1];
-        if (a && b && pointToSegmentDistance(p, a, b) < threshold) return { line, index };
+        if (!a || !b) continue;
+        if (!smooth) {
+          if (pointToSegmentDistance(p, a, b) < threshold) return { line, index };
+          continue;
+        }
+        const span = smoothSpan(line.points, index, false);
+        for (let k = 1; k < span.length; k += 1) {
+          if (pointToSegmentDistance(p, span[k - 1]!, span[k]!) < threshold) return { line, index };
+        }
       }
     }
     return null;
@@ -759,7 +770,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       ...pasteItems,
       { label: "Duplicate", shortcut: "Ctrl+D", onSelect: commands.duplicateSelection },
       { label: mark?.locked ? "Unlock position" : "Lock in place", shortcut: "Ctrl+L", onSelect: commands.toggleLockSelection },
-      ...(mark && mark.kind !== "image" ? [{ label: "Set as default style", onSelect: commands.setSelectionAsDefault }] : []),
+      ...(mark && mark.kind !== "image" ? [{ label: "Set as default", onSelect: commands.setSelectionAsDefault }] : []),
       ...(isLine
         ? [
             "separator" as const,
@@ -951,13 +962,15 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         const endAng = lineAngleRad(pts[last - 1]!.x, pts[last - 1]!.y, pts[last]!.x, pts[last]!.y);
         const source = v2Project.marks.find((mark) => mark.id === line.id);
         const owned = source?.kind === "line" ? source : undefined;
+        const smooth = !!owned?.smooth && last > 1;
         // Outline: a halo under the whole line (every segment, strand and ending), drawn before the line itself.
         const halo = owned?.outline && owned.outline.widthPt > 0 ? owned.outline : null;
         const haloStrokePx = halo ? strokePx + halo.widthPt * 2.5 * labelScale : 0;
         const capsFor = (color: string, width: number) => {
           const startCap = renderLineCap(style.start, color, width, startAng, true, labelScale);
           const endCap = renderLineCap(style.end, color, width, endAng, false, labelScale);
-          // Mid markers sit on each split point, pointing along the segment that arrives there.
+          // Mid markers sit on each split point, pointing along the segment that arrives there
+          // (on a smooth line, along the curve).
           const midEnding = owned?.mid ? legacyEnding(owned.mid) : null;
           return (
             <>
@@ -966,26 +979,34 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
               {midEnding &&
                 pts.slice(1, -1).map((point, index) => {
                   const before = pts[index]!;
-                  const cap = renderLineCap(midEnding, color, width, lineAngleRad(before.x, before.y, point.x, point.y), false, labelScale);
+                  const after = smooth ? pts[index + 2]! : point;
+                  const cap = renderLineCap(midEnding, color, width, lineAngleRad(before.x, before.y, after.x, after.y), false, labelScale);
                   return cap && <g key={`mid-${index}`} transform={`translate(${point.x}, ${point.y})`}>{cap.elements}</g>;
                 })}
             </>
           );
         };
+        const ptsPt = pts.map((p) => ({ x: p.x / labelScale, y: p.y / labelScale }));
         const segments = pts.slice(0, -1).map((start, index) => {
           const end = pts[index + 1]!;
           const look = owned
             ? segmentLook(owned, index)
             : { pattern: style.stroke === "solid" ? "straight" : style.stroke, widthPt: style.widthPt };
           const [shaftStart, shaftEnd] = shaftEnds(start, end, index === 0 ? startInset : 0, index === last - 1 ? endInset : 0);
-          const strands = segmentStrands(
-            { x: shaftStart.x / labelScale, y: shaftStart.y / labelScale },
-            { x: shaftEnd.x / labelScale, y: shaftEnd.y / labelScale },
-            look.pattern,
-            look.widthPt,
-            look
-          );
-          return { index, look, shaftStart, shaftEnd, strands };
+          // A smooth line curves through its points; each segment keeps its own pattern along its part of the curve.
+          const curve = smooth
+            ? trimPolyline(smoothSpan(ptsPt, index, false), index === 0 ? startInset / labelScale : 0, index === last - 1 ? endInset / labelScale : 0)
+            : null;
+          const strands = curve
+            ? polylineStrands(curve, look.pattern, look.widthPt, look)
+            : segmentStrands(
+                { x: shaftStart.x / labelScale, y: shaftStart.y / labelScale },
+                { x: shaftEnd.x / labelScale, y: shaftEnd.y / labelScale },
+                look.pattern,
+                look.widthPt,
+                look
+              );
+          return { index, look, shaftStart, shaftEnd, strands, curve };
         });
         const strandLines = (color: string, extraPt: number, key: string) =>
           segments.flatMap(({ index, strands }) =>
@@ -1006,8 +1027,19 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
 
         return (
           <g key={line.id} className={isSel ? "line-selected" : undefined}>
-            {segments.map(({ index, look, shaftStart, shaftEnd }) =>
-              last > 1 && lineSegment?.lineId === line.id && lineSegment.index === index ? (
+            {segments.map(({ index, look, shaftStart, shaftEnd, curve }) =>
+              last > 1 && lineSegment?.lineId === line.id && lineSegment.index === index && curve ? (
+                <polyline
+                  key={`sel-${index}`}
+                  points={curve.map((p) => `${p.x * labelScale},${p.y * labelScale}`).join(" ")}
+                  fill="none"
+                  stroke="#4a9eff"
+                  strokeWidth={look.widthPt * labelScale + 6}
+                  strokeOpacity={0.45}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ) : last > 1 && lineSegment?.lineId === line.id && lineSegment.index === index ? (
                 <line
                   key={`sel-${index}`}
                   x1={shaftStart.x}

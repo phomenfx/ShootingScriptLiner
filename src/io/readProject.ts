@@ -340,6 +340,7 @@ function readLine(raw: Raw, ctx: MarkContext, notes: string[], what: string): Li
     end: readEnding(raw.end, defaults.end),
     caption: readCaption(raw.caption, defaults.caption),
   };
+  if (raw.smooth === true) line.smooth = true;
   if (isRecord(raw.mid)) {
     const mid = readEnding(raw.mid, { type: "none", sizePct: 100, filled: true });
     if (mid.type !== "none") line.mid = mid;
@@ -429,7 +430,7 @@ function readShape(raw: Raw, ctx: MarkContext, notes: string[], what: string): S
   if (stamp) shape.stamp = stamp;
   if (isRecord(raw.path) && Array.isArray(raw.path.points)) {
     const points = raw.path.points.map(readPoint).filter((p): p is Point => !!p);
-    if (points.length >= 2) shape.path = { points, closed: raw.path.closed === true };
+    if (points.length >= 2) shape.path = { points, closed: raw.path.closed === true, ...(raw.path.smooth === true ? { smooth: true } : {}) };
   }
   if (isRecord(raw.stroke)) shape.stroke = readStroke(raw.stroke, { pattern: "straight", widthPt: 2 });
   if (isRecord(raw.fill)) {

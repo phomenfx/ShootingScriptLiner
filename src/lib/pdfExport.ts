@@ -41,12 +41,12 @@ import {
 } from "./labelLayout";
 import { endingGeometry, shaftEnds } from "./geometry";
 import { legacyEnding } from "../legacy/legacyView";
-import { segmentStrands, type StrokeStrand } from "./strokeGeometry";
+import { polylineStrands, segmentStrands, smoothSpan, trimPolyline, type StrokeStrand } from "./strokeGeometry";
 import { segmentLook } from "../model/segments";
 import type { LineMark, Project as V2Project, ShapeMark } from "../model/types";
 import { assetBlob } from "./assetStore";
 import { DEFAULT_PDF_OPTIONS, markPrints, pagesToKeep, type PdfExportOptions } from "../model/pdfOptions";
-import { isShapeShown, outlineEdges, shapeColor, shapeFill, shapeHalo, shapeHasStroke, shapeOutline, stampScalePercent, stampTip } from "./shapeGeometry";
+import { isShapeShown, outlineStrands, shapeColor, shapeFill, shapeHalo, shapeHasStroke, shapeOutline, stampScalePercent, stampTip } from "./shapeGeometry";
 import { drawPdfLineCap } from "./pdfLineCaps";
 import { resolvePdfExportFont, sanitizePdfExportText } from "./pdfExportFonts";
 import {
@@ -249,6 +249,7 @@ export async function buildLinedPdfBytes(
       const startInset = endingGeometry(style.start, style.widthPt)?.shaftInsetPt ?? 0;
       const endInset = endingGeometry(style.end, style.widthPt)?.shaftInsetPt ?? 0;
       const strands: StrokeStrand[] = [];
+      const smooth = !!source?.smooth && last > 1;
       for (let index = 0; index < last; index += 1) {
         const start = pts[index]!;
         const end = pts[index + 1]!;
@@ -258,7 +259,15 @@ export async function buildLinedPdfBytes(
         const [shaftStart, shaftEnd] = shaftEnds(start, end, index === 0 ? startInset : 0, index === last - 1 ? endInset : 0);
         // Build strands with y pointing down, as on screen, so sided patterns land on the same side; then flip for the PDF.
         const flip = (point: { x: number; y: number }) => ({ x: point.x, y: ph - point.y });
-        for (const strand of segmentStrands(flip(shaftStart), flip(shaftEnd), look.pattern, look.widthPt, look)) {
+        const built = smooth
+          ? polylineStrands(
+              trimPolyline(smoothSpan(pts.map(flip), index, false), index === 0 ? startInset : 0, index === last - 1 ? endInset : 0),
+              look.pattern,
+              look.widthPt,
+              look
+            )
+          : segmentStrands(flip(shaftStart), flip(shaftEnd), look.pattern, look.widthPt, look);
+        for (const strand of built) {
           if (strand.export) strands.push({ ...strand, points: strand.points.map(flip) });
         }
       }
@@ -275,7 +284,9 @@ export async function buildLinedPdfBytes(
         for (let index = 1; index < last; index += 1) {
           const at = pts[index]!;
           const before = pts[index - 1]!;
-          drawPdfLineCap(page, at.x, at.y, Math.atan2(at.y - before.y, at.x - before.x), mid, color, style.widthPt, false, haloPt);
+          // On a smooth line the marker follows the curve through the point.
+          const after = smooth ? pts[index + 1]! : at;
+          drawPdfLineCap(page, at.x, at.y, Math.atan2(after.y - before.y, after.x - before.x), mid, color, style.widthPt, false, haloPt);
         }
       };
       // Outline: a halo under the whole line, every strand and ending, before the line itself.
@@ -443,8 +454,7 @@ function drawShape(page: PDFPage, ph: number, source: V2Project, shape: ShapeMar
   }
   if (!hasStroke) return;
   const stroke = shape.stroke!;
-  const strands = outlineEdges(outline)
-    .flatMap(([a, b]) => segmentStrands(a, b, stroke.pattern, stroke.widthPt, stroke))
+  const strands = outlineStrands(outline, stroke)
     .filter((strand) => strand.export)
     .map((strand) => ({ ...strand, points: strand.points.map(flip) }));
   // The halo goes down first, under every stroke.

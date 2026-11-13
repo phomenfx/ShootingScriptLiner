@@ -44,9 +44,10 @@ export function tuneKey(field: TuneField): keyof PatternTune {
   return "waveSide";
 }
 
-export function patternKeys(current: string): string[] {
+/** The patterns to offer: built-in ones, then custom ones already in use, then the current one. */
+export function patternKeys(current: string, custom: string[] = []): string[] {
   const keys = [...PRIMARY_PATTERNS, ...LEGACY_DASHES];
-  if (current && !keys.includes(current)) keys.push(current);
+  for (const key of [...custom, current]) if (key && !keys.includes(key)) keys.push(key);
   return keys;
 }
 
@@ -124,6 +125,33 @@ function dashParts(pattern: string, width: number, lengthScale: number, gapScale
   return units.map((part, index) => part * width * (index % 2 === 0 ? lengthScale : gapScale));
 }
 
+/**
+ * Custom dash patterns are written into the pattern name: "dashed_8_3_2_3" is
+ * dash 8, gap 3, dash 2, gap 3, in line widths. The built-in dashed patterns
+ * use the same form, so a custom one needs no new file format.
+ */
+export function parseDashKey(pattern: string): number[] | undefined {
+  if (!/^dashed(_\d+(\.\d+)?)+$/.test(pattern)) return undefined;
+  const units = pattern.split("_").slice(1).map(Number);
+  return units.some((u) => u > 0) ? units : undefined;
+}
+
+/** The pattern name for a dash sequence typed as "8 3 2 3", or null when it can't be one. */
+export function customDashKey(text: string): string | null {
+  const parts = text.trim().split(/[\s,;·-]+/).filter(Boolean);
+  if (parts.length === 0 || parts.length > 8) return null;
+  const units = parts.map(Number);
+  if (units.some((u) => !Number.isFinite(u) || u < 0 || u > 99) || !units.some((u) => u > 0)) return null;
+  return `dashed_${units.map((u) => Math.round(u * 10) / 10).join("_")}`;
+}
+
+/** A custom dash pattern's name for the list: "Dashes 8-3-2-3". */
+export function customDashLabel(pattern: string): string | null {
+  if (LEGACY_DASHES.includes(pattern)) return null;
+  const units = parseDashKey(pattern);
+  return units ? `Dashes ${units.join("-")}` : null;
+}
+
 function dashUnits(pattern: string): number[] | undefined {
   switch (pattern) {
     case "dashed_2_2":
@@ -141,7 +169,7 @@ function dashUnits(pattern: string): number[] | undefined {
     case "dotted":
       return [1, 2];
     default:
-      return LEGACY_DASHES.includes(pattern) ? [4, 4] : undefined;
+      return parseDashKey(pattern) ?? (LEGACY_DASHES.includes(pattern) ? [4, 4] : undefined);
   }
 }
 
@@ -231,4 +259,106 @@ function normal(a: StrokePoint, b: StrokePoint): StrokePoint {
 
 function moved(origin: StrokePoint, dir: StrokePoint, n: StrokePoint, along: number, lift: number): StrokePoint {
   return { x: origin.x + dir.x * along + n.x * lift, y: origin.y + dir.y * along + n.y * lift };
+}
+
+/* ---------- curves ---------- */
+
+/** Points on the smooth curve from `a` to `b` (Catmull-Rom), shaped by the points before and after. */
+export function curveSpan(prev: StrokePoint, a: StrokePoint, b: StrokePoint, next: StrokePoint, steps = 20): StrokePoint[] {
+  const out: StrokePoint[] = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const at = (p0: number, p1: number, p2: number, p3: number) =>
+      0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+    out.push({ x: at(prev.x, a.x, b.x, next.x), y: at(prev.y, a.y, b.y, next.y) });
+  }
+  return out;
+}
+
+/** The span of a smoothed path from point `i` to `i + 1`. Open paths repeat their end points. */
+export function smoothSpan(points: StrokePoint[], i: number, closed: boolean): StrokePoint[] {
+  const n = points.length;
+  const pick = (k: number) => (closed ? points[((k % n) + n) % n]! : points[Math.max(0, Math.min(n - 1, k))]!);
+  return curveSpan(pick(i - 1), pick(i), pick(i + 1), pick(i + 2));
+}
+
+/** A whole smoothed path through the points, as a polyline. */
+export function smoothPath(points: StrokePoint[], closed: boolean): StrokePoint[] {
+  if (points.length < 3) return closed && points.length > 0 ? [...points, points[0]!] : points;
+  const spans = closed ? points.length : points.length - 1;
+  const out: StrokePoint[] = [];
+  for (let i = 0; i < spans; i += 1) {
+    const span = smoothSpan(points, i, closed);
+    out.push(...(i === 0 ? span : span.slice(1)));
+  }
+  return out;
+}
+
+function polylineLength(points: StrokePoint[]): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) total += length(points[i - 1]!, points[i]!);
+  return total;
+}
+
+/** The polyline with `start` and `end` points' worth of length cut off its ends (to make room for endings). */
+export function trimPolyline(points: StrokePoint[], start: number, end: number): StrokePoint[] {
+  const cut = (pts: StrokePoint[], by: number): StrokePoint[] => {
+    let left = by;
+    for (let i = 1; i < pts.length; i += 1) {
+      const seg = length(pts[i - 1]!, pts[i]!);
+      if (seg >= left) {
+        const t = seg > 0 ? left / seg : 0;
+        const a = pts[i - 1]!;
+        const b = pts[i]!;
+        return [{ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, ...pts.slice(i)];
+      }
+      left -= seg;
+    }
+    return [pts[pts.length - 1]!];
+  };
+  let out = start > 0 ? cut(points, start) : points;
+  if (end > 0) out = cut([...out].reverse(), end).reverse();
+  return out.length >= 2 ? out : points.slice(0, 2);
+}
+
+/**
+ * Strands for a pattern laid along any path: the pattern is made along a
+ * straight run as long as the path, then bent onto it, so waves, zigzags,
+ * parallel strands and ticks follow the curve.
+ */
+export function polylineStrands(path: StrokePoint[], pattern: string, widthPt: number, tune: PatternTune = {}): StrokeStrand[] {
+  const total = polylineLength(path);
+  if (path.length < 2 || total < 0.5) return path.length >= 2 ? segmentStrands(path[0]!, path[path.length - 1]!, pattern, widthPt, tune) : [];
+  const cumulative = [0];
+  for (let i = 1; i < path.length; i += 1) cumulative.push(cumulative[i - 1]! + length(path[i - 1]!, path[i]!));
+  const place = (u: number, v: number): StrokePoint => {
+    const along = Math.max(0, Math.min(total, u));
+    let i = 1;
+    while (i < path.length - 1 && cumulative[i]! < along) i += 1;
+    const a = path[i - 1]!;
+    const b = path[i]!;
+    const seg = cumulative[i]! - cumulative[i - 1]! || 1;
+    const t = (along - cumulative[i - 1]!) / seg;
+    const n = normal(a, b);
+    return { x: a.x + (b.x - a.x) * t + n.x * v, y: a.y + (b.y - a.y) * t + n.y * v };
+  };
+  const step = Math.max(1, Math.min(4, widthPt));
+  return segmentStrands({ x: 0, y: 0 }, { x: total, y: 0 }, pattern, widthPt, tune).map((strand) => {
+    // Fill in long straight runs so they can bend with the path.
+    const dense: StrokePoint[] = [];
+    strand.points.forEach((p, i) => {
+      const prev = strand.points[i - 1];
+      if (prev) {
+        const gap = length(prev, p);
+        for (let k = 1; k < Math.floor(gap / step); k += 1) {
+          const t = (k * step) / gap;
+          dense.push({ x: prev.x + (p.x - prev.x) * t, y: prev.y + (p.y - prev.y) * t });
+        }
+      }
+      dense.push(p);
+    });
+    return { ...strand, points: dense.map((p) => place(p.x, p.y)) };
+  });
 }

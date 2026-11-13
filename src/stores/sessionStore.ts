@@ -58,6 +58,8 @@ type SessionState = {
   /** Find on script (Ctrl+F). */
   find: { open: boolean; query: string; matches: FindMatch[]; index: number; busy: boolean };
   setFind: (patch: Partial<SessionState["find"]>) => void;
+  restorePointsOpen: boolean;
+  setRestorePointsOpen: (open: boolean) => void;
   settingsOpen: boolean;
   /** Section to show when Settings opens (then cleared). */
   settingsSection: string | null;
@@ -136,6 +138,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   outlineClipboard: null,
   find: { open: false, query: "", matches: [], index: 0, busy: false },
   setFind: (patch) => set((s) => ({ find: { ...s.find, ...patch } })),
+  restorePointsOpen: false,
+  setRestorePointsOpen: (restorePointsOpen) => set({ restorePointsOpen }),
   settingsOpen: false,
   settingsSection: null,
   confirm: null,

@@ -34,6 +34,7 @@ import type { Mark, Project, ScriptInfo } from "../model/types";
 import {
   applyWithoutUndo,
   breakUndoGroup,
+  isProjectUnsaved,
   markProjectSaved,
   redoProject,
   replaceProject,
@@ -152,6 +153,17 @@ export function startAutosaveAndOfferRestore(): void {
     if (renamed) void cacheScript(state.project, file);
   });
   if (saved) void offerRestore(saved);
+}
+
+/** Opens an earlier autosaved copy, asking first when there is unsaved work. */
+export async function restoreFromPoint(point: Autosave): Promise<void> {
+  if (isProjectUnsaved(useProjectStore.getState())) {
+    const ok = await confirm(`Open the copy of "${point.name || "a project"}" from ${new Date(point.savedAt).toLocaleString()}? Unsaved work in the open project will be lost.`, "Open copy", true);
+    if (!ok) return;
+  }
+  session().setRestorePointsOpen(false);
+  await openProject(new File([point.json], `${point.name || "autosave"}.json`, { type: "application/json" }));
+  markProjectUnsaved();
 }
 
 async function offerRestore(saved: Autosave): Promise<void> {

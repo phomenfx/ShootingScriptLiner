@@ -8,11 +8,15 @@ import { newId } from "../../lib/ids";
 import { renderLineCap } from "../../lib/lineCaps";
 import {
   hitsShape,
+  MAX_CORNER_HANDLES,
+  moveCorner,
   pathBox,
+  pathCorners,
+  refitPath,
   simplifyPoints,
   isShapeShown,
   MIN_SHAPE_PT,
-  outlineEdges,
+  outlineStrands,
   resizeShape,
   rotationToward,
   shapeCenter,
@@ -26,7 +30,6 @@ import {
   stampTip,
   type ShapeHandle,
 } from "../../lib/shapeGeometry";
-import { segmentStrands } from "../../lib/strokeGeometry";
 import * as edits from "../../model/edits";
 import type { ImageMark, Project, ShapeMark } from "../../model/types";
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
@@ -42,6 +45,7 @@ type ShapeDrag =
   | { type: "move"; origin: ShapeMark; start: Pt }
   | { type: "resize"; origin: ShapeMark; handle: Extract<ShapeHandle, { kind: "resize" }> }
   | { type: "rotate"; origin: ShapeMark }
+  | { type: "corner"; origin: ShapeMark; index: number }
   | { type: "image-move"; origin: ImageMark; start: Pt }
   | { type: "image-resize"; origin: ImageMark; handle: Extract<ShapeHandle, { kind: "resize" }> };
 
@@ -100,7 +104,7 @@ export function ShapeGraphic({ project, shape, k }: { project: Project; shape: S
   const points = outline.points.map((p) => `${p.x * k},${p.y * k}`).join(" ");
   const stroke = shapeHasStroke(shape) ? shape.stroke! : null;
   const halo = shapeHalo(shape);
-  const strands = stroke ? outlineEdges(outline).flatMap(([a, b]) => segmentStrands(a, b, stroke.pattern, stroke.widthPt, stroke)) : [];
+  const strands = stroke ? outlineStrands(outline, stroke) : [];
   const drawStrands = (ink: string, extraPt: number, key: string) =>
     strands.map((strand, index) => (
       <polyline
@@ -268,6 +272,8 @@ export function useShapeGestures({
     }
   }, [activeTool]);
   const replace = (shape: ShapeMark) => useProjectStore.getState().apply(edits.replaceMark(shape));
+  /** Pen and Polygon shapes show a handle on each corner, unless they have too many (a long freehand stroke). */
+  const cornersShown = (shape: ShapeMark) => shape.shape === "path" && !!shape.path && shape.path.points.length <= MAX_CORNER_HANDLES;
 
   const boxFrom = (a: Pt, b: Pt, square: boolean) => {
     let w = b.x - a.x;
@@ -307,6 +313,16 @@ export function useShapeGestures({
     if (!selected) return false;
     const p = toPt(n);
     const reach = (HANDLE_PX + 3) / k;
+    // A Pen or Polygon shape's own corners come before its box handles.
+    if (cornersShown(selected)) {
+      const index = pathCorners(selected).findIndex((c) => Math.hypot(c.x - p.x, c.y - p.y) <= reach);
+      if (index >= 0) {
+        breakUndoGroup();
+        dragRef.current = { type: "corner", origin: selected, index };
+        capture(e);
+        return true;
+      }
+    }
     const hit = shapeHandles(selected, ROTATE_GAP_PX / k).find((h) => Math.hypot(h.at.x - p.x, h.at.y - p.y) <= reach);
     if (!hit) return false;
     breakUndoGroup();
@@ -396,6 +412,8 @@ export function useShapeGestures({
       replace({ ...drag.origin, x: drag.origin.x + p.x - drag.start.x, y: drag.origin.y + p.y - drag.start.y });
     } else if (drag.type === "resize") {
       replace(resizeShape(drag.origin, drag.handle, p, e.shiftKey));
+    } else if (drag.type === "corner") {
+      replace(moveCorner(drag.origin, drag.index, p));
     } else {
       replace({ ...drag.origin, rotation: rotationToward(drag.origin, p, e.shiftKey ? 15 : (snapDegrees ?? undefined)) });
     }
@@ -434,6 +452,11 @@ export function useShapeGestures({
       useProjectStore.getState().apply(edits.addMarks([shape]));
       breakUndoGroup();
       useSessionStore.getState().select("mark", shape.id);
+    } else if (drag.type === "corner") {
+      // The box fits the moved corner again, as part of the same step.
+      const current = useProjectStore.getState().project.marks.find((m) => m.id === drag.origin.id);
+      if (current?.kind === "shape") replace(refitPath(current));
+      breakUndoGroup();
     } else {
       breakUndoGroup();
     }
@@ -554,6 +577,10 @@ export function useShapeGestures({
         return (
           <>
             <line x1={top.at.x * k} y1={top.at.y * k} x2={rotate.at.x * k} y2={rotate.at.y * k} stroke="#4a9eff" strokeWidth={1} />
+            {cornersShown(selected) &&
+              pathCorners(selected).map((c, i) => (
+                <circle key={`corner-${i}`} cx={c.x * k} cy={c.y * k} r={HANDLE_PX - 0.5} fill="#4a9eff" stroke="#ffffff" strokeWidth={1.5} />
+              ))}
             {handles.map((h, i) =>
               h.handle.kind === "rotate" ? (
                 <circle key={i} cx={h.at.x * k} cy={h.at.y * k} r={HANDLE_PX} fill="#ffffff" stroke="#4a9eff" strokeWidth={1.5} />

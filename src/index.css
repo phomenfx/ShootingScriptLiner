@@ -142,3 +142,30 @@
 .dialog-btn-left {
   margin-right: auto;
 }
+
+/* Restore points list. */
+.restore-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.restore-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.restore-list span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.restore-list small {
+  color: var(--color-text-muted);
+}

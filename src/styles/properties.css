@@ -839,3 +839,47 @@ textarea.pf-input {
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
+
+/* A number counted from position rather than typed. */
+.pf-input-auto {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Three fields to a row: a little tighter so their labels fit at the usual panel width. */
+.pf-three {
+  gap: 0.375rem;
+}
+.pf-three .pf-label {
+  gap: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Custom dash pattern editor at the end of the pattern list. */
+.pf-pattern-custom {
+  color: var(--color-text-muted);
+}
+.pf-pattern-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.375rem;
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.pf-pattern-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.pf-pattern-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.pf-pattern-editor-row .pf-pattern-swatch {
+  flex: 1;
+  color: var(--color-text);
+}
