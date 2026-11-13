@@ -519,3 +519,8 @@
   color: var(--color-text-dim);
   font-size: var(--font-size-sm);
 }
+
+/* A row whose side list is open stays highlighted. */
+.menu-item[data-state="open"] {
+  background: var(--color-btn-hover);
+}

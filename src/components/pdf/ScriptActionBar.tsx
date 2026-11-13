@@ -1,4 +1,4 @@
-import { ClipboardCopy, ClipboardPaste, Copy, GripVertical, Link2, Lock, LockOpen, Merge, Scissors, Trash2, X } from "lucide-react";
+import { Copy, GripVertical, Lock, LockOpen, Menu as MenuIcon, Merge, Scissors, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as commands from "../../commands";
 import { shiftActionBar } from "../../lib/actionBarLayout";
@@ -6,6 +6,7 @@ import { shotName } from "../../model/captions";
 import { findShot } from "../../model/edits";
 import { applyColor, SWATCHES } from "../properties/ColorBar";
 import { listScenes } from "../../model/shotList";
+import { usePrefsStore } from "../../stores/prefsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { Menu, type MenuEntry } from "../topbar/Menu";
@@ -21,7 +22,7 @@ type Props = {
   pageHeight: number;
 };
 
-/** Color, duplicate, copy, paste, rejoin, split, link, lock, and delete beside the selected mark. */
+/** Color, a menu with copy, paste and link to shot, then duplicate, rejoin, split, lock and delete beside the selected mark. */
 export function ScriptActionBar({ markId, shotId, isLine, anchorLeft, anchorTop, pageWidth, pageHeight }: Props) {
   const project = useProjectStore((s) => s.project);
   const offset = useSessionStore((s) => s.actionBarOffset);
@@ -34,6 +35,8 @@ export function ScriptActionBar({ markId, shotId, isLine, anchorLeft, anchorTop,
   const canPaste = useSessionStore((s) => !!s.clipboard?.length || !!s.outlineClipboard);
   // The preset swatches open above the bar; a click outside or Escape closes them.
   const [swatchesOpen, setSwatchesOpen] = useState(false);
+  // Where the preset swatches open: below suits systems whose color picker opens above.
+  const swatchesBelow = usePrefsStore((s) => s.actionBarSwatches) === "below";
   const colorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!swatchesOpen) return;
@@ -140,7 +143,7 @@ export function ScriptActionBar({ markId, shotId, isLine, anchorLeft, anchorTop,
             <input type="color" aria-label="Pick any color" value={color} onChange={(e) => applyColor(e.target.value.toUpperCase(), true)} />
           </label>
           {swatchesOpen && (
-            <div className="script-swatches" role="toolbar" aria-label="Colors">
+            <div className={`script-swatches${swatchesBelow ? " is-below" : ""}`} role="toolbar" aria-label="Colors">
               {SWATCHES.map((c) => (
                 <button
                   key={c}
@@ -159,14 +162,19 @@ export function ScriptActionBar({ markId, shotId, isLine, anchorLeft, anchorTop,
           )}
         </div>
       )}
+      <Menu
+        trigger={<MenuIcon size={14} strokeWidth={1.75} />}
+        triggerClassName="script-iconbtn"
+        triggerLabel="More: copy, paste, link to shot"
+        entries={[
+          { label: "Copy", shortcut: "Ctrl+C", onSelect: () => commands.copy() },
+          { label: "Paste", shortcut: "Ctrl+V", disabled: !canPaste, hint: canPaste ? undefined : "Copy something first", onSelect: () => commands.paste() },
+          { kind: "separator" },
+          { kind: "sub", label: "Link to shot", entries },
+        ]}
+      />
       <button type="button" className="script-iconbtn" title="Duplicate" onClick={() => commands.duplicateSelection()}>
         <Copy size={14} strokeWidth={1.75} />
-      </button>
-      <button type="button" className="script-iconbtn" title="Copy (Ctrl+C)" onClick={() => commands.copy()}>
-        <ClipboardCopy size={14} strokeWidth={1.75} />
-      </button>
-      <button type="button" className="script-iconbtn" title="Paste (Ctrl+V)" disabled={!canPaste} onClick={() => commands.paste()}>
-        <ClipboardPaste size={14} strokeWidth={1.75} />
       </button>
       {isLine && (
         <button type="button" className="script-iconbtn" title={pointCount < 3 ? "Rejoin (needs a line with a bend)" : "Rejoin: remove the middle corner"} disabled={pointCount < 3} onClick={() => commands.rejoinSelection()}>
@@ -178,12 +186,6 @@ export function ScriptActionBar({ markId, shotId, isLine, anchorLeft, anchorTop,
           <Scissors size={14} strokeWidth={1.75} />
         </button>
       )}
-      <Menu
-        trigger={<Link2 size={14} strokeWidth={1.75} />}
-        triggerClassName="script-iconbtn"
-        triggerLabel="Link to shot"
-        entries={entries}
-      />
       <button
         type="button"
         className={`script-iconbtn${mark?.locked ? " on" : ""}`}

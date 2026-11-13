@@ -948,13 +948,23 @@ export function SettingsDialog() {
         },
         {
           label: "Floating action bar",
-          hint: "Duplicate, link and delete beside the selected mark.",
+          hint: "Color, copy, paste, link, duplicate, split, lock and delete beside the selected mark.",
           control: (
             <input
               type="checkbox"
               checked={prefs.showActionBar}
               onChange={(e) => prefs.setShowActionBar(e.target.checked)}
             />
+          ),
+        },
+        {
+          label: "Action bar swatches",
+          hint: "Where the preset colors open when you click the bar's color. Below suits systems (such as macOS) whose color picker opens above.",
+          control: (
+            <select value={prefs.actionBarSwatches} onChange={(e) => prefs.setActionBarSwatches(e.target.value as "above" | "below")}>
+              <option value="above">Above the bar</option>
+              <option value="below">Below the bar</option>
+            </select>
           ),
         },
         {

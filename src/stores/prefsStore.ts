@@ -79,6 +79,8 @@ type PrefsValues = {
   autosaveSeconds: number;
   /** How many earlier copies autosave keeps (0 keeps none). */
   restorePoints: number;
+  /** Where the action bar's preset swatches open. */
+  actionBarSwatches: "above" | "below";
   /** Unit lengths are shown in (stored in points either way). */
   lengthUnit: LengthUnit;
   /** My default suggestion lists (never Cast): projects without their own use these. */
@@ -115,6 +117,7 @@ type PrefsState = PrefsValues & {
   setAutosave: (on: boolean) => void;
   setAutosaveSeconds: (seconds: number) => void;
   setRestorePoints: (count: number) => void;
+  setActionBarSwatches: (where: "above" | "below") => void;
   setLengthUnit: (unit: LengthUnit) => void;
   setSuggestionDefaults: (lists: SuggestionLists) => void;
 };
@@ -213,6 +216,8 @@ export const usePrefsStore = create<PrefsState>()(
       autosave: true,
       autosaveSeconds: 3,
       restorePoints: 5,
+      // On a Mac the system color picker opens over the top, so the swatches start below.
+      actionBarSwatches: typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || navigator.userAgent) ? "below" : "above",
       lengthUnit: "pt",
       suggestionDefaults: {},
       ...readOldKeys(),
@@ -272,6 +277,7 @@ export const usePrefsStore = create<PrefsState>()(
       setAutosave: (autosave) => set({ autosave }),
       setAutosaveSeconds: (autosaveSeconds) => set({ autosaveSeconds }),
       setRestorePoints: (restorePoints) => set({ restorePoints }),
+      setActionBarSwatches: (actionBarSwatches) => set({ actionBarSwatches }),
       setLengthUnit: (lengthUnit) => set({ lengthUnit }),
       setSuggestionDefaults: (suggestionDefaults) => set({ suggestionDefaults }),
       setTableColumnOrder: (tableColumnOrder) => set({ tableColumnOrder }),
@@ -312,6 +318,7 @@ export const usePrefsStore = create<PrefsState>()(
           autosave: s.autosave !== false,
           autosaveSeconds: typeof s.autosaveSeconds === "number" && s.autosaveSeconds > 0 ? s.autosaveSeconds : 3,
           restorePoints: typeof s.restorePoints === "number" && s.restorePoints >= 0 ? s.restorePoints : 5,
+          ...(s.actionBarSwatches === "above" || s.actionBarSwatches === "below" ? { actionBarSwatches: s.actionBarSwatches } : {}),
           lengthUnit: isLengthUnit(s.lengthUnit) ? s.lengthUnit : "pt",
           suggestionDefaults: s.suggestionDefaults && typeof s.suggestionDefaults === "object" ? (s.suggestionDefaults as SuggestionLists) : {},
           toolKeybinds: sanitizeToolKeybinds({ ...DEFAULT_TOOL_KEYBINDS, ...s.toolKeybinds }),
@@ -346,6 +353,7 @@ export const usePrefsStore = create<PrefsState>()(
         autosave,
         autosaveSeconds,
         restorePoints,
+        actionBarSwatches,
         lengthUnit,
         suggestionDefaults,
       }): PrefsValues => ({
@@ -370,6 +378,7 @@ export const usePrefsStore = create<PrefsState>()(
         autosave,
         autosaveSeconds,
         restorePoints,
+        actionBarSwatches,
         lengthUnit,
         suggestionDefaults,
       }),
