@@ -8,7 +8,7 @@ import { computeMarginContinuationTrim, type MarginTrimHint } from "../lib/lineM
 import { FALLBACK_PAGE } from "../io/migrateV1";
 import { legacyLine, legacyText, lineToV2, textToV2, toLegacyProject } from "../legacy/legacyView";
 import * as edits from "../model/edits";
-import { breakUndoGroup, useProjectStore } from "../stores/projectStore";
+import { applyIntoLastStep, breakUndoGroup, useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 import type { LineAnnotation, NormalizedPoint, TextAnnotation } from "../types/annotations";
 
@@ -93,6 +93,13 @@ export function replaceLine(id: string, patch: Partial<LineAnnotation>): void {
   useProjectStore.getState().apply(edits.replaceMark(lineToV2({ ...shown, ...patch } as typeof shown, v2(), base)));
 }
 
+/** Adds a line in the same undo step as the edit just before it (the new shot of a Ctrl+drag). */
+export function addLineJoined(line: LineAnnotation): void {
+  useProjectStore.getState().apply(edits.addMarks([lineToV2(line, v2())]));
+  breakUndoGroup();
+  session().select("mark", line.id);
+}
+
 export function addLine(line: LineAnnotation): void {
   applyStep(edits.addMarks([lineToV2(line, v2())]));
   session().select("mark", line.id);
@@ -119,7 +126,15 @@ export function applyMarginContinuationTrim(
   if (!base) return;
   const shown = legacyLine(base, v2());
   const trimmed = trimPolyline(shown.points, pageHeightPt, hint);
-  replaceLine(lineId, trimmed);
+  const same =
+    !trimmed.marginContinuation &&
+    !shown.marginContinuation &&
+    trimmed.points.length === shown.points.length &&
+    trimmed.points.every((p, i) => p.x === shown.points[i]!.x && p.y === shown.points[i]!.y);
+  if (same) return;
+  // The trim belongs to the gesture that drew or moved the line, so it shares its undo step.
+  const full = legacyLine(base, v2(), shotTypeUnlocked.has(lineId));
+  applyIntoLastStep(edits.replaceMark(lineToV2({ ...full, ...trimmed } as typeof full, v2(), base)));
 }
 
 /** Clip only the first and last segments. Interior vertices stay where they are. */

@@ -22,6 +22,8 @@ function step(edit: edits.Edit) {
 }
 
 const DEFAULT_STROKE: Stroke = { pattern: "straight", widthPt: 2 };
+/** A white halo reads well on a script page. */
+const DEFAULT_OUTLINE = { color: "#FFFFFF", widthPt: 1.5 };
 
 /** Properties of a box shape: link, kind, color, stroke, fill and size. */
 export function ShapeInspector({ project, shape }: { project: Project; shape: ShapeMark }) {
@@ -74,6 +76,7 @@ export function ShapeInspector({ project, shape }: { project: Project; shape: Sh
       edits.updateSettings((s) => {
         const shapeDefaults: typeof s.markDefaults.shape = { shape: shape.shape, stroke: { ...stroke } };
         if (shape.fill) shapeDefaults.fill = { opacityPct: shape.fill.opacityPct };
+        if (shape.outline) shapeDefaults.outline = { ...shape.outline };
         return { ...s, markDefaults: { ...s.markDefaults, shape: shapeDefaults } };
       })
     );
@@ -239,6 +242,44 @@ export function ShapeInspector({ project, shape }: { project: Project; shape: Sh
                   onChange={(opacityPct) => opacityPct !== undefined && update((s) => ({ ...s, fill: { ...s.fill, opacityPct } }))}
                 />
               </Field>
+            )}
+          </Group>
+        )}
+
+        {shape.shape !== "highlight" && (
+          <Group
+            name="shape-outline"
+            title="Outline"
+            enabled={!!shape.outline}
+            onEnabledChange={(on) =>
+              update((s) => {
+                if (on) return { ...s, outline: s.outline ?? { ...DEFAULT_OUTLINE } };
+                const { outline: _removed, ...rest } = s;
+                return rest;
+              })
+            }
+          >
+            {shape.outline && (
+              <>
+                <Field label="Color">
+                  <ColorField
+                    label="Outline color"
+                    color={shape.outline.color}
+                    onChange={(color) => update((s) => (s.outline ? { ...s, outline: { ...s.outline, color } } : s))}
+                  />
+                </Field>
+                <Field label="Width">
+                  <NumberInput
+                    label="Outline width"
+                    value={shape.outline.widthPt}
+                    min={0.25}
+                    max={6}
+                    step={0.25}
+                    unit="pt"
+                    onChange={(widthPt) => widthPt && update((s) => (s.outline ? { ...s, outline: { ...s.outline, widthPt } } : s))}
+                  />
+                </Field>
+              </>
             )}
           </Group>
         )}

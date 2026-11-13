@@ -5,6 +5,8 @@ import {
   ArrowUp,
   BookOpen,
   FileText,
+  Film,
+  Gauge,
   Keyboard,
   List,
   MousePointer2,
@@ -21,8 +23,9 @@ import { formatLineCaption } from "../../lib/lineCaption";
 import { CAPTION_DIVIDERS, customDividerSeed, isCaptionDivider } from "../../model/captions";
 import { defaultSettings } from "../../model/defaults";
 import { setName, updateSettings } from "../../model/edits";
+import { clearAutosave } from "../../io/autosave";
 import { CAPTION_FIELDS, choiceEntries, isCaptionFieldId } from "../../model/registry";
-import type { CaptionDivider, Ending, LineDefaults, ProjectSettings, WaveSide } from "../../model/types";
+import type { CaptionDivider, Ending, LineDefaults, Outline, ProjectSettings, ShapeDefaults, TextDefaults, WaveSide } from "../../model/types";
 import { patternFields, tuneLabel, type TuneField } from "../../lib/strokeGeometry";
 import { editStrokeTune, tunePercent } from "../../model/segments";
 import { useProjectStore } from "../../stores/projectStore";
@@ -44,6 +47,22 @@ import { ToolKeybindSettings } from "../ToolKeybindSettings";
 
 const DATE_CODES =
   "m 1–12 · mm 01–12 · mmm Jan · mmmm January\nd 1–31 · dd 01–31 · ddd Sun · dddd Sunday\nyy 00–99 · yyyy 1900–9999";
+
+/** Mouse and drawing moves that have no key of their own. */
+const GESTURES: [string, string][] = [
+  ["Draw a line with a new shot", "Ctrl+drag (Line tool)"],
+  ["Snap a line, edge or rotation", "Shift (when Snap is off)"],
+  ["Copy a line while dragging it", "Alt+drag"],
+  ["Split a line at a point", "Double-click the line"],
+  ["Square shape / keep proportions", "Shift while drawing or resizing"],
+  ["Straight segment with the Pen", "Hold Shift"],
+  ["Polygon: close / finish open / undo corner / cancel", "Click first corner / Enter or double-click / Backspace / Esc"],
+  ["Actions for anything", "Right-click"],
+  ["Table: edit a cell / paste a block", "Type or Enter / Ctrl+V"],
+];
+
+/** A white halo reads well on a script page. */
+const DEFAULT_OUTLINE: Outline = { color: "#FFFFFF", widthPt: 1.5 };
 
 const FIXED_SHORTCUTS: [string, string][] = [
   ["Save", "Ctrl+S"],
@@ -173,6 +192,35 @@ function NumberField({
   );
 }
 
+/** Font, size and bold for captions or notes. */
+function FontField({
+  style,
+  fonts,
+  onChange,
+}: {
+  style: { font: string; sizePt: number; bold: boolean };
+  fonts: { value: string; label: string }[];
+  onChange: (patch: { font?: string; sizePt?: number; bold?: boolean }) => void;
+}) {
+  return (
+    <span className="set-inline">
+      <select value={style.font} onChange={(e) => onChange({ font: e.target.value })}>
+        {!fonts.some((font) => font.value === style.font) && <option value={style.font}>{style.font}</option>}
+        {fonts.map((font) => (
+          <option key={font.value} value={font.value}>
+            {font.label}
+          </option>
+        ))}
+      </select>
+      <NumberField value={style.sizePt} min={4} max={96} unit="pt" onChange={(sizePt) => onChange({ sizePt })} />
+      <label className="set-check">
+        <input type="checkbox" checked={style.bold} onChange={(e) => onChange({ bold: e.target.checked })} />
+        Bold
+      </label>
+    </span>
+  );
+}
+
 function EndingField({ value, onChange }: { value: Ending; onChange: (value: Ending) => void }) {
   return (
     <span className="set-inline set-ending">
@@ -253,16 +301,24 @@ export function SettingsDialog() {
     set((p) => ({ ...p, drawing: { ...p.drawing, ...patch } }));
   const setLine = (patch: Partial<LineDefaults>) =>
     set((p) => ({ ...p, markDefaults: { ...p.markDefaults, line: { ...p.markDefaults.line, ...patch } } }));
-  /** Captions and notes share one text style for now, as they always have. */
-  const setLineText = (patch: Partial<LineDefaults["caption"]>) =>
-    set((p) => ({
-      ...p,
-      markDefaults: {
-        ...p.markDefaults,
-        line: { ...p.markDefaults.line, caption: { ...p.markDefaults.line.caption, ...patch } },
-        text: { ...p.markDefaults.text, style: { ...p.markDefaults.text.style, ...patch } },
-      },
-    }));
+  const setCaptionStyle = (patch: Partial<LineDefaults["caption"]>) =>
+    set((p) => ({ ...p, markDefaults: { ...p.markDefaults, line: { ...p.markDefaults.line, caption: { ...p.markDefaults.line.caption, ...patch } } } }));
+  const setNote = (patch: Partial<TextDefaults>) =>
+    set((p) => ({ ...p, markDefaults: { ...p.markDefaults, text: { ...p.markDefaults.text, ...patch } } }));
+  const setShape = (patch: Partial<ShapeDefaults>) =>
+    set((p) => ({ ...p, markDefaults: { ...p.markDefaults, shape: { ...p.markDefaults.shape, ...patch } } }));
+  /** One default outline for every new mark: lines, their captions, shapes and notes. */
+  const setOutline = (outline: Outline | undefined) =>
+    set((p) => {
+      const strip = <T extends { outline?: Outline }>(d: T): T => {
+        const { outline: _removed, ...rest } = d;
+        return (outline ? { ...rest, outline: { ...outline } } : rest) as T;
+      };
+      const line = strip(p.markDefaults.line);
+      if (outline) line.captionOutline = { ...outline };
+      else delete line.captionOutline;
+      return { ...p, markDefaults: { ...p.markDefaults, line, shape: strip(p.markDefaults.shape), text: strip(p.markDefaults.text) } };
+    });
 
   // Every caption field the project stores, including Angle, Cast, Tags and Setup.
   const captionFields = s.captions.fields.filter((field) => isCaptionFieldId(field.id));
@@ -284,6 +340,9 @@ export function SettingsDialog() {
     : "Add a shot to see a preview";
 
   const line = s.markDefaults.line;
+  const note = s.markDefaults.text;
+  const shape = s.markDefaults.shape;
+  const outline = shape.outline ?? line.outline ?? note.outline;
   const fonts = getFontOptions();
   const icon = { size: 15, strokeWidth: 1.75 } as const;
 
@@ -299,20 +358,8 @@ export function SettingsDialog() {
           control: <input type="text" className="set-wide" value={project.name} onChange={(e) => apply(setName(e.target.value))} />,
         },
         {
-          label: "Shot IDs",
-          control: (
-            <Segmented
-              value={s.general.shotIdStyle}
-              options={[
-                { value: "letter", label: "Letters · 1A, 1B" },
-                { value: "decimal", label: "Numbers · 1.1, 1.2" },
-              ]}
-              onChange={(shotIdStyle) => setGeneral({ shotIdStyle })}
-            />
-          ),
-        },
-        {
-          label: "New shot color",
+          label: "Default color",
+          hint: "New shots, lines and shapes start with this color (notes use Note color). The color bar above Properties sets it too.",
           control: (
             <span className="set-color">
               <input type="color" value={s.general.newShotColor} onChange={(e) => setGeneral({ newShotColor: e.target.value })} />
@@ -331,6 +378,42 @@ export function SettingsDialog() {
               </span>
               <span className="set-preview">{formatExcelDate("2012-03-14", s.captions.dateFormat) || "—"}</span>
             </span>
+          ),
+        },
+        {
+          label: "Autosave",
+          hint: "Keeps unsaved work in this browser and offers it back on the next start. Saving to a file is still how you keep a project.",
+          control: (
+            <span className="set-inline">
+              <label className="set-check">
+                <input type="checkbox" checked={prefs.autosave} onChange={(e) => prefs.setAutosave(e.target.checked)} />
+                Keep unsaved work in this browser
+              </label>
+              <button type="button" className="dialog-btn" onClick={clearAutosave}>
+                Discard saved copy
+              </button>
+            </span>
+          ),
+        },
+      ],
+    },
+    {
+      id: "shots",
+      group: "Project",
+      title: "Shots",
+      icon: <Film {...icon} />,
+      rows: [
+        {
+          label: "Shot IDs",
+          control: (
+            <Segmented
+              value={s.general.shotIdStyle}
+              options={[
+                { value: "letter", label: "Letters · 1A, 1B" },
+                { value: "decimal", label: "Numbers · 1.1, 1.2" },
+              ]}
+              onChange={(shotIdStyle) => setGeneral({ shotIdStyle })}
+            />
           ),
         },
         {
@@ -358,6 +441,10 @@ export function SettingsDialog() {
       icon: <List {...icon} />,
       rows: [
         { label: "Preview", control: <span className="set-preview set-preview-mono">{captionPreview}</span> },
+        {
+          label: "Caption font",
+          control: <FontField style={line.caption} fonts={fonts} onChange={setCaptionStyle} />,
+        },
         {
           label: "Fields and order",
           hint: "The divider joins that field to the one before it. Parentheses, brackets, braces and quotes wrap the field, so the defaults read 1A-WS Subject (Info). Custom uses … for the value, as in “ (…)”. A shot can still turn a field off for itself.",
@@ -442,12 +529,13 @@ export function SettingsDialog() {
         },
         {
           label: "Offset across",
-          hint: "How far a caption starts to the right of its line's first point.",
-          control: <NumberField value={s.captions.offsetAcrossPt} min={0} max={48} unit="pt" onChange={(offsetAcrossPt) => setCaptions({ offsetAcrossPt })} />,
+          hint: "How far a caption starts to the right of its line's first point. Negative moves it to the left, beside the line.",
+          control: <NumberField value={s.captions.offsetAcrossPt} min={-400} max={400} unit="pt" onChange={(offsetAcrossPt) => setCaptions({ offsetAcrossPt })} />,
         },
         {
-          label: "Offset above line",
-          control: <NumberField value={s.captions.offsetAbovePt} min={0} max={48} unit="pt" onChange={(offsetAbovePt) => setCaptions({ offsetAbovePt })} />,
+          label: "Offset up",
+          hint: "Negative moves the caption below the line's first point.",
+          control: <NumberField value={s.captions.offsetAbovePt} min={-200} max={200} unit="pt" onChange={(offsetAbovePt) => setCaptions({ offsetAbovePt })} />,
         },
         {
           label: '"(cont.)" gap',
@@ -479,22 +567,91 @@ export function SettingsDialog() {
         { label: "Line start", control: <EndingField value={line.start} onChange={(start) => setLine({ start })} /> },
         { label: "Line end", control: <EndingField value={line.end} onChange={(end) => setLine({ end })} /> },
         {
-          label: "Caption and note font",
+          label: "New lines copy the last line",
+          hint: "A new line takes the style of the line drawn before it instead of these defaults.",
+          control: (
+            <input type="checkbox" checked={s.drawing.newLineCopiesPrevious} onChange={(e) => setDrawing({ newLineCopiesPrevious: e.target.checked })} />
+          ),
+        },
+        {
+          label: "Note color",
+          control: (
+            <span className="set-color">
+              <input type="color" value={note.color} onChange={(e) => setNote({ color: e.target.value })} />
+              {note.color}
+            </span>
+          ),
+        },
+        {
+          label: "Note font",
+          control: <FontField style={note.style} fonts={fonts} onChange={(patch) => setNote({ style: { ...note.style, ...patch } })} />,
+        },
+        {
+          label: "Shape thickness",
+          control: (
+            <NumberField
+              value={shape.stroke?.widthPt ?? 2}
+              min={0.25}
+              max={24}
+              step={0.25}
+              unit="pt"
+              onChange={(widthPt) => setShape({ stroke: { ...(shape.stroke ?? { pattern: "straight", widthPt: 2 }), widthPt } })}
+            />
+          ),
+        },
+        {
+          label: "Shape fill",
+          hint: "New rectangles, ellipses, polygons and stars start filled at this opacity.",
           control: (
             <span className="set-inline">
-              <select value={line.caption.font} onChange={(e) => setLineText({ font: e.target.value })}>
-                {!fonts.some((font) => font.value === line.caption.font) && <option value={line.caption.font}>{line.caption.font}</option>}
-                {fonts.map((font) => (
-                  <option key={font.value} value={font.value}>
-                    {font.label}
-                  </option>
-                ))}
-              </select>
-              <NumberField value={line.caption.sizePt} min={4} max={96} unit="pt" onChange={(sizePt) => setLineText({ sizePt })} />
               <label className="set-check">
-                <input type="checkbox" checked={line.caption.bold} onChange={(e) => setLineText({ bold: e.target.checked })} />
-                Bold
+                <input
+                  type="checkbox"
+                  checked={!!shape.fill}
+                  onChange={(e) =>
+                    e.target.checked
+                      ? setShape({ fill: { opacityPct: 25 } })
+                      : set((p) => {
+                          const { fill: _removed, ...rest } = p.markDefaults.shape;
+                          return { ...p, markDefaults: { ...p.markDefaults, shape: rest } };
+                        })
+                  }
+                />
+                Filled
               </label>
+              {shape.fill && (
+                <NumberField value={shape.fill.opacityPct} min={0} max={100} step={5} unit="%" onChange={(opacityPct) => setShape({ fill: { opacityPct } })} />
+              )}
+            </span>
+          ),
+        },
+        {
+          label: "Highlight color",
+          control: (
+            <span className="set-color">
+              <input type="color" value={shape.highlightColor ?? "#FFE14D"} onChange={(e) => setShape({ highlightColor: e.target.value })} />
+              {shape.highlightColor ?? "#FFE14D"}
+            </span>
+          ),
+        },
+        {
+          label: "Outline",
+          hint: "A halo under new lines, captions, shapes and notes, so they read over the script text. Highlights never get one.",
+          control: (
+            <span className="set-inline">
+              <label className="set-check">
+                <input type="checkbox" checked={!!outline} onChange={(e) => setOutline(e.target.checked ? { ...(outline ?? DEFAULT_OUTLINE) } : undefined)} />
+                On
+              </label>
+              {outline && (
+                <>
+                  <span className="set-color">
+                    <input type="color" value={outline.color} onChange={(e) => setOutline({ ...outline, color: e.target.value })} />
+                    {outline.color}
+                  </span>
+                  <NumberField value={outline.widthPt} min={0.25} max={6} step={0.25} unit="pt" onChange={(widthPt) => setOutline({ ...outline, widthPt })} />
+                </>
+              )}
             </span>
           ),
         },
@@ -506,7 +663,7 @@ export function SettingsDialog() {
               className="dialog-btn"
               onClick={() => {
                 const d = defaultSettings().markDefaults;
-                set((p) => ({ ...p, markDefaults: { ...p.markDefaults, line: d.line, text: d.text } }));
+                set((p) => ({ ...p, markDefaults: { ...p.markDefaults, line: d.line, text: d.text, shape: d.shape } }));
               }}
             >
               Reset mark defaults
@@ -536,16 +693,9 @@ export function SettingsDialog() {
           ),
         },
         {
-          label: "Angle snap",
-          hint: "A line within this many degrees of straight up or across snaps to it. 0 is off; holding Shift snaps at 15°.",
+          label: "Snap angle step",
+          hint: "With Snap on, lines, edges and rotation snap to this many degrees. 0 turns Snap off; Shift snaps at 15° when Snap is off.",
           control: <NumberField value={s.drawing.angleSnapDegrees} min={0} max={90} unit="°" onChange={(angleSnapDegrees) => setDrawing({ angleSnapDegrees })} />,
-        },
-        {
-          label: "New lines copy the last line",
-          hint: "A new line takes the style of the line drawn before it instead of the mark defaults.",
-          control: (
-            <input type="checkbox" checked={s.drawing.newLineCopiesPrevious} onChange={(e) => setDrawing({ newLineCopiesPrevious: e.target.checked })} />
-          ),
         },
       ],
     },
@@ -621,17 +771,10 @@ export function SettingsDialog() {
       icon: <MousePointer2 {...icon} />,
       rows: [
         {
-          label: "Line click margin",
-          hint: "How close to a line a click has to be to select it.",
+          label: "Click distance",
+          hint: "How close a click has to be to a line, shape or pen stroke to select it.",
           control: (
             <NumberField value={prefs.lineHitTolerancePx} min={MIN_LINE_HIT_TOLERANCE_PX} max={MAX_LINE_HIT_TOLERANCE_PX} unit="px" onChange={prefs.setLineHitTolerancePx} />
-          ),
-        },
-        {
-          label: "Scroll view: pages kept loaded",
-          hint: "More pages scroll more smoothly but use more memory.",
-          control: (
-            <NumberField value={prefs.maxMountedPdfPages} min={MIN_MAX_MOUNTED_PDF_PAGES} max={MAX_MAX_MOUNTED_PDF_PAGES} onChange={prefs.setMaxMountedPdfPages} />
           ),
         },
         {
@@ -642,12 +785,41 @@ export function SettingsDialog() {
       ],
     },
     {
+      id: "performance",
+      group: "Preferences",
+      title: "Performance",
+      icon: <Gauge {...icon} />,
+      rows: [
+        {
+          label: "Pages kept loaded",
+          hint: "In Continuous scroll. More pages scroll more smoothly but use more memory.",
+          control: (
+            <NumberField value={prefs.maxMountedPdfPages} min={MIN_MAX_MOUNTED_PDF_PAGES} max={MAX_MAX_MOUNTED_PDF_PAGES} onChange={prefs.setMaxMountedPdfPages} />
+          ),
+        },
+      ],
+    },
+    {
       id: "shortcuts",
       group: "Preferences",
       title: "Shortcuts",
       icon: <Keyboard {...icon} />,
       rows: [
         { label: "Tool keys", stacked: true, control: <ToolKeybindSettings /> },
+        {
+          label: "Mouse and drawing",
+          stacked: true,
+          control: (
+            <dl className="set-shortcuts">
+              {GESTURES.map(([name, keys]) => (
+                <div key={name}>
+                  <dt>{name}</dt>
+                  <dd>{keys}</dd>
+                </div>
+              ))}
+            </dl>
+          ),
+        },
         {
           label: "Fixed shortcuts",
           stacked: true,

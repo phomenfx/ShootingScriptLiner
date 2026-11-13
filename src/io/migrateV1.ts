@@ -480,8 +480,9 @@ function settingsFromV1(raw: Raw): ProjectSettings {
     );
   }
   const offset = (value: unknown, fallback: number) => clamp(finite(value) ?? fallback, 0, 48);
-  settings.captions.offsetAcrossPt = offset(raw.labelOffsetXPt, 3);
-  settings.captions.offsetAbovePt = offset(raw.labelOffsetYPt, 4);
+  // Caption offsets may be negative: across to sit left of the line, above to sit below its start.
+  settings.captions.offsetAcrossPt = clamp(finite(raw.labelOffsetXPt) ?? 3, -400, 400);
+  settings.captions.offsetAbovePt = clamp(finite(raw.labelOffsetYPt) ?? 4, -200, 200);
   settings.captions.contGapPt = offset(raw.labelSecondaryGapPt, 4);
   settings.captions.dateFormat = trimmed(raw.scheduledDateFormat)
     ? str(raw.scheduledDateFormat)

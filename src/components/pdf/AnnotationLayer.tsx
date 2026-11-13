@@ -27,7 +27,7 @@ import {
 import { newId } from "../../lib/ids";
 import * as commands from "../../commands";
 import { legacyEnding, toLegacyProject } from "../../legacy/legacyView";
-import { addLine, addText, applyMarginContinuationTrim, replaceLine, selectMark, updateText } from "../../drawing/marks";
+import { addLine, addLineJoined, addText, applyMarginContinuationTrim, replaceLine, selectMark, updateText } from "../../drawing/marks";
 import { useProjectStore } from "../../stores/projectStore";
 import { shotIdLabel } from "../../model/shotList";
 import { usePrefsStore } from "../../stores/prefsStore";
@@ -377,7 +377,7 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
         x: p.x,
         y: p.y,
         text: "Note",
-        color: "#111111",
+        color: v2Project.settings.markDefaults.text.color,
         fontSize: project.defaultLine.fontSizePt,
         fontFamily: project.defaultLine.fontFamily,
         labelBold: project.defaultLine.labelBold,
@@ -680,9 +680,17 @@ export function AnnotationLayer({ pageNum, width, height }: Props) {
       const pu = getPointUnclamped(e);
       const end = finishDrawEnd(current.start, pu, snapDegrees, e.shiftKey);
 
-      const line = createLineFromShot(pageNum, [current.start, end], project, linkedShotId);
-      addLine(line);
-      trimLineId = line.id;
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+drag: a new shot for this line, in one undo step.
+        const shotId = commands.newShotForLine();
+        const line = createLineFromShot(pageNum, [current.start, end], toLegacyProject(useProjectStore.getState().project), shotId);
+        addLineJoined(line);
+        trimLineId = line.id;
+      } else {
+        const line = createLineFromShot(pageNum, [current.start, end], project, linkedShotId);
+        addLine(line);
+        trimLineId = line.id;
+      }
       trimHint = "drawEnd";
     }
 

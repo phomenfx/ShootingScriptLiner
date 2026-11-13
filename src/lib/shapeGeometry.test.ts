@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ShapeMark } from "../model/types";
-import { hitsShape, pathBox, resizeShape, rotationToward, shapeHandles, shapeOutline, simplifyPoints } from "./shapeGeometry";
+import { hitsShape, pathBox, shapeHalo, resizeShape, rotationToward, shapeHandles, shapeOutline, simplifyPoints } from "./shapeGeometry";
 
 const box = (extra: Partial<ShapeMark> = {}): ShapeMark => ({
   id: "s",
@@ -97,3 +97,12 @@ describe("pen and polygon paths", () => {
 function box_(b: ReturnType<typeof pathBox>, closed: boolean): ShapeMark {
   return { id: "p", kind: "shape", page: 1, shape: "path", x: b.x, y: b.y, widthPt: b.widthPt, heightPt: b.heightPt, rotation: 0, path: { points: b.path, closed } };
 }
+
+describe("outlines", () => {
+  it("draws a halo for shapes with an outline, but never under a highlight", () => {
+    const outline = { color: "#FFFFFF", widthPt: 2 };
+    expect(shapeHalo(box({ outline }))).toEqual(outline);
+    expect(shapeHalo(box())).toBeNull();
+    expect(shapeHalo(box({ shape: "highlight", outline }))).toBeNull();
+  });
+});

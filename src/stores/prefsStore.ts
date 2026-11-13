@@ -57,6 +57,8 @@ type PrefsValues = {
   foldedGroups: Record<string, true>;
   /** Shot list table columns turned off, by column id. */
   hiddenTableColumns: string[];
+  /** Keep unsaved work in this browser between visits. */
+  autosave: boolean;
 };
 
 type PrefsState = PrefsValues & {
@@ -79,6 +81,7 @@ type PrefsState = PrefsValues & {
   setGroupFolded: (group: string, folded: boolean) => void;
   setTableColumnHidden: (column: string, hidden: boolean) => void;
   showAllTableColumns: () => void;
+  setAutosave: (on: boolean) => void;
 };
 
 const memory = new Map<string, string>();
@@ -159,6 +162,7 @@ export const usePrefsStore = create<PrefsState>()(
       panels: defaultPanelPrefs(),
       foldedGroups: {},
       hiddenTableColumns: [],
+      autosave: true,
       ...readOldKeys(),
 
       setColorTheme: (theme) => {
@@ -213,6 +217,7 @@ export const usePrefsStore = create<PrefsState>()(
           return { foldedGroups };
         }),
       showAllTableColumns: () => set({ hiddenTableColumns: [] }),
+      setAutosave: (autosave) => set({ autosave }),
       setTableColumnHidden: (column, hidden) =>
         set((s) => ({
           hiddenTableColumns: hidden ? [...new Set([...s.hiddenTableColumns, column])] : s.hiddenTableColumns.filter((c) => c !== column),
@@ -230,6 +235,7 @@ export const usePrefsStore = create<PrefsState>()(
           ...s,
           // Tools added later (Shape) get their default key.
           hiddenTableColumns: Array.isArray(s.hiddenTableColumns) ? s.hiddenTableColumns : [],
+          autosave: s.autosave !== false,
           toolKeybinds: sanitizeToolKeybinds({ ...DEFAULT_TOOL_KEYBINDS, ...s.toolKeybinds }),
           panels: {
             widthPx: { ...d.widthPx, ...s.panels?.widthPx },
@@ -253,6 +259,7 @@ export const usePrefsStore = create<PrefsState>()(
         panels,
         foldedGroups,
         hiddenTableColumns,
+        autosave,
       }): PrefsValues => ({
         colorTheme,
         uiScale,
@@ -266,6 +273,7 @@ export const usePrefsStore = create<PrefsState>()(
         panels,
         foldedGroups,
         hiddenTableColumns,
+        autosave,
       }),
     }
   )

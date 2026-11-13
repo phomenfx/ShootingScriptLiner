@@ -37,7 +37,7 @@ import { legacyEnding } from "../legacy/legacyView";
 import { segmentStrands, type StrokeStrand } from "./strokeGeometry";
 import { segmentLook } from "../model/segments";
 import type { LineMark, Project as V2Project, ShapeMark } from "../model/types";
-import { isShapeShown, outlineEdges, shapeColor, shapeFill, shapeHasStroke, shapeOutline, stampScalePercent, stampTip } from "./shapeGeometry";
+import { isShapeShown, outlineEdges, shapeColor, shapeFill, shapeHalo, shapeHasStroke, shapeOutline, stampScalePercent, stampTip } from "./shapeGeometry";
 import { drawPdfLineCap } from "./pdfLineCaps";
 import { resolvePdfExportFont, sanitizePdfExportText } from "./pdfExportFonts";
 import {
@@ -315,15 +315,24 @@ function drawShape(page: PDFPage, ph: number, source: V2Project, shape: ShapeMar
   if (shape.shape === "stamp") {
     const tip = flip(stampTip(shape));
     const ending = { cap: (shape.stamp ?? "arrow") as LineCap, scalePercent: stampScalePercent(shape), filled: !!shape.fill };
-    drawPdfLineCap(page, tip.x, tip.y, (-shape.rotation * Math.PI) / 180, ending, color, widthPt, false);
+    const angle = (-shape.rotation * Math.PI) / 180;
+    const halo = shapeHalo(shape);
+    if (halo) drawPdfLineCap(page, tip.x, tip.y, angle, ending, halo.color, widthPt, false, halo.widthPt);
+    drawPdfLineCap(page, tip.x, tip.y, angle, ending, color, widthPt, false);
     return;
   }
   const outline = shapeOutline(shape);
   if (!outline) return;
   const fill = shapeFill(source, shape);
+  const halo = shapeHalo(shape);
+  const hasStroke = shapeHasStroke(shape) && !!shape.stroke;
+  const d = outline.points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ") + (outline.closed ? " Z" : "");
+  // A fill with no stroke still gets its outline around the edge.
+  if (halo && !hasStroke && fill && outline.closed) {
+    page.drawSvgPath(d, { x: 0, y: ph, borderColor: hexToRgb(halo.color), borderWidth: halo.widthPt * 2 });
+  }
   if (fill && outline.closed) {
     // drawSvgPath reads y downward from the given origin, so the page points go in as they are.
-    const d = outline.points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ") + " Z";
     page.drawSvgPath(d, {
       x: 0,
       y: ph,
@@ -333,13 +342,18 @@ function drawShape(page: PDFPage, ph: number, source: V2Project, shape: ShapeMar
       ...(shape.shape === "highlight" ? { blendMode: BlendMode.Multiply } : {}),
     });
   }
-  if (!shapeHasStroke(shape) || !shape.stroke) return;
-  const stroke = shape.stroke;
-  for (const [a, b] of outlineEdges(outline)) {
-    for (const strand of segmentStrands(a, b, stroke.pattern, stroke.widthPt, stroke)) {
-      if (strand.export) drawStrand(page, { ...strand, points: strand.points.map(flip) }, ink);
-    }
+  if (!hasStroke) return;
+  const stroke = shape.stroke!;
+  const strands = outlineEdges(outline)
+    .flatMap(([a, b]) => segmentStrands(a, b, stroke.pattern, stroke.widthPt, stroke))
+    .filter((strand) => strand.export)
+    .map((strand) => ({ ...strand, points: strand.points.map(flip) }));
+  // The halo goes down first, under every stroke.
+  if (halo) {
+    const haloInk = hexToRgb(halo.color);
+    for (const strand of strands) drawStrand(page, { ...strand, widthPt: strand.widthPt + halo.widthPt * 2 }, haloInk);
   }
+  for (const strand of strands) drawStrand(page, strand, ink);
 }
 
 function drawStrand(page: PDFPage, strand: StrokeStrand, color: ReturnType<typeof hexToRgb>): void {

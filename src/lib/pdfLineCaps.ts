@@ -41,7 +41,8 @@ function drawLocalSvgPath(
   path: string,
   color: ReturnType<typeof rgb>,
   filled: boolean,
-  lineWidth: number
+  lineWidth: number,
+  haloPt = 0
 ): void {
   page.drawSvgPath(path, {
     x: cx,
@@ -49,7 +50,7 @@ function drawLocalSvgPath(
     rotate: degrees((angleRad * 180) / Math.PI),
     color: filled ? color : undefined,
     borderColor: color,
-    borderWidth: filled ? Math.max(0.25, lineWidth * 0.25) : lineWidth,
+    borderWidth: (filled ? Math.max(0.25, lineWidth * 0.25) : lineWidth) + haloPt * 2,
   });
 }
 
@@ -65,7 +66,9 @@ export function drawPdfLineCap(
   ending: LineEnding,
   colorHex: string,
   lineWidthPt: number,
-  atStart: boolean
+  atStart: boolean,
+  /** Draws the ending as an outline: this much wider on every side. */
+  haloPt = 0
 ): void {
   const geo = endingGeometry(ending, lineWidthPt);
   if (!geo) return;
@@ -77,7 +80,7 @@ export function drawPdfLineCap(
   const primitive = geo.primitive;
 
   if (primitive.kind === "path") {
-    drawLocalSvgPath(page, cx, cy, outAngle, primitive.d, color, primitive.filled, geo.strokePt);
+    drawLocalSvgPath(page, cx, cy, outAngle, primitive.d, color, primitive.filled, geo.strokePt, haloPt);
     return;
   }
   if (primitive.kind === "circle") {
@@ -86,7 +89,7 @@ export function drawPdfLineCap(
       y: cy,
       size: primitive.r * 2,
       borderColor: color,
-      borderWidth: geo.strokePt,
+      borderWidth: geo.strokePt + haloPt * 2,
       color: primitive.filled ? color : undefined,
     });
     return;
@@ -95,7 +98,7 @@ export function drawPdfLineCap(
     page.drawLine({
       start: mapLocal(a.x, a.y, cx, cy, cos, sin),
       end: mapLocal(b.x, b.y, cx, cy, cos, sin),
-      thickness: geo.strokePt,
+      thickness: geo.strokePt + haloPt * 2,
       color,
     });
   }

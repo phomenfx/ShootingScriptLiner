@@ -343,6 +343,8 @@ export type LineDefaults = {
 
 export type ShapeDefaults = {
   shape: string;
+  /** Color new highlights start with. */
+  highlightColor?: string;
   stroke?: Stroke;
   fill?: { opacityPct: number };
   outline?: Outline;

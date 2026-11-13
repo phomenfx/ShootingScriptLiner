@@ -3,13 +3,24 @@ import * as edits from "../../model/edits";
 import { useProjectStore } from "../../stores/projectStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { LineInspector, OtherMarkInspector, TextInspector } from "./MarkForms";
+import { ColorBar } from "./ColorBar";
 import { ShapeInspector } from "./ShapeForm";
 import { SceneInspector, ShotInspector } from "./ShotSceneForms";
 
 const MARK_NAMES: Record<string, string> = { line: "Line", text: "Note", shape: "Shape", image: "Image" };
 
-/** Shows the form for whatever is selected: a line, a note, a shot or a scene. */
+/** The color bar, then the form for whatever is selected. */
 export function PropertiesPanel() {
+  return (
+    <div className="properties-panel">
+      <ColorBar />
+      <PropertiesBody />
+    </div>
+  );
+}
+
+/** Shows the form for whatever is selected: a line, a note, a shot or a scene. */
+function PropertiesBody() {
   const project = useProjectStore((s) => s.project);
   const selection = useSessionStore((s) => s.selection);
   const markTab = useSessionStore((s) => s.markTab);

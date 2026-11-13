@@ -19,6 +19,7 @@ import {
   shapeColor,
   shapeFill,
   shapeHandles,
+  shapeHalo,
   shapeHasStroke,
   shapeOutline,
   stampScalePercent,
@@ -29,6 +30,7 @@ import { segmentStrands } from "../../lib/strokeGeometry";
 import * as edits from "../../model/edits";
 import type { Project, ShapeMark } from "../../model/types";
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
+import { usePrefsStore } from "../../stores/prefsStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { LineCap } from "../../types/annotations";
 
@@ -51,6 +53,7 @@ function newShape(project: Project, page: number, box: { x: number; y: number; w
   const shape: ShapeMark = { id: newId(), kind: "shape", page, shape: kind, ...box, rotation: 0 };
   if (d.stroke) shape.stroke = { ...d.stroke };
   if (d.fill) shape.fill = { ...d.fill };
+  if (d.outline) shape.outline = { ...d.outline };
   if (kind === "polygon") shape.sides = 6;
   if (kind === "star") {
     shape.points = 5;
@@ -61,7 +64,7 @@ function newShape(project: Project, page: number, box: { x: number; y: number; w
     shape.fill = { opacityPct: 100 };
   }
   if (kind === "highlight") {
-    shape.color = HIGHLIGHT_COLOR;
+    shape.color = d.highlightColor ?? HIGHLIGHT_COLOR;
     // Full strength: the highlight layer multiplies, so the text shows through like a highlighter.
     shape.fill = { opacityPct: 100 };
   } else if (shotId && edits.findShot(project, shotId)) shape.shotId = shotId;
@@ -75,34 +78,49 @@ export function ShapeGraphic({ project, shape, k }: { project: Project; shape: S
   if (shape.shape === "stamp") {
     const ending = { cap: (shape.stamp ?? "arrow") as LineCap, scalePercent: stampScalePercent(shape), filled: !!shape.fill };
     const widthPt = shape.stroke?.widthPt ?? 2;
-    const cap = renderLineCap(ending, color, widthPt * k, (shape.rotation * Math.PI) / 180, false, k);
+    const angle = (shape.rotation * Math.PI) / 180;
+    const cap = renderLineCap(ending, color, widthPt * k, angle, false, k);
+    const halo = shapeHalo(shape);
+    // The ending drawn again underneath, in the outline color and thicker.
+    const under = halo ? renderLineCap(ending, halo.color, (widthPt + (halo.widthPt * 2.5)) * k, angle, false, k) : null;
     const tip = stampTip(shape);
-    return cap ? <g transform={`translate(${tip.x * k}, ${tip.y * k})`}>{cap.elements}</g> : null;
+    return cap ? (
+      <g transform={`translate(${tip.x * k}, ${tip.y * k})`}>
+        {under?.elements}
+        {cap.elements}
+      </g>
+    ) : null;
   }
   const outline = shapeOutline(shape);
   if (!outline) return null;
   const fill = shapeFill(project, shape);
   const points = outline.points.map((p) => `${p.x * k},${p.y * k}`).join(" ");
   const stroke = shapeHasStroke(shape) ? shape.stroke! : null;
+  const halo = shapeHalo(shape);
+  const strands = stroke ? outlineEdges(outline).flatMap(([a, b]) => segmentStrands(a, b, stroke.pattern, stroke.widthPt, stroke)) : [];
+  const drawStrands = (ink: string, extraPt: number, key: string) =>
+    strands.map((strand, index) => (
+      <polyline
+        key={`${key}-${index}`}
+        points={strand.points.map((p) => `${p.x * k},${p.y * k}`).join(" ")}
+        fill="none"
+        stroke={ink}
+        strokeWidth={(strand.widthPt + extraPt) * k}
+        strokeDasharray={strand.dash?.map((part) => part * k).join(" ")}
+        strokeOpacity={strand.opacity}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    ));
   return (
     <g>
+      {/* A fill with no stroke still gets its outline around the edge. */}
+      {halo && !stroke && fill && outline.closed && (
+        <polygon points={points} fill="none" stroke={halo.color} strokeWidth={halo.widthPt * 2 * k} strokeLinejoin="round" />
+      )}
       {fill && outline.closed && <polygon points={points} fill={fill.color} fillOpacity={fill.opacity} stroke="none" />}
-      {stroke &&
-        outlineEdges(outline).flatMap(([a, b], edge) =>
-          segmentStrands(a, b, stroke.pattern, stroke.widthPt, stroke).map((strand, index) => (
-            <polyline
-              key={`${edge}-${index}`}
-              points={strand.points.map((p) => `${p.x * k},${p.y * k}`).join(" ")}
-              fill="none"
-              stroke={color}
-              strokeWidth={strand.widthPt * k}
-              strokeDasharray={strand.dash?.map((part) => part * k).join(" ")}
-              strokeOpacity={strand.opacity}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          ))
-        )}
+      {halo && drawStrands(halo.color, halo.widthPt * 2, "halo")}
+      {drawStrands(color, 0, "stroke")}
     </g>
   );
 }
@@ -120,6 +138,8 @@ export function useShapeGestures({
 }) {
   const project = useProjectStore((s) => s.project);
   const shapeKind = useSessionStore((s) => s.shapeKind);
+  // The same click distance as lines (Settings → Interaction).
+  const clickPx = usePrefsStore((s) => s.lineHitTolerancePx);
   const linkedShotId = useSessionStore((s) => (s.selection?.kind === "shot" ? s.selection.ids[0] : undefined));
   const page = project.script?.pages[pageNum - 1];
   const widthPt = page?.widthPt ?? 612;
@@ -266,7 +286,7 @@ export function useShapeGestures({
   /** Select tool, after lines and notes: picks the top shape under the pointer and starts moving it. */
   const grabShape = (n: Pt, e: ReactPointerEvent): boolean => {
     const p = toPt(n);
-    const hit = [...shapes].reverse().find((shape) => hitsShape(shape, p, 2 / k));
+    const hit = [...shapes].reverse().find((shape) => hitsShape(shape, p, clickPx / k));
     if (!hit) return false;
     useSessionStore.getState().select("mark", hit.id);
     breakUndoGroup();
@@ -278,7 +298,7 @@ export function useShapeGestures({
   /** The top shape under a normalized page point, if any. */
   const shapeAt = (n: Pt): ShapeMark | null => {
     const p = toPt(n);
-    return [...shapes].reverse().find((shape) => hitsShape(shape, p, 2 / k)) ?? null;
+    return [...shapes].reverse().find((shape) => hitsShape(shape, p, clickPx / k)) ?? null;
   };
 
   /** Returns true when a shape gesture used the event. */

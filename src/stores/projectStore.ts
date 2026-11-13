@@ -85,6 +85,23 @@ export function applyWithoutUndo(edit: Edit): void {
   breakUndoGroup();
 }
 
+/**
+ * Applies an edit as part of the last undo step: undoing that step also undoes
+ * this. For follow-ups that finish a gesture, like trimming a drawn line.
+ */
+export function applyIntoLastStep(edit: Edit): void {
+  history().pause();
+  useProjectStore.getState().apply(edit);
+  history().resume();
+}
+
+/** Marks the open project as not saved to a file (restored autosave). */
+export function markProjectUnsaved(): void {
+  history().pause();
+  useProjectStore.setState((state) => ({ savedProject: { ...state.savedProject } }));
+  history().resume();
+}
+
 export function markProjectSaved(): void {
   history().pause();
   useProjectStore.setState((state) => ({ savedProject: state.project }));

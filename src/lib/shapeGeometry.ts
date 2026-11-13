@@ -197,6 +197,15 @@ export function shapeFill(project: Project, shape: ShapeMark): { color: string; 
   return { color: fill.color ?? shapeColor(project, shape), opacity: Math.max(0, Math.min(100, fill.opacityPct)) / 100 };
 }
 
+/**
+ * The halo drawn under a shape: every stroke again, in the outline color and
+ * wider by the outline width on each side. Highlights have none.
+ */
+export function shapeHalo(shape: ShapeMark): { color: string; widthPt: number } | null {
+  if (!shape.outline || shape.shape === "highlight" || shape.outline.widthPt <= 0) return null;
+  return shape.outline;
+}
+
 /** Ending size that fills a stamp's box. */
 export function stampScalePercent(shape: ShapeMark): number {
   return (Math.min(shape.widthPt, shape.heightPt) / 8) * 100 * 0.9;

@@ -507,6 +507,8 @@ function readSettings(raw: unknown): ProjectSettings {
     }
     const outline = readOutline(marks.shape.outline);
     if (outline) settings.markDefaults.shape.outline = outline;
+    const highlightColor = nonEmpty(marks.shape.highlightColor);
+    if (highlightColor) settings.markDefaults.shape.highlightColor = highlightColor;
   }
   if (isRecord(marks.text)) {
     const d = settings.markDefaults.text;

@@ -12,8 +12,9 @@ import { compareScript, describeScript, scriptMismatchMessage } from "../io/scri
 import { projectFileStem } from "../io/writeProject";
 import { toLegacyProject } from "../legacy/legacyView";
 import { loadPdfFromCache, savePdfToCache } from "../lib/pdfCache";
-import { createProject } from "../model/defaults";
-import { updateScene, updateShot } from "../model/edits";
+import { createProject, createScene, createShot } from "../model/defaults";
+import { clearAutosave, readAutosave, startAutosave, type Autosave } from "../io/autosave";
+import { addScene, addShot, updateScene, updateShot } from "../model/edits";
 import { CLONE_NUDGE_PT, addMarks, cloneMark, deleteMarks, deleteScene, deleteShot, findShot, setScript, unlinkMark, updateMark, updateSettings } from "../model/edits";
 import { insertOutline, outlineClipOf, type OutlineAnchor, type OutlineClip } from "../model/outlineClipboard";
 import type { Mark, Project, ScriptInfo } from "../model/types";
@@ -25,6 +26,7 @@ import {
   replaceProject,
   undoProject,
   useProjectStore,
+  markProjectUnsaved,
 } from "../stores/projectStore";
 import { usePrefsStore } from "../stores/prefsStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -93,6 +95,45 @@ function pickFile(accept: string): Promise<File | null> {
 function hasUnsavedWork(): boolean {
   const state = useProjectStore.getState();
   return state.project !== state.savedProject;
+}
+
+/* ---------- autosave ---------- */
+
+let autosaveStarted = false;
+
+/**
+ * Starts autosave and, once per page load, offers to bring back unsaved work
+ * from last time. Keeps the script PDF cached under the project's current name
+ * so a restore finds it.
+ */
+export function startAutosaveAndOfferRestore(): void {
+  if (autosaveStarted) return;
+  autosaveStarted = true;
+  const saved = readAutosave();
+  startAutosave();
+  useProjectStore.subscribe((state, previous) => {
+    const file = session().scriptPdfFile;
+    if (!file) return;
+    const renamed = state.project.name !== previous.project.name || state.project.script?.fileName !== previous.project.script?.fileName;
+    if (renamed) void cacheScript(state.project, file);
+  });
+  if (saved) void offerRestore(saved);
+}
+
+async function offerRestore(saved: Autosave): Promise<void> {
+  const when = new Date(saved.savedAt).toLocaleString();
+  const what = saved.name ? `"${saved.name}"` : "a project";
+  const ok = await confirm(
+    `You have unsaved work on ${what} from ${when}. Restore it? Choosing Cancel discards it.`,
+    "Restore"
+  );
+  if (!ok) {
+    clearAutosave();
+    return;
+  }
+  await openProject(new File([saved.json], `${saved.name || "autosave"}.json`, { type: "application/json" }));
+  // Restored work is still not saved to a file.
+  markProjectUnsaved();
 }
 
 /* ---------- project files ---------- */
@@ -470,6 +511,32 @@ export function hideSelectedScene(): void {
   useProjectStore.getState().apply(updateScene(sceneId, (scene) => ({ ...scene, visible: false })));
   breakUndoGroup();
   if (session().selection?.kind === "mark") session().clearSelection();
+}
+
+/**
+ * Ctrl+drag with the Line tool: makes a new shot for the line being drawn.
+ * It goes after the selected shot (or the selected line's shot), at the end of
+ * a selected scene, or at the end of the last scene; with no scenes, a scene
+ * is made first. Leaves the undo group open so the line joins the same step.
+ */
+export function newShotForLine(): string {
+  const p = project();
+  const selection = session().selection;
+  const anchor = selectedShotFound();
+  const shot = createShot(p);
+  breakUndoGroup();
+  if (anchor) {
+    useProjectStore.getState().apply(addShot(anchor.scene.id, shot, anchor.shotIndex + 1));
+  } else {
+    let sceneId = selection?.kind === "scene" ? selection.ids[0] : p.scenes[p.scenes.length - 1]?.id;
+    if (!sceneId) {
+      const scene = createScene();
+      useProjectStore.getState().apply(addScene(scene));
+      sceneId = scene.id;
+    }
+    useProjectStore.getState().apply(addShot(sceneId!, shot));
+  }
+  return shot.id;
 }
 
 /** Alt+H: shows every hidden shot and scene, and every row and column hidden in the table. */

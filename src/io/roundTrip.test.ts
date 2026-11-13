@@ -63,6 +63,7 @@ function sample(): Project {
       innerDepthPct: 40,
       stroke: { pattern: "dashes", widthPt: 3, gapPct: 150 },
       fill: { opacityPct: 25 },
+      outline: { color: "#FFFFFF", widthPt: 1.5 },
     },
     {
       id: "pen",
