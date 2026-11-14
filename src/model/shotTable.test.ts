@@ -54,11 +54,11 @@ describe("pasting and filters", () => {
   it("fills right and down from the anchor, skips read-only columns and never adds rows", () => {
     const p = sample();
     // Columns run Shot, Size, Angle, Subject.
-    const block = parseCellBlock("MS\tlow\tA\nOTS\thigh\tB\nXX\tC\tD\n");
+    const block = parseCellBlock("MS\tLow\tA\nOTS\tHigh\tB\nXX\tC\tD\n");
     const columns = TABLE_COLUMNS.filter((c) => ["shot", "type", "subject", "angle"].includes(c.id));
     const next = pasteBlock(block, ["a", "b"], columns, { shotId: "a", columnId: "type" })(p);
-    expect(shot(next, "a").shot).toMatchObject({ type: "MS", subject: "A", angle: "low" });
-    expect(shot(next, "b").shot).toMatchObject({ type: "OTS", subject: "B", angle: "high" });
+    expect(shot(next, "a").shot).toMatchObject({ type: "MS", subject: "A", angle: "Low" });
+    expect(shot(next, "b").shot).toMatchObject({ type: "OTS", subject: "B", angle: "High" });
     expect(next.scenes[0]!.shots).toHaveLength(2);
   });
 

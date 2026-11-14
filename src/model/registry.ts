@@ -160,6 +160,22 @@ export function keyForText(
   return hit ? hit.key : text.trim();
 }
 
+/**
+ * Stores typed text as typed, for fields that now take free text with a
+ * suggestion list (angle). Text that happens to be an old entry's key ("ots")
+ * is marked custom so it doesn't show as that entry's label.
+ */
+export function keyForTypedText(
+  field: ChoiceField,
+  text: string,
+  lists?: Project["settings"]["lists"]
+): string {
+  const value = text.trim();
+  if (!value) return "";
+  const clash = choiceEntries(field, lists).some((e) => e.key === value && e.label !== value);
+  return clash ? `${CUSTOM_PREFIX}${value}` : value;
+}
+
 /* ---------- Caption fields ---------- */
 
 /** Every field a caption can print, in the default print order. */

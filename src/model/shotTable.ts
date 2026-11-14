@@ -6,7 +6,7 @@ import { revisionLabel } from "./revisions";
 import { cameraNames, effectiveShot } from "./captions";
 import * as edits from "./edits";
 import { formatEighths, formatPageRange, shotLength } from "./pageLength";
-import { choiceEntries, choiceLabel, keyForText } from "./registry";
+import { choiceEntries, choiceLabel, keyForText, keyForTypedText } from "./registry";
 import { sceneNumber } from "./numbering";
 import { shotIdLabel } from "./shotList";
 import type { CameraRow, ListEntry, Project, Scene, Shot, ShotOwn } from "./types";
@@ -191,7 +191,7 @@ const ALL_COLUMNS: TableColumn[] = [
     label: "Angle",
     width: 7,
     read: (p, _s, shot) => ({ text: choiceLabel("angle", shot.angle, p.settings.lists) }),
-    write: (p, shot, text) => setField("angle", keyForText("angle", text, p.settings.lists))(shot.id),
+    write: (p, shot, text) => setField("angle", keyForTypedText("angle", text, p.settings.lists))(shot.id),
   },
   textColumn("subject", "Subject", 7),
   {

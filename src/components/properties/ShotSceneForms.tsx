@@ -9,7 +9,7 @@ import { cameraRowPrints, captionFieldText, printsField, printsSceneNumber, shot
 import { createShot } from "../../model/defaults";
 import * as edits from "../../model/edits";
 import { describeLength, formatEighths, formatPageRange, sceneLength, shotLength } from "../../model/pageLength";
-import { choiceEntries, choiceLabel, keyForText } from "../../model/registry";
+import { choiceEntries, choiceLabel, keyForTypedText } from "../../model/registry";
 import type {CameraRow, LineMark, MarkOwn, Project, Scene, Shot, ShotOwn, TextMark } from "../../model/types";
 import { breakUndoGroup, useProjectStore } from "../../stores/projectStore";
 import { usePrefsStore } from "../../stores/prefsStore";
@@ -410,7 +410,7 @@ export function ShotInspector({ project, found, asTab, mark, markId }: ShotInspe
                 label="Angle"
                 value={choiceLabel("angle", shown("angle"), lists)}
                 suggestions={suggestions("angle")}
-                onChange={(text) => write("angle", keyForText("angle", text, lists))}
+                onChange={(text) => write("angle", keyForTypedText("angle", text, lists))}
                 onBlur={relockMarkIfEmpty("angle")}
               />
             )}
