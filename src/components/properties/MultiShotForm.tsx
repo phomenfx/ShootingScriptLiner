@@ -1,6 +1,6 @@
 /*
  * Several shots selected in the Scenes list (Ctrl- or Shift-click): change
- * status, priority, shoot date, shot type or visibility for all of them at once.
+ * status, priority, scheduled date, shot type or visibility for all of them at once.
  */
 import * as commands from "../../commands";
 import { effectiveShot } from "../../model/captions";
@@ -59,11 +59,11 @@ export function MultiShotInspector({ project, ids }: { project: Project; ids: st
               onChange={(value) => value !== MIXED && updateAll(ids, (shot) => ({ ...shot, priority: value }))}
             />
           </Field>
-          <Field label="Shoot date" hint="Sets each shot's own date. Clear it to follow the scene again.">
+          <Field label="Scheduled date" hint="Sets each shot's own date. Clear it to follow the scene again.">
             <input
               className="pf-input"
               type="date"
-              aria-label="Shoot date of all"
+              aria-label="Scheduled date of all"
               value={date === MIXED ? "" : date}
               onChange={(e) => {
                 const value = e.target.value;

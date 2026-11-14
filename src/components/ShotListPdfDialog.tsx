@@ -167,7 +167,7 @@ export function ShotListPdfDialog() {
                 </label>
                 <label>
                   <input type="radio" checked={options.groupBy === "date"} onChange={() => set({ groupBy: "date" })} />
-                  By shoot date
+                  By scheduled date
                 </label>
                 <label>
                   <input type="checkbox" checked={options.newPagePerGroup} onChange={(ev) => set({ newPagePerGroup: ev.target.checked })} />

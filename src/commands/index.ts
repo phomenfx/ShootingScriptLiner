@@ -565,7 +565,7 @@ export async function exportLinedPdf(): Promise<void> {
       project(),
       linedPdfOptions()
     );
-    downloadBlob(new Blob([bytes], { type: "application/pdf" }), `${projectFileStem(project())}-lined.pdf`);
+    downloadBlob(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }), `${projectFileStem(project())}-lined.pdf`);
   } catch (error) {
     notify(
       error instanceof Error && (error.message.includes("font") || error.message.startsWith("Nothing to export"))
@@ -652,7 +652,7 @@ export async function exportShotListPdf(): Promise<void> {
     const options = shotListPdfOptions();
     const { buildShotListPdfBytes } = await import("../lib/shotListPdfBytes");
     const bytes = await buildShotListPdfBytes(project(), options, shotListPdfColumns(options), usePrefsStore.getState().tableColumnWidths, shotListPdfExtra());
-    downloadBlob(new Blob([bytes], { type: "application/pdf" }), `${projectFileStem(project())}-shot-list.pdf`);
+    downloadBlob(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "application/pdf" }), `${projectFileStem(project())}-shot-list.pdf`);
   } catch (error) {
     notify(errorText(error, "Could not export the shot list PDF."));
   }

@@ -64,7 +64,7 @@ export const IMPORT_FIELDS: { id: ImportField; label: string; names: string[] }[
   { id: "audio", label: "Audio", names: ["audio", "sound", "mic", "mics"] },
   { id: "fps", label: "FPS", names: ["fps", "frame rate", "framerate"] },
   { id: "sync", label: "Sync", names: ["sync", "sync sound"] },
-  { id: "date", label: "Date", names: ["day scheduled", "date", "shoot date", "scheduled", "schedule", "shoot day", "day"] },
+  { id: "date", label: "Scheduled date", names: ["scheduled date", "day scheduled", "date", "shoot date", "scheduled", "schedule", "shoot day", "day"] },
   { id: "notes", label: "Notes", names: ["notes", "note", "comments", "comment", "description"] },
   { id: "color", label: "Color", names: ["color", "colour"] },
 ];

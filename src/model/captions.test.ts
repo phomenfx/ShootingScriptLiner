@@ -218,7 +218,7 @@ describe("shot list CSV", () => {
       Lens: "85mm + 135mm; 50mm",
       Audio: "",
       Sync: "MOS",
-      "Day Scheduled": "2026-11-14",
+      "Scheduled date": "2026-11-14",
       Pages: "2–3",
       Eighths: "4/8",
       Lines: "2",

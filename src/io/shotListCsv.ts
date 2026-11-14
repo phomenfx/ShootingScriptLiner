@@ -36,7 +36,7 @@ export const SHOT_LIST_COLUMNS = [
   "Audio",
   "FPS",
   "Sync",
-  "Day Scheduled",
+  "Scheduled date",
   "Notes",
   "Pages",
   "Eighths",
@@ -82,7 +82,7 @@ export function buildShotListRows(project: Project): ShotListRow[] {
         Audio: multi(d.audio),
         FPS: d.fps ?? "",
         Sync: choiceLabel("sync", d.sync, lists),
-        "Day Scheduled": d.date ?? "",
+        "Scheduled date": d.date ?? "",
       });
       continue;
     }
@@ -114,7 +114,7 @@ export function buildShotListRows(project: Project): ShotListRow[] {
         Audio: multi(e.audio),
         FPS: e.fps ?? "",
         Sync: choiceLabel("sync", e.sync, lists),
-        "Day Scheduled": e.date ?? "",
+        "Scheduled date": e.date ?? "",
         Notes: shot.notes?.trim() ?? "",
         Pages: formatPageRange(length.pages).replace(/^pages? /, ""),
         Eighths: length.lineCount > 0 ? formatEighths(length.eighths) : "",

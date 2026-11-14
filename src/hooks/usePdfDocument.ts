@@ -38,7 +38,7 @@ export function usePdfDocument(file: File | null) {
         task = pdfjs.getDocument({ data });
         const doc = await task.promise;
         if (cancelled) {
-          void doc.destroy();
+          void doc.loadingTask.destroy();
           return;
         }
         setPdf(doc);
@@ -56,7 +56,7 @@ export function usePdfDocument(file: File | null) {
       cancelled = true;
       void task?.destroy();
       setPdf((prev) => {
-        if (prev) void prev.destroy();
+        if (prev) void prev.loadingTask.destroy();
         return null;
       });
     };

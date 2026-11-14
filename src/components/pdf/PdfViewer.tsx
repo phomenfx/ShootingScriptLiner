@@ -1,7 +1,10 @@
 import { useTouchGestures } from "../../hooks/useTouchGestures";
 import { FindBar } from "./FindBar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, File, Rows3 } from "lucide-react";
+
+/** The layout picker shows an icon instead of its name when the bar is narrow. */
+const LAYOUT_ICONS = { scroll: Rows3, single: File, spread: BookOpen } as const;
 import * as commands from "../../commands";
 import { useAnnotationKeyboard } from "../../hooks/useAnnotationKeyboard";
 import { usePdfDocument } from "../../hooks/usePdfDocument";
@@ -241,7 +244,11 @@ export function PdfViewer({ file }: Props) {
           triggerLabel="View"
           trigger={
             <>
-              <span>{VIEWER_LAYOUT_SHORT[layoutMode]}</span>
+              {(() => {
+                const Icon = LAYOUT_ICONS[layoutMode as keyof typeof LAYOUT_ICONS] ?? Rows3;
+                return <Icon className="script-view-icon" size={15} strokeWidth={1.75} aria-hidden="true" />;
+              })()}
+              <span className="script-view-label">{VIEWER_LAYOUT_SHORT[layoutMode]}</span>
               <ChevronDown size={12} strokeWidth={1.75} />
             </>
           }

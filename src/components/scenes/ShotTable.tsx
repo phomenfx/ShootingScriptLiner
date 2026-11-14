@@ -471,7 +471,7 @@ export function ShotTable() {
           </Dropdown.Portal>
         </Dropdown.Root>
         <span className="shot-table-spacer" />
-        <label className="table-group" title="Group rows by scene or by shoot date">
+        <label className="table-group" title="Group rows by scene or by scheduled date">
           <CalendarDays size={14} strokeWidth={1.75} aria-hidden="true" />
           <select aria-label="Group rows by" value={groupBy} onChange={(e) => usePrefsStore.getState().setTableGroupBy(e.target.value as "scene" | "date")}>
             <option value="scene">By scene</option>

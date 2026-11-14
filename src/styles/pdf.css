@@ -580,3 +580,50 @@
   bottom: auto;
   top: calc(100% + 6px);
 }
+
+/*
+ * Compact bottom bar: when the script area is narrow (a tablet with a panel
+ * open, say), everything stays on one row: the layout picker becomes an icon,
+ * the divider goes and the zoom field tightens. Wide windows are unchanged.
+ */
+.pdf-viewer {
+  container-type: inline-size;
+}
+.script-view-icon {
+  display: none;
+}
+@container (max-width: 560px) {
+  .script-bottombar {
+    flex-wrap: nowrap;
+    gap: 2px;
+    padding: 5px 6px;
+  }
+  .script-view-icon {
+    display: inline-block;
+  }
+  .script-view-label,
+  .script-bottombar .script-sep {
+    display: none;
+  }
+  .script-bottombar .script-view-picker {
+    width: auto;
+    min-width: 0;
+    gap: 2px;
+    padding: 0 6px;
+  }
+  .script-bottombar .script-zoom-field {
+    width: 3.25rem;
+  }
+  .script-bottombar .script-page-field {
+    min-width: 0;
+  }
+}
+
+/*
+ * Book and single-page view: the browser may scroll up and down beside the
+ * page, but sideways swipes are left to the app, which turns the page.
+ */
+.pdf-single-wrap,
+.pdf-spread-wrap {
+  touch-action: pan-y;
+}

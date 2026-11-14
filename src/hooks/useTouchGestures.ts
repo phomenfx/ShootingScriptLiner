@@ -8,6 +8,9 @@
  *   gesture is cancelled so nothing is drawn.
  * - A single finger is held back for a moment before the drawing layer sees
  *   it, so a second finger can still turn it into a pinch.
+ * - In Book and single-page view, a sideways swipe turns the page: two fingers
+ *   always, one finger when fingers scroll. When the page is wider than the
+ *   view (zoomed in), sideways drags scroll instead.
  */
 import { useEffect, type RefObject } from "react";
 import { usePrefsStore } from "../stores/prefsStore";
@@ -17,8 +20,10 @@ import { useSessionStore } from "../stores/sessionStore";
 const HOLD_MS = 90;
 /** Movement that ends the wait early (or starts a scroll). */
 const SLOP_PX = 6;
+/** A sideways swipe this long turns the page. */
+const SWIPE_PX = 70;
 
-type Touch = { id: number; x: number; y: number; startX: number; startY: number; target: EventTarget | null; state: "held" | "passed" | "pan" | "pinch"; timer?: number };
+type Touch = { id: number; x: number; y: number; startX: number; startY: number; target: EventTarget | null; state: "held" | "passed" | "pan" | "pinch" | "watch"; timer?: number };
 
 const synthetic = new WeakSet<Event>();
 
@@ -46,7 +51,7 @@ export function useTouchGestures(rootRef: RefObject<HTMLElement | null>) {
     const root = rootRef.current;
     if (!root) return;
     const touches = new Map<number, Touch>();
-    let pinch: { dist: number; zoom: number; midX: number; midY: number } | null = null;
+    let pinch: { dist: number; zoom: number; midX: number; midY: number; startMidX: number; startMidY: number } | null = null;
 
     const scroller = () => root.querySelector<HTMLElement>(".pdf-canvas-wrap");
     const onLayer = (target: EventTarget | null) => target instanceof Element && !!target.closest(".annotation-layer");
@@ -85,13 +90,16 @@ export function useTouchGestures(rootRef: RefObject<HTMLElement | null>) {
           other.state = "pinch";
         }
         const info = pinchInfo();
-        pinch = { ...info, zoom: usePrefsStore.getState().viewerZoomPercent };
+        pinch = { ...info, zoom: usePrefsStore.getState().viewerZoomPercent, startMidX: info.midX, startMidY: info.midY };
         e.stopPropagation();
         e.preventDefault();
         return;
       }
       if (!onLayer(e.target)) {
-        touches.delete(e.pointerId);
+        // Beside the page (margins, the gap in Book view): the browser scrolls as usual,
+        // and a sideways swipe still turns the page.
+        if (e.target instanceof Element && e.target.closest(".pdf-canvas-wrap")) t.state = "watch";
+        else touches.delete(e.pointerId);
         return;
       }
       e.stopPropagation();
@@ -110,7 +118,7 @@ export function useTouchGestures(rootRef: RefObject<HTMLElement | null>) {
       const dy = e.clientY - t.y;
       t.x = e.clientX;
       t.y = e.clientY;
-      if (t.state === "passed") return;
+      if (t.state === "passed" || t.state === "watch") return;
       e.stopPropagation();
       e.preventDefault();
       if (t.state === "pinch" && pinch && touches.size >= 2) {
@@ -136,20 +144,48 @@ export function useTouchGestures(rootRef: RefObject<HTMLElement | null>) {
       if (t.state === "held" && Math.hypot(t.x - t.startX, t.y - t.startY) > SLOP_PX) handOff(t);
     };
 
+    /** Turns the page for a sideways swipe in Book or single-page view. Returns whether it did. */
+    const turnPage = (dx: number, dy: number): boolean => {
+      if (usePrefsStore.getState().viewerLayoutMode === "scroll") return false;
+      if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return false;
+      const wrap = scroller();
+      if (wrap && wrap.scrollWidth > wrap.clientWidth + 1) return false; // zoomed in: sideways is scrolling
+      // Swipe left for the next page, right for the previous, as with paper.
+      const button = root.querySelector<HTMLButtonElement>(`button[title="${dx < 0 ? "Next page" : "Previous page"}"]`);
+      if (!button || button.disabled) return false;
+      button.click();
+      return true;
+    };
+
     const onUp = (e: PointerEvent) => {
       if (synthetic.has(e)) return;
       const t = touches.get(e.pointerId);
       if (!t) return;
+      // Two fingers lifting after moving sideways together (barely pinching): turn the page.
+      if (pinch && touches.size === 2) {
+        const info = pinchInfo();
+        const dx = info.midX - pinch.startMidX;
+        const dy = info.midY - pinch.startMidY;
+        if (pinch.dist > 0 && Math.abs(info.dist / pinch.dist - 1) < 0.2 && turnPage(dx, dy)) {
+          usePrefsStore.getState().setViewerZoomPercent(pinch.zoom); // undo the slight zoom on the way
+        }
+      }
       touches.delete(e.pointerId);
       window.clearTimeout(t.timer);
       if (touches.size < 2) pinch = null;
       if (t.state === "passed") return;
+      if (t.state === "watch") {
+        turnPage(t.x - t.startX, t.y - t.startY);
+        return;
+      }
       e.stopPropagation();
       const tapped = Math.hypot(t.x - t.startX, t.y - t.startY) <= SLOP_PX;
       if (t.state === "held" && e.type === "pointerup") {
         // A quick tap: the drawing layer gets it whole.
         handOff(t);
         redispatch(t.target, "pointerup", t);
+      } else if (t.state === "pan" && e.type === "pointerup" && turnPage(t.x - t.startX, t.y - t.startY)) {
+        // One finger swiping sideways turned the page.
       } else if (t.state === "pan" && tapped && e.type === "pointerup" && useSessionStore.getState().activeTool === "select") {
         // Scrolling fingers still select with a tap.
         redispatch(t.target, "pointerdown", t);

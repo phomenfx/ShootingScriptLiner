@@ -52,7 +52,7 @@ export async function readScriptLines(file: File): Promise<string[][]> {
     }
     return pages;
   } finally {
-    void doc.destroy();
+    void doc.loadingTask.destroy();
   }
 }
 
@@ -87,6 +87,6 @@ export async function readScriptLayout(file: File): Promise<PageText[]> {
     }
     return pages;
   } finally {
-    void doc.destroy();
+    void doc.loadingTask.destroy();
   }
 }

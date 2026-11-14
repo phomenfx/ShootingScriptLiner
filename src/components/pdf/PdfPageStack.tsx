@@ -69,14 +69,13 @@ export function PdfPageStack({
         if (cancelled) return;
 
         const viewport = page.getViewport({ scale });
-        const ctx = canvas.getContext("2d");
-        if (!ctx || cancelled) return;
+        if (cancelled) return;
 
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         setSize({ width: viewport.width, height: viewport.height });
 
-        const task = page.render({ canvasContext: ctx, viewport });
+        const task = page.render({ canvas, viewport });
         renderTaskRef.current = task;
         await task.promise;
         if (cancelled) return;
